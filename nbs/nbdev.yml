@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "nicl"
+  site-url: "https://IntraClusterLight.github.io/nicl"
+  description: "New Nottingham ICL code"
+  repo-branch: main
+  repo-url: "https://github.com/IntraClusterLight/nicl"
