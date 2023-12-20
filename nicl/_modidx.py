@@ -5,4 +5,6 @@ d = { 'settings': { 'branch': 'main',
                 'doc_host': 'https://IntraClusterLight.github.io',
                 'git_url': 'https://github.com/IntraClusterLight/nicl',
                 'lib_path': 'nicl'},
-  'syms': {'nicl.core': {'nicl.core.foo': ('core.html#foo', 'nicl/core.py')}}}
+  'syms': { 'nicl.core': {'nicl.core.foo': ('core.html#foo', 'nicl/core.py')},
+            'nicl.main': { 'nicl.main.foo': ('main.html#foo', 'nicl/main.py'),
+                           'nicl.main.say_hello': ('main.html#say_hello', 'nicl/main.py')}}}
