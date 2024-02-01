@@ -10,7 +10,7 @@ import astropy.cosmology.units as cu
 import astropy.units as u
 from astropy.nddata import CCDData
 from astropy.table import QTable
-from importlib_resources import files
+from importlib.resources import files
 
 from ..utilities import physical_to_angular
 
