@@ -3,7 +3,11 @@ website:
     contents:
       - index.ipynb
       - 00_main.ipynb
+      - 10_filter.ipynb
+      - 11_measure.ipynb
       - section: hsc
         contents:
           - hsc/01_hsc_preparation.ipynb
-          - hsc/02_hsc_analysis.ipynb
+          - hsc/02_hsc_masking.ipynb
+          - hsc/03_hsc_measurement.ipynb
+          - hsc/04_hsc_analysis.ipynb

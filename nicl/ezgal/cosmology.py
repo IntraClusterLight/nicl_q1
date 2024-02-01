@@ -3,7 +3,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import sys, math
 import scipy.integrate as integrate
-from scipy import inf
+from numpy import inf
 import numpy as num
 
 __author__ = 'becker@astro.washington.edu (Andrew Becker)'
