@@ -59,9 +59,11 @@ def sampled_median_filter(
         data = np.where(~mask, data, np.nan)
     if nsample is None:
         nsample = 10 * size
-    nsample = min(nsample, size**2)
     weight = filter_weights(size, gaussian_sigma)
-    sample = np.random.choice(np.arange(size**2), nsample, replace=False, p=weight)
+    nvalid = (weight > 0).sum()
+    nsample = min(nsample, nvalid)
+    replace = gaussian_sigma is not None
+    sample = np.random.choice(np.arange(size**2), nsample, replace=replace, p=weight)
     footprint = np.zeros((size, size), dtype=bool)
     footprint.flat[sample] = True
     if allow_nans:
