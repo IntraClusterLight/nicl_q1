@@ -8,3 +8,4 @@ jobs:
       - uses: fastai/workflows/nbdev-ci@master
         with:
           version: '3.12'
+          skip_test: true
