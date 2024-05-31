@@ -7,6 +7,11 @@ __all__ = ['sampled_mad_filter', 'filter_weights', 'sampled_median_filter']
 from functools import partial
 
 import numpy as np
+import xarray as xr
+import dask.array as da
+import warnings
+from astropy.wcs import WCS
+from dask_image.ndfilters import median_filter as dask_median_filter
 from scipy.ndimage import generic_filter, median_filter
 
 # %% ../nbs/11_filter.ipynb 6
@@ -32,49 +37,130 @@ def filter_weights(
     return weight.flatten()
 
 # %% ../nbs/11_filter.ipynb 9
+def _sign_checkerboard(shape):
+    return 1 - 2 * (np.indices(shape).sum(axis=0) % 2)
+
+
+def _nan_to_inf(x):
+    substitutes = np.inf * _sign_checkerboard(x.shape)
+    x = x.where(~x.isnull(), substitutes)
+    return x
+
+
+def _inf_to_nan(x):
+    return x.where(np.isfinite(x))
+
+
 def sampled_median_filter(
-    data: np.ndarray,  # the 2D array of data to filter
-    size: int,  # diameter of the kernel
-    nsample: int = None,  # the number of samples
+    data: np.ndarray | xr.DataArray,  # the 2D array of data to filter
+    size: int,  # diameter of the filter kernel
+    nsample: int | None = None,  # the number of samples in the sparse median filter
     gaussian_sigma: float | None = None,  # optional Gaussian standard deviation
-    mask: np.ndarray | None = None,  # optional 2D mask to apply to `data`
+    coarse_factor: int | None = None,  # the factor by which to initially coarsen the image
+    coarse_samples=25,  # the sampling rate for the coarsened image, if `coarse_factor=None`
     mode="nearest",  # the mode passed to the median filter
-    allow_nans=False,  # ignore NaNs in `data`
+    mask: np.ndarray | None = None,  # optional 2D mask to apply to `data`
+    allow_nans=True,  # ignore NaNs in `data`
     return_mad=False,  # additionally return the MAD
-) -> np.ndarray:  # the filtered data
-    """Perform median filtering using a randomly-sampled circular, potentially Gaussian, footprint.
+    keep_coarse=False,
+    verbose=True,
+) -> np.ndarray | xr.DataArray:  # the filtered data
+    """Perform median filtering in an efficient, but reduced accuracy, method.
+    
+    For large kernels, the image is first 'coarsened', by calculating the median in square blocks of pixels.
+    The resulting image is then median filtered using a circular footprint, which may optionally
+    be randomly-sampled and centrally weighted by taking the sampling probablity as a Gaussian distribution.
 
-    Optionally also return the median-absolute-deviation (MAD), scaled to match the standard deviation for Gaussian noise.
+    If `data` is an `xarray.DataArray`, then the filtering is performed using dask, and the returned object is an
+    `xarray.DataArray`, with lazy computation. Otherwise, numpy is used and the returned object is a `numpy.ndarray`.
 
-    If `gaussian_sigma` is specified, the samples are weighted by a Gaussian profile, otherwise the filter is a tophat.
+    If `gaussian_sigma` is specified, the samples are weighted by a Gaussian profile, otherwise the filter is a
+    tophat. When using a Gaussian profile,  the number of samples, `nsample`, defaults to `10 * size`, clipped to a
+    minimum of 100 and a maximum of `size**2`. Otherwise, is `nsample` is not specifed, the entire tophat is used,
+    without random sampling.
 
-    The number of samples, `nsample`, defaults to `10 * size` and is clipped to a maximum of `size**2`.
-
-    If `allow_nans` is False, then NaNs in `data` are propagated, otherwise they are ignored (which is slower).
+    If the `coarse_factor` is not specified, it is chosen such that the kernel `size` or 6 times the
+    `gaussian_sigma`, whichever is smaller, is sampled by at least `coarse_samples` coarsened pixels.
 
     Where `mask` is True, `data` is ignored. Specifying a mask implies `allow_nans = True`.
+
+    If `allow_nans` is False, then NaNs in `data` are propagated, otherwise they are ignored; for
+    efficiency, this is achieved by setting them to infinity with a checkerboard sign pattern.
+
+    Optionally also return the median-absolute-deviation (MAD), scaled to match the standard deviation for Gaussian noise.
     """
+    use_dask = isinstance(data, xr.DataArray) and isinstance(data.data, da.Array)
+    if not use_dask:
+        data = xr.DataArray(data)
+    dims = data.dims
+    original_dims = {d: data[d] for d in dims}
+    data = data.assign_coords(original_dims)
     if mask is not None:
         allow_nans = True
-        data = np.where(~mask, data, np.nan)
-    if nsample is None:
-        nsample = 10 * size
-    weight = filter_weights(size, gaussian_sigma)
-    nvalid = (weight > 0).sum()
-    nsample = min(nsample, nvalid)
-    replace = gaussian_sigma is not None
-    sample = np.random.choice(np.arange(size**2), nsample, replace=replace, p=weight)
-    footprint = np.zeros((size, size), dtype=bool)
-    footprint.flat[sample] = True
+        data = data.where(~mask)
     if allow_nans:
-        filt = partial(generic_filter, function=np.nanmedian)
+        # using the generic filter with nanmedian is slow and runs into problems with dask
+        # this is a workaround by replacing nans with a grid of positive and negative infinity
+        data = _nan_to_inf(data)
+    if coarse_factor is None:
+        size_scale = size if gaussian_sigma is None else min(6 * gaussian_sigma, size)
+        coarsening = max(size_scale // coarse_samples, 1)
     else:
-        filt = median_filter
-    median = filt(data, footprint=footprint, mode=mode)
+        coarsening = coarse_factor
+    coarse_data = data
+    if coarsening > 1:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+            with np.errstate(invalid='ignore'):
+                coarse_data = data.coarsen({d: coarsening for d in dims}, boundary="pad").median()
+        if allow_nans:
+            coarse_data = _nan_to_inf(coarse_data)
+    coarse_size = round(size / coarsening)
+    coarse_gaussian_sigma = None if gaussian_sigma is None else gaussian_sigma / coarsening
+    weight = filter_weights(coarse_size, coarse_gaussian_sigma)
+    nvalid = (weight > 0).sum()
+    if nsample is None:
+        if gaussian_sigma is not None:
+            nsample = max(100, 10 * coarse_size)
+        else:            
+            nsample = nvalid
+    if nsample < nvalid:
+        sample = np.random.choice(np.arange(coarse_size**2), nsample, replace=False, p=weight)
+    else:
+        sample = weight > 0
+    footprint = np.zeros((coarse_size, coarse_size), dtype=bool)
+    footprint.flat[sample] = True
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+        if use_dask:
+            median = xr.DataArray(dask_median_filter(coarse_data.data, footprint=footprint, mode=mode),
+                                  coords=coarse_data.coords, dims=coarse_data.dims, attrs=coarse_data.attrs)
+        else:
+            median = xr.apply_ufunc(median_filter, coarse_data, kwargs=dict(footprint=footprint, mode=mode),
+                                    keep_attrs=True)
+    median = _inf_to_nan(median)
+    if coarsening > 1:
+        if keep_coarse:
+            if "wcs" in median.attrs:
+                wcs = WCS(median.wcs)[::coarsening, ::coarsening]
+                median = median.assign_attrs(wcs=wcs.to_header_string())
+        else:
+            median = median.pad({d: 1 for d in dims}, mode="reflect", reflect_type="odd")
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+                with np.errstate(invalid='ignore'):
+                    median = median.interp(original_dims, assume_sorted=True,
+                                           method='linear', kwargs=dict(bounds_error=False, fill_value=None))
     if return_mad:
         absolute_deviation = np.abs(data - median)
-        mad = filt(absolute_deviation, footprint=footprint, mode=mode)
+        mad = sampled_median_filter(data=absolute_deviation, size=size, nsample=nsample,
+                                    gaussian_sigma=gaussian_sigma, coarse_factor=coarse_factor,
+                                    coarse_samples=coarse_samples, mode=mode, mask=mask,
+                                    allow_nans=allow_nans, return_mad=False)
         mad *= 1.4826
+    if not use_dask:
+        median = median.to_numpy()
+    if return_mad:    
         return median, mad
     else:
         return median
