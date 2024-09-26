@@ -1,0 +1,25 @@
+name: icl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - astropy
+  - numpy
+  - photutils
+  - nbdev
+  - ruff
+  - nbqa
+  - pre-commit
+  - sigfig
+  - pointpats
+  - pyarrow
+  - astroquery
+  - fsspec
+  - aiohttp
+  - requests
+  - dask-image
+  - xarray
+  - zarr
+  - pymc
+  - reproject
+prefix: /Users/spb/anaconda/envs/icl
