@@ -3,11 +3,32 @@ website:
     contents:
       - index.ipynb
       - 00_main.ipynb
-      - 10_filter.ipynb
-      - 11_measure.ipynb
+      - 10_utilities.ipynb
+      - 11_filter.ipynb
+      - 12_measure.ipynb
+      - section: euclid
+        contents:
+          - euclid/data_access.ipynb
+          - section: ero
+            contents:
+              - section: abell
+                contents:
+                  - euclid/ero/abell/A2390_cirrus.ipynb
+              - section: gc
+                contents:
+                  - euclid/ero/gc/GCLF.ipynb
+          - section: psf
+            contents:
+              - euclid/psf/EUCLID_ERO_PSF.ipynb
+              - euclid/psf/EUCLID_SIM_PSF.ipynb
       - section: hsc
         contents:
           - hsc/01_hsc_preparation.ipynb
           - hsc/02_hsc_masking.ipynb
           - hsc/03_hsc_measurement.ipynb
-          - hsc/04_hsc_analysis.ipynb
+          - hsc/04_hsc_galaxies.ipynb
+          - hsc/05_hsc_analysis.ipynb
+      - section: other
+        contents:
+          - other/redshifting_check.ipynb
+          - other/sky_background_error_estimates.ipynb
