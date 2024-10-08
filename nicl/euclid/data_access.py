@@ -3,7 +3,7 @@
 # %% auto 0
 __all__ = ['DataAccess']
 
-# %% ../../nbs/euclid/data_access.ipynb 2
+# %% ../../nbs/euclid/data_access.ipynb 3
 class DataAccess:
     """Provides access to Euclid data."""
     
