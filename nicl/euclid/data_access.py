@@ -28,14 +28,22 @@ class DataAccess:
     ):
         """Create an object for accessing data and log in to the ESA server."""
         if esa_username is None:
-            esa_username = getpass(prompt="ESA User:")
+            self.esa_username = getpass(prompt="ESA User:")
+        else:
+            self.esa_username = esa_username
         if esa_password is None:
-            esa_password = getpass(prompt="ESA Password:")
+            self.esa_password = getpass(prompt="ESA Password:")
+        else:
+            self.esa_password = esa_password
         self.dry_run = dry_run
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
-        self.tap.login(user=esa_username, password=esa_password)
-        self.data_tap.login(user=esa_username, password=esa_password)
+    
+    def tap_login(self):
+        self.tap.login(user=self.esa_username, password=self.esa_password)
+    
+    def data_login(self):
+        self.data_tap.login(user=self.esa_username, password=self.esa_password)
 
     def find_observations_for_target(
         self,
@@ -50,6 +58,7 @@ class DataAccess:
                     WHERE (product_type like '%Stacked%')
                     AND ((observation_stack.fov IS NOT NULL AND CONTAINS(CIRCLE('ICRS',{ra},{dec},{radius}),observation_stack.fov)=1))
                     ORDER BY observation_id ASC"""
+        self.tap_login()
         job = self.tap.launch_job(query)
         results = job.get_results()
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
@@ -74,6 +83,7 @@ class DataAccess:
                     {instrument_condition}
                     {filter_condition}
                     AND observation_id = '{obs_id}'"""
+        self.tap_login()
         job = self.tap.launch_job(query)
         file_info = job.get_results()
         return file_info
@@ -106,6 +116,7 @@ class DataAccess:
         params_dict.update(FILE_NAME=filename)
         outpath = os.path.expanduser(outpath)
         outfn = os.path.join(outpath, filename)
+        self.data_login()
         if not self.dry_run:
             self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
 
