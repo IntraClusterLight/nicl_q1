@@ -50,13 +50,16 @@ class DataAccess:
         ra,  # RA of the target, in decimal degrees
         dec,  # Dec of the target, in decimal degrees
         radius=1 / 60,  # radius of the target, in decimal degrees
+        fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
     ):  # returns a list of observation_ids
-        """Obtain a list of obs_ids for observations that entirely contain the specified target region."""
+        """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
+        criterion = f"CONTAINS" if fully_contained else "INTERSECTS"
         query = f"""SELECT observation_stack.observation_id
                     FROM sedm.observation_stack
                     AS observation_stack
                     WHERE (product_type like '%Stacked%')
-                    AND ((observation_stack.fov IS NOT NULL AND CONTAINS(CIRCLE('ICRS',{ra},{dec},{radius}),observation_stack.fov)=1))
+                    AND (release_name not like 'CALBLOCK%')
+                    AND (observation_stack.fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),observation_stack.fov)=1)
                     ORDER BY observation_id ASC"""
         self.tap_login()
         job = self.tap.launch_job(query)
@@ -82,7 +85,7 @@ class DataAccess:
                     WHERE (product_type like '%Calibrated%')
                     {instrument_condition}
                     {filter_condition}
-                    AND observation_id = '{obs_id}'"""
+                    AND (observation_id = '{obs_id}')"""
         self.tap_login()
         job = self.tap.launch_job(query)
         file_info = job.get_results()
@@ -140,6 +143,7 @@ class DataAccess:
         ra,  # RA of the target, in decimal degrees
         dec,  # Dec of the target, in decimal degrees
         radius=1 / 60,  # radius of the target, in decimal degrees
+        fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
         outpath="./",  # the folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
@@ -147,7 +151,7 @@ class DataAccess:
     ):  #  returns a table of file information
         """Download all calibrated files for Euclid observations covering a target, optionally restricted by instrument or filter."""
         file_info = []
-        obs_ids = self.find_observations_for_target(ra, dec, radius)
+        obs_ids = self.find_observations_for_target(ra, dec, radius, fully_contained=fully_contained)
         for obs_id in obs_ids:
             if verbose:
                 print(f"Downloading files for observation id {obs_id}")
