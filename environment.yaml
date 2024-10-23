@@ -9,6 +9,7 @@ dependencies:
   - photutils
   - nbdev
   - ruff
+  - nbdime
   - nbqa
   - pre-commit
   - sigfig
