@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask', 'get_persistence_mask', 'get_invalid_mask',
-           'get_rms', 'fits_append']
+           'get_rms', 'fits_append', 'remove_if_necessary']
 
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
@@ -27,7 +27,9 @@ def get_nisp_images_for_observation(
     obs_id = int(obs_id)
     for i in range(obs_id - n_prior, obs_id + n_after + 1):
         if recursive:
-            fns = glob(os.path.join(path, "**", f"EUC_NIR*-{i}-*Z.fits"), recursive=True)
+            fns = glob(
+                os.path.join(path, "**", f"EUC_NIR*-{i}-*Z.fits"), recursive=True
+            )
         else:
             fns = glob(os.path.join(path, f"EUC_NIR*-{i}-*Z.fits"))
         if len(fns) == 0:
@@ -35,7 +37,7 @@ def get_nisp_images_for_observation(
         if len(fns) < 12:
             print(f"Missing some files for observation id {i}.")
         elif len(fns) > 12:
-            print(f"Found too many files for observation id {i}.")        
+            print(f"Found too many files for observation id {i}.")
         for fn in fns:
             with fits.open(fn) as f:
                 h = f[0].header
@@ -53,7 +55,7 @@ def get_primary_header(
     fns,  # an iterable of image filenames
 ):
     """Create a primary header from the provided list of files.
-    
+
     The returned header contains all the entries from the files' primary headers
     that have consistent values across all the files.
     """
@@ -78,26 +80,37 @@ def get_dq_mask(fn, extname, maskbits):
     extname = extname.replace("SCI", "DQ")
     dq = fits.getdata(fn, extname=extname)
     maskbits = np.atleast_1d(maskbits)
-    mask = dq & 2**maskbits[0] > 0
+    mask = dq & 2 ** maskbits[0] > 0
     for b in maskbits[1:]:
         mask |= dq & 2**b > 0
     return mask
 
+
 def get_persistence_mask(fn, extname):
     return get_dq_mask(fn, extname, [13])
-    
+
+
 def get_invalid_mask(fn, extname):
     return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16])
+
 
 def get_rms(fn, extname):
     extname = extname.replace("SCI", "RMS")
     rms = fits.getdata(fn, extname=extname)
     return rms
 
-def fits_append(fn, data, ext, primary_header):
-    exthdr = fits.Header([("EXTNAME", ext)])
+
+def fits_append(fn, data, ext, primary_header, exthdr=None):
+    if exthdr is None:
+        exthdr = fits.Header([("EXTNAME", ext)])
+    else:
+        exthdr.update(EXTNAME=ext)
     if not os.path.exists(fn):
         fits.append(fn, None, primary_header)
     fits.append(fn, data, exthdr)
 
-
+# %% ../../nbs/euclid/utilities.ipynb 6
+def remove_if_necessary(path, glob):
+    fns = glob.glob(os.path.join(path, glob))
+    for fn in fns:
+        os.remove(fn)
