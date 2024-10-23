@@ -38,10 +38,10 @@ class DataAccess:
         self.dry_run = dry_run
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
-    
+
     def tap_login(self):
         self.tap.login(user=self.esa_username, password=self.esa_password)
-    
+
     def data_login(self):
         self.data_tap.login(user=self.esa_username, password=self.esa_password)
 
@@ -53,7 +53,7 @@ class DataAccess:
         fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
     ):  # returns a list of observation_ids
         """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
-        criterion = f"CONTAINS" if fully_contained else "INTERSECTS"
+        criterion = "CONTAINS" if fully_contained else "INTERSECTS"
         query = f"""SELECT observation_stack.observation_id
                     FROM sedm.observation_stack
                     AS observation_stack
@@ -151,7 +151,9 @@ class DataAccess:
     ):  #  returns a table of file information
         """Download all calibrated files for Euclid observations covering a target, optionally restricted by instrument or filter."""
         file_info = []
-        obs_ids = self.find_observations_for_target(ra, dec, radius, fully_contained=fully_contained)
+        obs_ids = self.find_observations_for_target(
+            ra, dec, radius, fully_contained=fully_contained
+        )
         for obs_id in obs_ids:
             if verbose:
                 print(f"Downloading files for observation id {obs_id}")
