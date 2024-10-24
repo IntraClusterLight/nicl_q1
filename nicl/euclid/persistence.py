@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['estimate_persistence_decay', 'correct_persistence']
 
-# %% ../../nbs/euclid/persistence.ipynb 3
+# %% ../../nbs/euclid/persistence.ipynb 4
 import numpy as np
 import os
 from astropy.io import fits
@@ -20,7 +20,7 @@ from nicl.euclid.utilities import (
     remove_if_necessary,
 )
 
-# %% ../../nbs/euclid/persistence.ipynb 12
+# %% ../../nbs/euclid/persistence.ipynb 13
 def estimate_persistence_decay(
     minimum_images,  # the minimum estimates of the persistence
     dt_lp_images,  # the times since the last persistence feature appeared
@@ -39,7 +39,7 @@ def estimate_persistence_decay(
         else:
             mean_img += img
     mean_img /= len(minimum_images)
-    obs_id = np.median(obs_ids)
+    obs_id = int(np.median(obs_ids))
     bkg = median_filter(mean_img, 25)
     mean_img_bkg_sub = mean_img - bkg
 
@@ -57,7 +57,7 @@ def estimate_persistence_decay(
         npixels=25,
         nlevels=32,
         contrast=0.1,
-        progress_bar=True,
+        progress_bar=False,
     )
     if debug:
         out_fn = os.path.join(outpath, f"segm_{obs_id}.fits")
@@ -84,33 +84,38 @@ def estimate_persistence_decay(
     for i in range(segm_dt_lp.shape[1]):
         x = segm_dt_lp[:, i]
         y = segm_log_fluxes[:, i]
-        decay_fits[i], clipped[i] = fit_persistence_decay(x, y)
+        if (~np.isnan(x)).sum() > 5:
+            decay_fits[i], clipped[i] = fit_persistence_decay(x, y)
     slope, intercept = np.transpose(
         [(d.slope.value, d.intercept.value) for d in decay_fits.values()]
     )
 
-    if debug:
+    if True:
         brightest = segm_fluxes.max(axis=0).argsort()[-10:]
         x = np.array([0.0, 0.1])
         fig, ax = plt.subplots(2)
         for b in brightest:
-            p = decay_fits[b]
-            points = ax[0].plot(segm_dt_lp[:, b], segm_log_fluxes[:, b], ".")
-            ax[0].plot(x, p(x), "-", color=points[0].get_color())
+            if b in decay_fits:
+                p = decay_fits[b]
+                points = ax[0].plot(segm_dt_lp[:, b], segm_log_fluxes[:, b], ".")
+                ax[0].plot(x, p(x), "-", color=points[0].get_color())
         ax[0].set_xlim(xmin=-0.02, xmax=0.12)
         ax[0].set_ylim(3, 6)
         ax[0].set_xlabel("time since pers. flag")
         ax[0].set_ylabel("$\\log_10$ flux in pers. feature")
         ax[1].hist(slope, bins=25, range=(-20, 5))
-        ax[0].set_xlabel("log slope of pers. decay")
+        ax[1].set_xlabel("log slope of pers. decay")
+        fig.suptitle(f"{obs_id} {ext}")
         plt.tight_layout()
         out_fn = os.path.join(outpath, f"decay_{obs_id}_{ext}.pdf")
         fig.savefig(out_fn)
+        plt.close()
 
     average_slope = np.nanmedian(slope)
-    return average_slope
+    n_features = (~np.isnan(slope)).sum()
+    return average_slope, n_features
 
-# %% ../../nbs/euclid/persistence.ipynb 13
+# %% ../../nbs/euclid/persistence.ipynb 14
 def correct_persistence(
     obs_id,
     path,
@@ -119,7 +124,7 @@ def correct_persistence(
     estimate_decay=False,
     use_estimated_decay=False,
     debug=False,
-    assumed_decay_slope=9,
+    assumed_decay_slope=8,
 ):
     if use_estimated_decay:
         estimate_decay = True
@@ -140,6 +145,8 @@ def correct_persistence(
     if os.path.isdir(outpath):
         for img_name in ("min", "lp", "dt_lp", "dt", "img", "corr", "pers"):
             remove_if_necessary(outpath, f"{img_name}_{obs_id}*.fits")
+        remove_if_necessary(outpath, f"seg*_{obs_id}.fits")
+        remove_if_necessary(outpath, f"decay*_{obs_id}*.pdf")
         for fn in image_info.filename:
             remove_if_necessary(outpath, os.path.basename(fn))
     else:
@@ -156,10 +163,17 @@ def correct_persistence(
             outpath=outpath,
         )
         if estimate_decay:
-            slope = estimate_persistence_decay(
-                minimum_images, dt_lp_images, ext=ext, debug=debug, primary_header=primary_header, outpath=outpath
+            slope, n_features = estimate_persistence_decay(
+                minimum_images,
+                dt_lp_images,
+                ext=ext,
+                debug=debug,
+                primary_header=primary_header,
+                outpath=outpath,
             )
-            print(f"Estimated persistence decay slope ({ext}): {slope:.2f}")
+            print(
+                f"Estimated persistence decay slope from {n_features} features ({ext}): {slope:.2f}"
+            )
             if not use_estimated_decay:
                 slope = assumed_decay_slope
         else:
