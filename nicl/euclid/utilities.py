@@ -9,6 +9,7 @@ __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
 
+import numpy as np
 import pandas as pd
 
 from astropy.io import fits
@@ -21,6 +22,7 @@ def get_nisp_images_for_observation(
     n_after=0,  # number of subsequent observations to include
     path="~/data/euclid",  # base path to search
     recursive=False,  # search recursively
+    download=True,  # attempt to download if not found
 ):
     """Find NISP images for the specified obs_id and optionally n_prior and n_after observations."""
     info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[])
@@ -110,7 +112,7 @@ def fits_append(fn, data, ext, primary_header, exthdr=None):
     fits.append(fn, data, exthdr)
 
 # %% ../../nbs/euclid/utilities.ipynb 6
-def remove_if_necessary(path, glob):
-    fns = glob.glob(os.path.join(path, glob))
+def remove_if_necessary(path, fnglob):
+    fns = glob(os.path.join(path, fnglob))
     for fn in fns:
         os.remove(fn)

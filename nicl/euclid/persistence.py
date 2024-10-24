@@ -95,14 +95,15 @@ def estimate_persistence_decay(
         fig, ax = plt.subplots(2)
         for b in brightest:
             p = decay_fits[b]
-            points = plt.plot(segm_dt_lp[:, b], segm_log_fluxes[:, b], ".")
+            points = ax[0].plot(segm_dt_lp[:, b], segm_log_fluxes[:, b], ".")
             ax[0].plot(x, p(x), "-", color=points[0].get_color())
-        ax[0].xlim(xmin=-0.02, xmax=0.12)
-        ax[0].ylim(2.5, 5)
-        ax[0].set_xlabel("time since persistence flagged")
-        ax[0].set_ylabel("$\\log_10$ flux in persistence feature")
-        ax[1].hist(slope, bins=100, range=(-20, 10))
-        ax[0].set_xlabel("log slope of persistence decay")
+        ax[0].set_xlim(xmin=-0.02, xmax=0.12)
+        ax[0].set_ylim(3, 6)
+        ax[0].set_xlabel("time since pers. flag")
+        ax[0].set_ylabel("$\\log_10$ flux in pers. feature")
+        ax[1].hist(slope, bins=25, range=(-20, 5))
+        ax[0].set_xlabel("log slope of pers. decay")
+        plt.tight_layout()
         out_fn = os.path.join(outpath, f"decay_{obs_id}_{ext}.pdf")
         fig.savefig(out_fn)
 
@@ -145,6 +146,7 @@ def correct_persistence(
         os.makedirs(outpath)
     obs_image_info = image_info[image_info.obs_id == obs_id]
     for ext in sci_exts:
+        print(ext)
         minimum_images, dt_lp_images, dt_images = calc_rolling_minimum(
             obs_id,
             image_info,
@@ -155,7 +157,7 @@ def correct_persistence(
         )
         if estimate_decay:
             slope = estimate_persistence_decay(
-                minimum_images, dt_lp_images, ext=ext, debug=debug, outpath=outpath
+                minimum_images, dt_lp_images, ext=ext, debug=debug, primary_header=primary_header, outpath=outpath
             )
             print(f"Estimated persistence decay slope ({ext}): {slope:.2f}")
             if not use_estimated_decay:
@@ -172,5 +174,5 @@ def correct_persistence(
             decay_slope=slope,
         )
         apply_persistence_correction(
-            obs_image_info, persistence_images, outpath=outpath
+            obs_image_info, persistence_images, ext=ext, outpath=outpath
         )
