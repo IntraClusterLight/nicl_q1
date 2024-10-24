@@ -9,6 +9,10 @@ website:
       - section: euclid
         contents:
           - euclid/data_access.ipynb
+          - euclid/test.ipynb
+          - section: Q1
+            contents:
+              - euclid/Q1/persistence.ipynb
           - section: ero
             contents:
               - section: abell
@@ -21,6 +25,7 @@ website:
             contents:
               - euclid/psf/EUCLID_ERO_PSF.ipynb
               - euclid/psf/EUCLID_SIM_PSF.ipynb
+        href: euclid/index.ipynb
       - section: hsc
         contents:
           - hsc/01_hsc_preparation.ipynb
