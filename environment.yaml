@@ -24,4 +24,5 @@ dependencies:
   - zarr
   - pymc
   - reproject
+  - setuptools
 prefix: /Users/spb/anaconda/envs/icl
