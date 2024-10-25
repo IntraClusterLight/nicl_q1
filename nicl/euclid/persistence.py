@@ -39,7 +39,7 @@ def forward_fill(arr, axis=-1):
     idx = np.indices(arr.shape)
     idx[axis][mask] = 0
     np.maximum.accumulate(idx[axis], axis=axis, out=idx[axis])
-    out = arr[*idx]
+    out = arr[tuple(idx)]
     return out
 
 # %% ../../nbs/euclid/persistence.ipynb 6
