@@ -374,7 +374,7 @@ def correct_persistence(
             raise FileExistsError("outpath cannot be the same as the path")
     else:
         outpath = os.path.join(path, "persistence")
-    image_info = get_nisp_images_for_observation(2070, n_prior=1, n_after=1, path=path)
+    image_info = get_nisp_images_for_observation(obs_id, n_prior=1, n_after=1, path=path)
     primary_header = get_primary_header(image_info.filename) if debug else None
     if detector is None:
         dets = [f"DET{i}{j}" for j in range(1, 5) for i in range(1, 5)]
