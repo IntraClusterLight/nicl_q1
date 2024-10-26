@@ -241,11 +241,16 @@ def apply_persistence_correction(
         fn = target["filename"]
         primary_header = fits.getheader(fn, 0)
         pers = persistence_images[(target["obs_id"], target["dithobs"])]
-        extension_header = fits.getheader(fn, ext)
+        hdr = fits.getheader(fn, extname=ext)
         img = fits.getdata(fn, extname=ext)
         img -= pers
         outfn = os.path.join(outpath, os.path.basename(fn))
-        fits_append(outfn, img, ext, primary_header, extension_header)
+        fits_append(outfn, img, ext, primary_header, hdr)
+        for extra in ("RMS", "DQ"):
+            extra_ext = ext.replace("SCI", extra)
+            img = fits.getdata(fn, extname=extra_ext)
+            hdr = fits.getheader(fn, extname=extra_ext)
+            fits_append(outfn, img, extra_ext, primary_header, hdr)
 
 # %% ../../nbs/euclid/persistence.ipynb 11
 def fit_persistence_decay(dt, flux):
