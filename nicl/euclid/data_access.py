@@ -23,7 +23,7 @@ class DataAccess:
         self,
         esa_username=None,  # ESA account username (prompts if not supplied)
         esa_password=None,  # ESA account password (prompts if not supplied)
-        esac_server_url="https://easotf.esac.esa.int",  # ESA server (default is on-the-fly)
+        esac_server_url="https://easidr.esac.esa.int",  # ESA server (default is Q1)
         dry_run=False,  # if True, do not actually download files
     ):
         """Create an object for accessing data and log in to the ESA server."""
@@ -55,9 +55,9 @@ class DataAccess:
         """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
         criterion = "CONTAINS" if fully_contained else "INTERSECTS"
         query = f"""SELECT observation_stack.observation_id
-                    FROM sedm.observation_stack
+                    FROM sedm.calibrated_frame
                     AS observation_stack
-                    WHERE (product_type like '%Stacked%')
+                    WHERE (product_type like '%Calibrated%')
                     AND (release_name not like 'CALBLOCK%')
                     AND (observation_stack.fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),observation_stack.fov)=1)
                     ORDER BY observation_id ASC"""
@@ -165,4 +165,5 @@ class DataAccess:
                 verbose=verbose,
             )
             file_info.append(obs_file_info)
-        return table.vstack(file_info)
+        if len(file_info) > 0:
+            return table.vstack(file_info)
