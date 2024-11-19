@@ -234,7 +234,6 @@ def calc_persistence_correction(
             mask = dt_lp < 1
             # no scaling for faint features
             std = mad_std(flux)
-            print(f"std = {std}")
             mask |= flux < 3 * std
             t1[mask] = 1
             t0[mask] = 1
