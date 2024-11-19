@@ -36,7 +36,7 @@ def get_nisp_images_for_observation(
             fns = glob(os.path.join(path, f"EUC_NIR*-{i}-*Z.fits"))
         if len(fns) == 0:
             print(f"Found no files for observation id {i}.")
-        if len(fns) < 12:
+        elif len(fns) < 12:
             print(f"Missing some files for observation id {i}.")
         elif len(fns) > 12:
             print(f"Found too many files for observation id {i}.")
