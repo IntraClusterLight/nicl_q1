@@ -67,8 +67,6 @@ class DataAccess:
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
         return obs_ids
 
-
-
     def get_calibrated_files_for_observation(
         self,
         obs_id,  # observation_id for which to find files
@@ -92,8 +90,6 @@ class DataAccess:
         job = self.tap.launch_job(query)
         file_info = job.get_results()
         return file_info
-
-
 
     def download_files(
         self,
@@ -171,126 +167,3 @@ class DataAccess:
             file_info.append(obs_file_info)
         if len(file_info) > 0:
             return table.vstack(file_info)
-
-
-    def find_observations_for_target_MER(
-        self,
-        ra,  # RA of the target, in decimal degrees
-        dec,  # Dec of the target, in decimal degrees
-        radius=1 / 60,  # radius of the target, in decimal degrees
-        fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
-    ):  # returns a list of observation_ids
-        """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
-        criterion = "CONTAINS" if fully_contained else "INTERSECTS"
-        query = f"""SELECT mosaic_product.file_name, mosaic_product.mosaic_product_oid, mosaic_product.tile_index, mosaic_product.instrument_name, mosaic_product.filter_name, mosaic_product.category, mosaic_product.second_type, mosaic_product.ra, mosaic_product.dec, mosaic_product.technique 
-                    FROM sedm.mosaic_product
-                    WHERE (release_name ='Q1_R1')
-                    AND ((mosaic_product.fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),mosaic_product.fov)=1))
-                    ORDER BY tile_index ASC"""
-        self.tap_login()
-        job = self.tap.launch_job(query)
-        results = job.get_results()
-        tile_ids = np.unique(list(results["tile_index"])).astype(int)
-        return tile_ids
-
-
-
-    def get_MER_files_for_observation(
-        self,
-        tile_index,  # observation_id for which to find files
-        instrument=None,  # None, NISP or VIS
-        filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-    ):  # returns a table of file information
-        """Obtain file information for obs_id, optionally restricted by instrument or filter."""
-        instrument_condition = (
-            f"AND instrument_name = '{instrument}'" if instrument is not None else ""
-        )
-        filter_condition = f"AND filter_name = '{filter}'" if filter is not None else ""
-        query = f"""SELECT mosaic_product.file_name, mosaic_product.mosaic_product_oid, mosaic_product.tile_index, mosaic_product.instrument_name, mosaic_product.filter_name, mosaic_product.category, mosaic_product.second_type, mosaic_product.ra, mosaic_product.dec, mosaic_product.technique 
-                    FROM sedm.mosaic_product
-                    WHERE (release_name ='Q1_R1')
-                    {instrument_condition}
-                    {filter_condition}
-                    AND (tile_index = '{tile_index}')"""
-        self.tap_login()
-        job = self.tap.launch_job(query)
-        file_info = job.get_results()
-        return file_info
-
-    def download_calibrated_files_for_observation_MER(
-        self,
-        tile_index,
-        outpath="./",  # the folder in which to save the downloaded files
-        instrument=None,  # None, NISP or VIS
-        filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-        verbose=True,  # print information to the screen
-    ):  #  returns a table of file information
-        """Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter."""
-        file_info = self.get_MER_files_for_observation(
-            tile_index, instrument=instrument, filter=filter
-        )
-        self.download_files(file_info, outpath=outpath, verbose=verbose)
-        return file_info
-
-
-
-    def find_observations_for_target_LE1(
-        self,
-        ra,  # RA of the target, in decimal degrees
-        dec,  # Dec of the target, in decimal degrees
-        LE1type,
-        radius=1 / 60,  # radius of the target, in decimal degrees
-        fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
-    ):  # returns a list of observation_ids
-        """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
-        criterion = "CONTAINS" if fully_contained else "INTERSECTS"
-        query = f"""SELECT raw_frame.file_name, raw_frame.rawframe_oid, raw_frame.observation_id, raw_frame.instrument_name, raw_frame.data_set_release, raw_frame.filter_name, raw_frame.observation_mode, raw_frame.grism_wheel_pos, raw_frame.cal_block_id, raw_frame.cal_block_variant, raw_frame.ra, raw_frame.dec, raw_frame.obs_time_utc, raw_frame.exposure_time
-                    FROM sedm.raw_frame
-                    WHERE (observation_mode='{LE1type}')
-                    AND ((raw_frame.fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),raw_frame.fov)=1))
-                    ORDER BY observation_id ASC"""
-        self.tap_login()
-        job = self.tap.launch_job(query)
-        results = job.get_results()
-        observation_ids = np.unique(list(results["observation_id"])).astype(int)
-        return observation_ids
-
-    def get_LE1_files_for_observation(
-        self,
-        observation_id,# observation_id for which to find files
-        LE1type,
-        instrument=None,  # None, NISP or VIS
-        filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-    ):  # returns a table of file information
-        """Obtain file information for obs_id, optionally restricted by instrument or filter."""
-        instrument_condition = (
-            f"AND instrument_name = '{instrument}'" if instrument is not None else ""
-        )
-        filter_condition = f"AND filter_name = '{filter}'" if filter is not None else ""
-        query = f"""SELECT raw_frame.file_name, raw_frame.rawframe_oid, raw_frame.observation_id, raw_frame.instrument_name, raw_frame.data_set_release, raw_frame.filter_name, raw_frame.observation_mode, raw_frame.grism_wheel_pos, raw_frame.cal_block_id, raw_frame.cal_block_variant, raw_frame.ra, raw_frame.dec, raw_frame.obs_time_utc, raw_frame.exposure_time
-                    FROM sedm.raw_frame
-                    WHERE (observation_mode='{LE1type}')
-                    {instrument_condition}
-                    {filter_condition}
-                    AND (observation_id = '{observation_id}')"""
-        self.tap_login()
-        job = self.tap.launch_job(query)
-        file_info = job.get_results()
-        return file_info
-
-    def download_calibrated_files_for_observation_LE1(
-        self,
-        observation_id,
-        LE1type, 
-        outpath="./",  # the folder in which to save the downloaded files
-        instrument=None,  # None, NISP or VIS
-        filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-        verbose=True,  # print information to the screen
-    ):  #  returns a table of file information
-        """Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter."""
-        file_info = self.get_LE1_files_for_observation(
-            observation_id, LE1type, instrument=instrument, filter=filter
-        )
-        self.download_files(file_info, outpath=outpath, verbose=verbose)
-        return file_info
-
