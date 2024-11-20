@@ -344,10 +344,10 @@ def estimate_persistence_decay(
                 points = ax[0].plot(segm_dt_lp[:, b], segm_log_fluxes[:, b], ".")
                 ax[0].plot(x, p(x), "-", color=points[0].get_color())
         ax[0].set_xlim(xmin=-0.02, xmax=0.12)
-        ax[0].set_ylim(3, 6)
+        ax[0].set_ylim(3.5, 5)
         ax[0].set_xlabel("time since pers. flag")
         ax[0].set_ylabel("$\\log_10$ flux in pers. feature")
-        ax[1].hist(slope, bins=25, range=(-20, 5))
+        ax[1].hist(slope, bins=20, range=(-15, 5))
         ax[1].set_xlabel("log slope of pers. decay")
         fig.suptitle(f"{obs_id} {ext}")
         plt.tight_layout()
@@ -362,7 +362,7 @@ def estimate_persistence_decay(
 # %% ../../nbs/euclid/persistence.ipynb 13
 def correct_persistence(
     obs_id,  # the observation_id to process
-    path,  # the folder containing the downloaded calibrated images 
+    path,  # the folder containing the downloaded calibrated images
     outpath=None,  # the folder where all output files should be placed
     detector=None,  # the detector number to process, e.g. 44; if None processes all detectors
     estimate_decay=False,  # print an estimate of the persistence decay slope for each detector
@@ -379,7 +379,9 @@ def correct_persistence(
             raise FileExistsError("outpath cannot be the same as the path")
     else:
         outpath = os.path.join(path, "persistence")
-    image_info = get_nisp_images_for_observation(obs_id, n_prior=1, n_after=1, path=path)
+    image_info = get_nisp_images_for_observation(
+        obs_id, n_prior=1, n_after=1, path=path
+    )
     primary_header = get_primary_header(image_info.filename) if debug else None
     if detector is None:
         dets = [f"DET{i}{j}" for j in range(1, 5) for i in range(1, 5)]
@@ -426,7 +428,7 @@ def correct_persistence(
             minimum_images,
             dt_images,
             ext=ext,
-            debug=False,
+            debug=debug,
             primary_header=primary_header,
             outpath=outpath,
             decay_slope=slope,
