@@ -32,7 +32,7 @@ from nicl.euclid.utilities import (
     remove_if_necessary,
 )
 
-# %% ../../nbs/euclid/persistence.ipynb 5
+# %% ../../nbs/euclid/persistence.ipynb 6
 def forward_fill(arr, axis=-1):
     arr = np.atleast_1d(arr)
     mask = np.isnan(arr)
@@ -42,7 +42,7 @@ def forward_fill(arr, axis=-1):
     out = arr[tuple(idx)]
     return out
 
-# %% ../../nbs/euclid/persistence.ipynb 6
+# %% ../../nbs/euclid/persistence.ipynb 7
 def minimum_map(fns, mask, extname, n_leading=0, correct=True):
     images = np.array([fits.getdata(fn, extname=extname) for fn in fns])
     rms = np.median(get_rms(fns.iloc[n_leading], extname))
@@ -82,7 +82,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True):
     minimum[invalid] = 0
     return minimum, minimum_err, minimum_idx
 
-# %% ../../nbs/euclid/persistence.ipynb 7
+# %% ../../nbs/euclid/persistence.ipynb 8
 def mjd_of_last_persistence(fns, ext):
     mjd = np.dstack([fits.getval(fn, "mjd-obs") for fn in fns])
     p = np.dstack([get_persistence_mask(fn, extname=ext) for fn in fns])
@@ -97,7 +97,7 @@ def mjd_of_last_persistence(fns, ext):
     last = np.moveaxis(last, -1, 0)
     return last
 
-# %% ../../nbs/euclid/persistence.ipynb 8
+# %% ../../nbs/euclid/persistence.ipynb 9
 def calc_rolling_minimum(
     obs_id,  # the observation_id on which to operate, if None operate on all in `image_info`
     image_info,  # a DataFrame of image information
@@ -190,7 +190,7 @@ def calc_rolling_minimum(
             dt_images[image_id] = dt
     return minimum_images, dt_lp_images, dt_images
 
-# %% ../../nbs/euclid/persistence.ipynb 9
+# %% ../../nbs/euclid/persistence.ipynb 10
 def calc_persistence_correction(
     minimum_images,  # the minimum estimates of the persistence
     dt_images,  # the times between the estimate and the target image
@@ -229,7 +229,7 @@ def calc_persistence_correction(
         persistence_images[(obs_id, dithobs)] = med
     return persistence_images
 
-# %% ../../nbs/euclid/persistence.ipynb 10
+# %% ../../nbs/euclid/persistence.ipynb 11
 def apply_persistence_correction(
     image_info,  # a DataFrame of image information for the images to correct
     persistence_images,  # a dictionary of persistence images
@@ -252,7 +252,7 @@ def apply_persistence_correction(
             hdr = fits.getheader(fn, extname=extra_ext)
             fits_append(outfn, img, extra_ext, primary_header, hdr)
 
-# %% ../../nbs/euclid/persistence.ipynb 11
+# %% ../../nbs/euclid/persistence.ipynb 12
 def fit_persistence_decay(dt, flux):
     slope = -10
     mask = (dt > 0) & (dt < 0.1)
@@ -264,7 +264,7 @@ def fit_persistence_decay(dt, flux):
     fitted_line, mask = or_fit(line_init, dt, flux)
     return fitted_line, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 12
+# %% ../../nbs/euclid/persistence.ipynb 13
 def estimate_persistence_decay(
     minimum_images,  # the minimum estimates of the persistence
     dt_lp_images,  # the times since the last persistence feature appeared
@@ -344,10 +344,10 @@ def estimate_persistence_decay(
                 points = ax[0].plot(segm_dt_lp[:, b], segm_log_fluxes[:, b], ".")
                 ax[0].plot(x, p(x), "-", color=points[0].get_color())
         ax[0].set_xlim(xmin=-0.02, xmax=0.12)
-        ax[0].set_ylim(3, 6)
+        ax[0].set_ylim(3.5, 5)
         ax[0].set_xlabel("time since pers. flag")
         ax[0].set_ylabel("$\\log_10$ flux in pers. feature")
-        ax[1].hist(slope, bins=25, range=(-20, 5))
+        ax[1].hist(slope, bins=20, range=(-15, 5))
         ax[1].set_xlabel("log slope of pers. decay")
         fig.suptitle(f"{obs_id} {ext}")
         plt.tight_layout()
@@ -359,10 +359,10 @@ def estimate_persistence_decay(
     n_features = (~np.isnan(slope)).sum()
     return average_slope, n_features
 
-# %% ../../nbs/euclid/persistence.ipynb 13
+# %% ../../nbs/euclid/persistence.ipynb 14
 def correct_persistence(
     obs_id,  # the observation_id to process
-    path,  # the folder containing the downloaded calibrated images 
+    path,  # the folder containing the downloaded calibrated images
     outpath=None,  # the folder where all output files should be placed
     detector=None,  # the detector number to process, e.g. 44; if None processes all detectors
     estimate_decay=False,  # print an estimate of the persistence decay slope for each detector
@@ -379,7 +379,9 @@ def correct_persistence(
             raise FileExistsError("outpath cannot be the same as the path")
     else:
         outpath = os.path.join(path, "persistence")
-    image_info = get_nisp_images_for_observation(obs_id, n_prior=1, n_after=1, path=path)
+    image_info = get_nisp_images_for_observation(
+        obs_id, n_prior=1, n_after=1, path=path
+    )
     primary_header = get_primary_header(image_info.filename) if debug else None
     if detector is None:
         dets = [f"DET{i}{j}" for j in range(1, 5) for i in range(1, 5)]
@@ -426,7 +428,7 @@ def correct_persistence(
             minimum_images,
             dt_images,
             ext=ext,
-            debug=False,
+            debug=debug,
             primary_header=primary_header,
             outpath=outpath,
             decay_slope=slope,
