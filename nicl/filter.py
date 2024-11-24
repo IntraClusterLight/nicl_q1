@@ -58,7 +58,8 @@ def sampled_median_filter(
     size: int,  # diameter of the filter kernel
     nsample: int | None = None,  # the number of samples in the sparse median filter
     gaussian_sigma: float | None = None,  # optional Gaussian standard deviation
-    coarse_factor: int | None = None,  # the factor by which to initially coarsen the image
+    coarse_factor: int
+    | None = None,  # the factor by which to initially coarsen the image
     coarse_samples=25,  # the sampling rate for the coarsened image, if `coarse_factor=None`
     mode="nearest",  # the mode passed to the median filter
     mask: np.ndarray | None = None,  # optional 2D mask to apply to `data`
@@ -68,7 +69,7 @@ def sampled_median_filter(
     verbose=True,
 ) -> np.ndarray | xr.DataArray:  # the filtered data
     """Perform median filtering in an efficient, but reduced accuracy, method.
-    
+
     For large kernels, the image is first 'coarsened', by calculating the median in square blocks of pixels.
     The resulting image is then median filtered using a circular footprint, which may optionally
     be randomly-sampled and centrally weighted by taking the sampling probablity as a Gaussian distribution.
@@ -112,34 +113,48 @@ def sampled_median_filter(
     coarse_data = data
     if coarsening > 1:
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
-            with np.errstate(invalid='ignore'):
-                coarse_data = data.coarsen({d: coarsening for d in dims}, boundary="pad").median()
+            warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+            with np.errstate(invalid="ignore"):
+                coarse_data = data.coarsen(
+                    {d: coarsening for d in dims}, boundary="pad"
+                ).median()
         if allow_nans:
             coarse_data = _nan_to_inf(coarse_data)
     coarse_size = round(size / coarsening)
-    coarse_gaussian_sigma = None if gaussian_sigma is None else gaussian_sigma / coarsening
+    coarse_gaussian_sigma = (
+        None if gaussian_sigma is None else gaussian_sigma / coarsening
+    )
     weight = filter_weights(coarse_size, coarse_gaussian_sigma)
     nvalid = (weight > 0).sum()
     if nsample is None:
         if gaussian_sigma is not None:
             nsample = max(100, 10 * coarse_size)
-        else:            
+        else:
             nsample = nvalid
     if nsample < nvalid:
-        sample = np.random.choice(np.arange(coarse_size**2), nsample, replace=False, p=weight)
+        sample = np.random.choice(
+            np.arange(coarse_size**2), nsample, replace=False, p=weight
+        )
     else:
         sample = weight > 0
     footprint = np.zeros((coarse_size, coarse_size), dtype=bool)
     footprint.flat[sample] = True
     with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+        warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
         if use_dask:
-            median = xr.DataArray(dask_median_filter(coarse_data.data, footprint=footprint, mode=mode),
-                                  coords=coarse_data.coords, dims=coarse_data.dims, attrs=coarse_data.attrs)
+            median = xr.DataArray(
+                dask_median_filter(coarse_data.data, footprint=footprint, mode=mode),
+                coords=coarse_data.coords,
+                dims=coarse_data.dims,
+                attrs=coarse_data.attrs,
+            )
         else:
-            median = xr.apply_ufunc(median_filter, coarse_data, kwargs=dict(footprint=footprint, mode=mode),
-                                    keep_attrs=True)
+            median = xr.apply_ufunc(
+                median_filter,
+                coarse_data,
+                kwargs=dict(footprint=footprint, mode=mode),
+                keep_attrs=True,
+            )
     median = _inf_to_nan(median)
     if coarsening > 1:
         if keep_coarse:
@@ -147,22 +162,36 @@ def sampled_median_filter(
                 wcs = WCS(median.wcs)[::coarsening, ::coarsening]
                 median = median.assign_attrs(wcs=wcs.to_header_string())
         else:
-            median = median.pad({d: 1 for d in dims}, mode="reflect", reflect_type="odd")
+            median = median.pad(
+                {d: 1 for d in dims}, mode="reflect", reflect_type="odd"
+            )
             with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
-                with np.errstate(invalid='ignore'):
-                    median = median.interp(original_dims, assume_sorted=True,
-                                           method='linear', kwargs=dict(bounds_error=False, fill_value=None))
+                warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+                with np.errstate(invalid="ignore"):
+                    median = median.interp(
+                        original_dims,
+                        assume_sorted=True,
+                        method="linear",
+                        kwargs=dict(bounds_error=False, fill_value=None),
+                    )
     if return_mad:
         absolute_deviation = np.abs(data - median)
-        mad = sampled_median_filter(data=absolute_deviation, size=size, nsample=nsample,
-                                    gaussian_sigma=gaussian_sigma, coarse_factor=coarse_factor,
-                                    coarse_samples=coarse_samples, mode=mode, mask=mask,
-                                    allow_nans=allow_nans, return_mad=False)
+        mad = sampled_median_filter(
+            data=absolute_deviation,
+            size=size,
+            nsample=nsample,
+            gaussian_sigma=gaussian_sigma,
+            coarse_factor=coarse_factor,
+            coarse_samples=coarse_samples,
+            mode=mode,
+            mask=mask,
+            allow_nans=allow_nans,
+            return_mad=False,
+        )
         mad *= 1.4826
     if not use_dask:
         median = median.to_numpy()
-    if return_mad:    
+    if return_mad:
         return median, mad
     else:
         return median

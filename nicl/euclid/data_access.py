@@ -6,14 +6,17 @@
 __all__ = ['DataAccess']
 
 # %% ../../nbs/euclid/data_access.ipynb 2
+import os
+from getpass import getpass
+from pathlib import Path
+
+import numpy as np
 from astropy import table
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
-from getpass import getpass
 
-import os
-
-import numpy as np
+from .utilities import euclid_credentials
+from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
 class DataAccess:
@@ -28,14 +31,18 @@ class DataAccess:
         dry_run=False,  # if True, do not actually download files
     ):
         """Create an object for accessing data and log in to the ESA server."""
+        credentials = euclid_credentials()
+        if credentials is not None:
+            if esa_username is None:
+                esa_username = credentials["user"]
+            if esa_password is None:
+                esa_password = credentials["password"]
         if esa_username is None:
-            self.esa_username = getpass(prompt="ESA User:")
-        else:
-            self.esa_username = esa_username
+            esa_username = getpass(prompt="ESA User:")
         if esa_password is None:
-            self.esa_password = getpass(prompt="ESA Password:")
-        else:
-            self.esa_password = esa_password
+            esa_password = getpass(prompt="ESA Password:")
+        self.esa_username = esa_username
+        self.esa_password = esa_password
         self.release_name = release_name
         self.dry_run = dry_run
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
@@ -53,7 +60,7 @@ class DataAccess:
         return job.get_results()
 
     def build_instrument_condition(self, instrument, filter, raw=False):
-        release_condition = "1=1" if raw else f"(release_name='{self.release_name}')" 
+        release_condition = "1=1" if raw else f"(release_name='{self.release_name}')"
         instrument_condition = (
             f"AND instrument_name = '{instrument}'" if instrument is not None else ""
         )
@@ -61,6 +68,7 @@ class DataAccess:
         return " ".join((release_condition, instrument_condition, filter_condition))
 
     def build_fov_condition(self, ra, dec, radius, fully_contained):
+        ra, dec, radius = [maybe_to_value(x, "deg") for x in (ra, dec, radius)]
         release_condition = f"(release_name='{self.release_name}')"
         criterion = "CONTAINS" if fully_contained else "INTERSECTS"
         fov_condition = f"AND (fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)"
@@ -68,9 +76,10 @@ class DataAccess:
 
     def find_observations_for_target(
         self,
-        ra,  # RA of the target, in decimal degrees
-        dec,  # Dec of the target, in decimal degrees
-        radius=1 / 60,  # radius of the target, in decimal degrees
+        ra,  # RA of the target, as an angular quantity or in decimal degrees
+        dec,  # Dec of the target, as an angular quantity or in decimal degrees
+        radius=1
+        / 60,  # radius of the target, as an angular quantity or in decimal degrees
         fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
     ):  # returns a list of observation_ids
         """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
@@ -86,9 +95,10 @@ class DataAccess:
 
     def find_tiles_for_target(
         self,
-        ra,  # RA of the target, in decimal degrees
-        dec,  # Dec of the target, in decimal degrees
-        radius=1 / 60,  # radius of the target, in decimal degrees
+        ra,  # RA of the target, as an angular quantity or in decimal degrees
+        dec,  # Dec of the target, as an angular quantity or in decimal degrees
+        radius=1
+        / 60,  # radius of the target, as an angular quantity or in decimal degrees
         fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
     ):  # returns a list of tile_indexes
         """Obtain a list of survey MER tile_indexes for tiles that entirely contain or intersect the specified target region."""
@@ -100,7 +110,7 @@ class DataAccess:
         results = self.tap_query(query)
         tile_indexes = np.unique(list(results["tile_index"])).astype(int)
         return tile_indexes
-    
+
     def get_calibrated_files_for_observation(
         self,
         obs_id,  # observation_id for which to find files
@@ -155,7 +165,7 @@ class DataAccess:
                     AND (tile_index = '{tile_index}')"""
         file_info = self.tap_query(query)
         return file_info
-    
+
     def download_files(
         self,
         filenames,  #  list of filenames or Table containing "file_name" column
@@ -182,8 +192,8 @@ class DataAccess:
             RETRIEVAL_TYPE="FILE", RELEASE="sedm", RETRIEVAL_ACCESS="DIRECT"
         )
         params_dict.update(FILE_NAME=filename)
-        outpath = os.path.expanduser(outpath)
-        outfn = os.path.join(outpath, filename)
+        outpath = Path(outpath).expanduser()
+        outfn = outpath / filename
         self.data_login()
         if not self.dry_run:
             self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
@@ -201,7 +211,9 @@ class DataAccess:
             t = info["tile_index"]
             i = info["instrument_name"]
             f = info["filter_name"]
-            self.download_mosaic_file(t, i, f, mer_file_type, outpath=outpath, verbose=verbose)
+            self.download_mosaic_file(
+                t, i, f, mer_file_type, outpath=outpath, verbose=verbose
+            )
 
     def download_mosaic_file(
         self,
@@ -213,11 +225,14 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download Euclid mosaic to outpath, using an alternative method."""
-        params_dict = dict(
-            RETRIEVAL_TYPE="MOSAIC", RELEASE="sedm"
+        params_dict = dict(RETRIEVAL_TYPE="MOSAIC", RELEASE="sedm")
+        params_dict.update(
+            TILE_INDEX=tile_index,
+            INSTRUMENT=instrument,
+            FILTER=filter,
+            TYPE=mer_file_type,
         )
-        params_dict.update(TILE_INDEX=tile_index, INSTRUMENT=instrument, FILTER=filter, TYPE=mer_file_type)
-        outpath = os.path.expanduser(outpath)
+        outpath = PATH(outpath).expanduser()
         if mer_file_type == "STK":
             filename = f"BGSUB-MOSAIC-{filter}"
         elif mer_file_type == "BKG":
@@ -229,9 +244,11 @@ class DataAccess:
         else:
             raise ValueError(f"Invalid mer_file_type provided: {mer_file_type}.")
         filename = f"EUC_MER_{filename}_TILE{tile_index}.fits"
-        outfn = os.path.join(outpath, filename)
+        outfn = outpath / filename
         if verbose:
-            print(f"Downloading {mer_file_type} file for tile {tile_index}, instrument {instrument} and filter {filter}")
+            print(
+                f"Downloading {mer_file_type} file for tile {tile_index}, instrument {instrument} and filter {filter}"
+            )
             print(f"Saving as {outfn}")
             print(params_dict)
         self.data_login()
@@ -267,7 +284,7 @@ class DataAccess:
         )
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
-    
+
     def download_files_for_tile(
         self,
         tile_index,
@@ -278,27 +295,28 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all files for a Euclid MER tile, optionally restricted by instrument or filter.
-        
+
         By default this gets the background subtracted image, but specifying `mer_file_type` can download the
         background model (BKG), RMS or FLAG images.
         """
         file_info = self.get_files_for_tile(
             tile_index, instrument=instrument, filter=filter
         )
-        #self.download_mosaic_files(file_info, mer_file_type, outpath=outpath, verbose=verbose)
+        # self.download_mosaic_files(file_info, mer_file_type, outpath=outpath, verbose=verbose)
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
-    
+
     def download_files_for_target(
         self,
-        ra,  # RA of the target, in decimal degrees
-        dec,  # Dec of the target, in decimal degrees
-        radius=1 / 60,  # radius of the target, in decimal degrees
+        ra,  # RA of the target, as an angular quantity or in decimal degrees
+        dec,  # Dec of the target, as an angular quantity or in decimal degrees
+        radius=1
+        / 60,  # radius of the target, as an angular quantity or in decimal degrees
         fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
         outpath="./",  # the folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-        file_type="CAL",  # CAL, MER or LE1
+        file_type="CAL",  # CAL, MER
         mer_file_type="STK",  # STK, BKG, RMS or FLAG, only for file_type="MER"
         verbose=True,  # print information to the screen
     ):  #  returns a table of file information

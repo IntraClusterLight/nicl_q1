@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['calc_kcorr', 'calc_sb_threshold', 'sb_to_adu', 'get_pixel_scale', 'get_img_centre_pixel', 'get_img_centre_world',
-           'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout']
+           'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout', 'maybe_to_value']
 
 # %% ../nbs/10_utilities.ipynb 2
 import numpy as np
@@ -77,7 +77,7 @@ def physical_to_angular(r_physical, z):
     cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
     deg_per_Mpc = 1 / cosmo.kpc_proper_per_arcmin(z).to(u.Mpc / u.deg)
     r_angular = r_physical * deg_per_Mpc
-    return r_angular
+    return r_angular.to(u.deg)
 
 # %% ../nbs/10_utilities.ipynb 6
 def pix2arcmin(
@@ -126,17 +126,19 @@ def pix2Mpc(axis, img, z):
     return forward, inverse
 
 # %% ../nbs/10_utilities.ipynb 7
-def get_cutout(image, size_angular, position=None, mask=None):
+def get_cutout(image, size, position=None, mask=None, wcs=None):
     if position is None:
         position = get_img_centre_pixel(image).astype(int)
-    pixel_size = get_pixel_scale(image) / u.pix
-    size_pixel = size_angular / pixel_size
-    cutout_size = int((size_pixel).to_value(u.pix))
-    # introduce an asymmetry for debugging purposes
-    # cutout_size = (cutout_size, cutout_size*1.05)
-    cutout = Cutout2D(image, position, cutout_size, mode="partial").data
+    if wcs is None:
+        wcs = image.wcs
+    cutout = Cutout2D(image, position, size, wcs=wcs, mode="partial").data
     if mask is not None:
-        mask = Cutout2D(mask, position, cutout_size, mode="partial").data
+        mask = Cutout2D(mask, position, size, wcs=wcs, mode="partial").data
         return cutout, mask
     else:
         return cutout
+
+# %% ../nbs/10_utilities.ipynb 8
+def maybe_to_value(x, unit):
+    """Converting `x` to a value in specified `unit`, assuming in correct unit if `x` is not q Quantity."""
+    return u.Quantity(x, unit).to_value(unit)
