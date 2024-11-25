@@ -151,7 +151,7 @@ class TooManyFilesFoundError(Exception):
     pass
 
 
-def find_single_file(glob, path):
+def find_single_file(fn, path):
     fn = Path(path) / "**" / fn
     fns = glob(fn, recursive=True)
     if len(fns) == 0:

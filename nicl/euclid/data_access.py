@@ -6,7 +6,6 @@
 __all__ = ['DataAccess']
 
 # %% ../../nbs/euclid/data_access.ipynb 2
-import os
 from getpass import getpass
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from astropy import table
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from .utilities import euclid_credentials, default_data_path
+from .utilities import euclid_credentials
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
@@ -68,7 +67,7 @@ class DataAccess:
         return " ".join((release_condition, instrument_condition, filter_condition))
 
     def build_fov_condition(self, ra, dec, radius, fully_contained):
-        ra, dec, radius = [maybe_to_value(x, "deg") for x in (ra, dec, radius)]
+        ra, dec, radius = (maybe_to_value(x, "deg") for x in (ra, dec, radius))
         release_condition = f"(release_name='{self.release_name}')"
         criterion = "CONTAINS" if fully_contained else "INTERSECTS"
         fov_condition = f"AND (fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)"
@@ -234,7 +233,7 @@ class DataAccess:
             FILTER=filter,
             TYPE=mer_file_type,
         )
-        outpath = PATH(outpath).expanduser()
+        outpath = Path(outpath).expanduser()
         if mer_file_type == "STK":
             filename = f"BGSUB-MOSAIC-{filter}"
         elif mer_file_type == "BKG":
