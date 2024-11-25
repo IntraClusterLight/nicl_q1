@@ -171,7 +171,7 @@ def calc_rolling_minimum(
             ).squeeze()
             if debug:
                 image_name = (
-                    f"{target["obs_id"]}_{target["dithobs"]}_{filter_index}_{filt}"
+                    f'{target["obs_id"]}_{target["dithobs"]}_{filter_index}_{filt}'
                 )
                 min_fn = os.path.join(outpath, f"min_{image_name}.fits")
                 fits_append(min_fn, minimum, ext, primary_header)

@@ -125,16 +125,16 @@ def default_data_path(*subfolders):
 
     This first looks for an environment variable `EUCLID_DATA`. If that is not found,
     it looks for a folder (potentially a link) `~/euclid_data`. If that is not present,
-    it raises an error.
+    it raises an error. Finally, any provided subfolders are appended to the path.
     """
     path = os.environ.get("EUCLID_DATA")
     if path is None:
         path = "~/euclid_data"
     path = Path(path).expanduser()
-    if subfolder:
-        path = path / Path(*subfolders)
     if not path.is_dir():
         raise FileNotFoundError(f"Folder {path} does not exist.")
+    if subfolders:
+        path = path / Path(*subfolders)
     return path
 
 # %% ../../nbs/euclid/utilities.ipynb 8

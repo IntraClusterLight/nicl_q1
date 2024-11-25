@@ -15,7 +15,7 @@ from astropy import table
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from .utilities import euclid_credentials
+from .utilities import euclid_credentials, default_data_path
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
@@ -169,10 +169,11 @@ class DataAccess:
     def download_files(
         self,
         filenames,  #  list of filenames or Table containing "file_name" column
-        outpath="./",  # the folder in which to save the downloaded files
+        outpath,  # the folder in which to save the downloaded files
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid filenames to outpath."""
+        outpath.mkdir(parents=True, exist_ok=True)
         if isinstance(filenames, Table):
             filenames = filenames["file_name"]
         if verbose:
@@ -185,7 +186,7 @@ class DataAccess:
     def download_file(
         self,
         filename,  # the filename to download
-        outpath="./",  # the folder in which to save the downloaded files
+        outpath,  # the folder in which to save the downloaded files
     ):
         """Download Euclid filename to outpath."""
         params_dict = dict(
@@ -201,11 +202,12 @@ class DataAccess:
     def download_mosaic_files(
         self,
         file_info,  #  Table containing file information
+        outpath,  # the folder in which to save the downloaded files
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
-        outpath="./",  # the folder in which to save the downloaded files
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid mosaics to outpath, using an alternative method."""
+        outpath.mkdir(parents=True, exist_ok=True)
         print(f"Downloading {len(file_info)} files to {outpath}")
         for info in file_info:
             t = info["tile_index"]
@@ -220,8 +222,8 @@ class DataAccess:
         tile_index,
         instrument,  # NISP or VIS
         filter,  # VIS, NIR_Y, NIR_J or NIR_H
+        outpath,  # the folder in which to save the downloaded files
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
-        outpath="./",  # the folder in which to save the downloaded files
         verbose=True,  # print information to the screen
     ):
         """Download Euclid mosaic to outpath, using an alternative method."""
@@ -258,7 +260,7 @@ class DataAccess:
     def download_calibrated_files_for_observation(
         self,
         obs_id,
-        outpath="./",  # the folder in which to save the downloaded files
+        outpath,  # the base folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         verbose=True,  # print information to the screen
@@ -267,13 +269,14 @@ class DataAccess:
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
+        outpath = Path(outpath, "NIR", f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 
     def download_raw_files_for_observation(
         self,
         obs_id,
-        outpath="./",  # the folder in which to save the downloaded files
+        outpath,  # the base folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         verbose=True,  # print information to the screen
@@ -282,13 +285,14 @@ class DataAccess:
         file_info = self.get_raw_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
+        outpath = Path(outpath, "NIR", f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 
     def download_files_for_tile(
         self,
         tile_index,
-        outpath="./",  # the folder in which to save the downloaded files
+        outpath,  # the base folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         mer_file_type="STK",  # "STK", BKG, RMS or FLAG
@@ -302,6 +306,7 @@ class DataAccess:
         file_info = self.get_files_for_tile(
             tile_index, instrument=instrument, filter=filter
         )
+        outpath = Path(outpath, "MER", f"{tile_index:n}", "NIR")
         # self.download_mosaic_files(file_info, mer_file_type, outpath=outpath, verbose=verbose)
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
@@ -313,7 +318,7 @@ class DataAccess:
         radius=1
         / 60,  # radius of the target, as an angular quantity or in decimal degrees
         fully_contained=True,  # if False, the target region only needs to intersect with the observation footprint
-        outpath="./",  # the folder in which to save the downloaded files
+        outpath=None,  # the folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         file_type="CAL",  # CAL, MER
@@ -343,7 +348,7 @@ class DataAccess:
             )
             for tile_id in tile_ids:
                 if verbose:
-                    print(f"Downloading files for observation id {tile_id}")
+                    print(f"Downloading files for tile index {tile_id}")
                 tile_file_info = self.download_files_for_tile(
                     tile_id,
                     outpath=outpath,
