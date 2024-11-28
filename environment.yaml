@@ -3,26 +3,28 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
+  - aiohttp
   - astropy
   - astroquery
-  - numpy
-  - photutils
+  - astroquery
+  - dask-image
+  - fsspec
+  - memory_profiler
   - nbdev
-  - ruff
   - nbdime
   - nbqa
-  - pre-commit
-  - sigfig
+  - numpy
+  - photutils
   - pointpats
+  - pre-commit
   - pyarrow
-  - astroquery
-  - fsspec
-  - aiohttp
+  - pymc
+  - pyyaml
+  - reproject
   - requests
-  - dask-image
+  - ruff
+  - setuptools
+  - sigfig
   - xarray
   - zarr
-  - pymc
-  - reproject
-  - setuptools
 prefix: /Users/spb/anaconda/envs/icl

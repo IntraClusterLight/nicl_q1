@@ -4,36 +4,31 @@
 
 # %% auto 0
 __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask', 'get_persistence_mask', 'get_invalid_mask',
-           'get_rms', 'fits_append', 'remove_if_necessary']
+           'get_rms', 'fits_append', 'remove_if_necessary', 'default_data_path', 'euclid_credentials',
+           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_stack']
 
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
+from glob import glob
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
+import yaml
 from astropy.io import fits
-from glob import glob
 
 # %% ../../nbs/euclid/utilities.ipynb 3
 def get_nisp_images_for_observation(
     obs_id,  # the main observation id
     n_prior=0,  # number of previous observations to include
     n_after=0,  # number of subsequent observations to include
-    path="~/data/euclid",  # base path to search
-    recursive=False,  # search recursively
-    download=True,  # attempt to download if not found
+    path=None,  # base path to search
 ):
     """Find NISP images for the specified obs_id and optionally n_prior and n_after observations."""
     info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[])
     obs_id = int(obs_id)
     for i in range(obs_id - n_prior, obs_id + n_after + 1):
-        if recursive:
-            fns = glob(
-                os.path.join(path, "**", f"EUC_NIR*-{i}-*Z.fits"), recursive=True
-            )
-        else:
-            fns = glob(os.path.join(path, f"EUC_NIR*-{i}-*Z.fits"))
+        fns = Path(path).glob("**/EUC_NIR*-{i}-*Z.fits")
         if len(fns) == 0:
             print(f"Found no files for observation id {i}.")
         elif len(fns) < 12:
@@ -113,6 +108,58 @@ def fits_append(fn, data, ext, primary_header, exthdr=None):
 
 # %% ../../nbs/euclid/utilities.ipynb 6
 def remove_if_necessary(path, fnglob):
-    fns = glob(os.path.join(path, fnglob))
+    fns = Path(path).glob(fnglob)
     for fn in fns:
         os.remove(fn)
+
+# %% ../../nbs/euclid/utilities.ipynb 7
+def default_data_path(*subfolders):
+    """Discover the default path to Euclid data, and append `subfolder`.
+
+    This first looks for an environment variable `EUCLID_DATA`. If that is not found,
+    it looks for a folder (potentially a link) `~/euclid_data`. If that is not present,
+    it raises an error. Finally, any provided subfolders are appended to the path.
+    """
+    path = os.environ.get("EUCLID_DATA")
+    if path is None:
+        path = "~/euclid_data"
+    path = Path(path).expanduser()
+    if not path.is_dir():
+        raise FileNotFoundError(f"Folder {path} does not exist.")
+    if subfolders:
+        path = path / Path(*subfolders)
+    return path
+
+# %% ../../nbs/euclid/utilities.ipynb 8
+def euclid_credentials():
+    """Get Euclid user and password from `~/.euclid_credentials`, if it exists."""
+    fn = Path("~/.euclid_credentials").expanduser()
+    if fn.is_file():
+        with open(fn) as stream:
+            credentials = yaml.safe_load(stream)
+        return credentials
+
+# %% ../../nbs/euclid/utilities.ipynb 9
+class TooManyFilesFoundError(Exception):
+    pass
+
+
+def find_single_file(fn, path):
+    fns = list(Path(path).glob(f"**/{fn}"))
+    if len(fns) == 0:
+        raise FileNotFoundError(f"No files found matching {fn}")
+    elif len(fns) > 1:
+        raise TooManyFilesFoundError(f"More than one file found matching {fn}")
+    return fns[0]
+
+
+def get_nisp_tile(tile_index, filter, path):
+    filter = filter.replace("NIR_", "")
+    fn = f"EUC_MER_BGSUB-MOSAIC-NIR-{filter}_TILE{tile_index}*.fits"
+    return find_single_file(fn, path)
+
+
+def get_nisp_stack(obs_id, filter, path):
+    filter = filter.replace("NIR_", "")
+    fn = f"EUC_NIR_W-STK-IMAGE_{filter}-{obs_id}.fits"
+    return find_single_file(fn, path)
