@@ -28,6 +28,7 @@ class DataAccess:
         esac_server_url="https://easidr.esac.esa.int",  # ESA server (default is Q1)
         release_name="Q1_R1",  # the Euclid release name
         dry_run=False,  # if True, do not actually download files
+        overwrite=False,  # should existing files be overwritten?
     ):
         """Create an object for accessing data and log in to the ESA server."""
         credentials = euclid_credentials()
@@ -44,6 +45,7 @@ class DataAccess:
         self.esa_password = esa_password
         self.release_name = release_name
         self.dry_run = dry_run
+        self.overwrite = overwrite
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
 
@@ -232,7 +234,10 @@ class DataAccess:
         outfn = outpath / filename
         self.data_login()
         if not self.dry_run:
-            self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+            if not outfn.exists() or self.overwrite:
+                self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+            else:
+                print(f"File already exists, skipping: {outfn}")
 
     def download_mosaic_files(
         self,
@@ -290,7 +295,10 @@ class DataAccess:
             print(params_dict)
         self.data_login()
         if not self.dry_run:
-            self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+            if not outfn.exists() or self.overwrite:
+                self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+            else:
+                print(f"File already exists, skipping: {outfn}")
 
     def download_calibrated_files_for_observation(
         self,
