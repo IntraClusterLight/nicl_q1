@@ -25,4 +25,5 @@ dependencies:
   - pymc
   - reproject
   - setuptools
+  - pyyaml
 prefix: /Users/spb/anaconda/envs/icl
