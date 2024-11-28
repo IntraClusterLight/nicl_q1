@@ -73,6 +73,31 @@ class DataAccess:
         fov_condition = f"AND (fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)"
         return " ".join((release_condition, fov_condition))
 
+    def find_all_observations(
+        self,
+    ):  # returns a list of observation_ids
+        """Obtain a list of all survey obs_ids for observations in the current release."""
+        query = f"""SELECT observation_id
+                    FROM sedm.calibrated_frame
+                    WHERE (product_type like '%Calibrated%')
+                    AND release_name='{self.release_name}'
+                    ORDER BY observation_id ASC"""
+        results = self.tap_query(query)
+        obs_ids = np.unique(list(results["observation_id"])).astype(int)
+        return obs_ids
+    
+    def find_all_tiles(
+        self,
+    ):  # returns a list of observation_ids
+        """Obtain a list of all MER tile_indexes for tiles in the current release."""
+        query = f"""SELECT tile_index
+                    FROM sedm.mosaic_product
+                    WHERE release_name='{self.release_name}'
+                    ORDER BY tile_index ASC"""
+        results = self.tap_query(query)
+        tile_indexes = np.unique(list(results["tile_index"])).astype(int)
+        return tile_indexes
+    
     def find_observations_for_target(
         self,
         ra,  # RA of the target, as an angular quantity or in decimal degrees
@@ -128,6 +153,17 @@ class DataAccess:
         file_info = self.tap_query(query)
         return file_info
 
+    def get_sir_files_for_observation(
+        self,
+        obs_id,  # observation_id for which to find files
+    ):  # returns a table of file information
+        """Obtain SIR file information for obs_id."""
+        query = f"""SELECT observation_id, file_name
+                    FROM sedm.sir_science_frame
+                    WHERE (observation_id = '{obs_id}')"""
+        file_info = self.tap_query(query)
+        return file_info
+    
     def get_raw_files_for_observation(
         self,
         obs_id,  # observation_id for which to find files
@@ -269,6 +305,18 @@ class DataAccess:
             obs_id, instrument=instrument, filter=filter
         )
         outpath = Path(outpath, "NIR", f"{obs_id:n}")
+        self.download_files(file_info, outpath=outpath, verbose=verbose)
+        return file_info
+
+    def download_sir_files_for_observation(
+        self,
+        obs_id,
+        outpath,  # the base folder in which to save the downloaded files
+        verbose=True,  # print information to the screen
+    ):  #  returns a table of file information
+        """Download all SIR files for a Euclid observation."""
+        file_info = self.get_sir_files_for_observation(obs_id)
+        outpath = Path(outpath, "SIR", f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 
