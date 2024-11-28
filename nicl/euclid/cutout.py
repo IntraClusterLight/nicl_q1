@@ -46,7 +46,7 @@ def get_cutout_and_save(
         for ext in ext_list:
             hdu = hdul[ext]
             data = hdu.data
-            if data:
+            if data is not None:
                 header = hdu.header
                 wcs = WCS(header)
                 if ra is None or dec is None:
@@ -54,16 +54,23 @@ def get_cutout_and_save(
                     centre_ra, centre_dec = wcs.pixel_to_world(*centre_pixel)
                     ext_ra = centre_ra if ra is None else ra
                     ext_dec = centre_dec if dec is None else dec
+                else:
+                    ext_ra = ra
+                    ext_dec = dec
                 ext_ra, ext_dec, cutout_size = u.Quantity(
                     (ext_ra, ext_dec, cutout_size), u.deg
                 )
                 position = SkyCoord(ra=ext_ra, dec=ext_dec, frame="icrs")
                 cutout = Cutout2D(data, position, cutout_size, wcs=wcs)
                 MatchingHDU = type(hdu)
-                out_hdu = MatchingHDU(data=cutout.data, header=cutout.header)
+                # Update the FITS header with the cutout WCS
+                cutout_header = header.copy()
+                cutout_header.update(cutout.wcs.to_header())
+                out_hdu = MatchingHDU(data=cutout.data, header=cutout_header)
                 output_hdul.append(out_hdu)
-    fn = f"{cutout_name}.fits"
-    fn = Path(output_path, fn)
+    output_path = Path(output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+    fn = output_path / f"{cutout_name}.fits"
     output_hdul.writeto(fn, overwrite=True)
     return fn, position
 
@@ -112,7 +119,7 @@ def cutout(
             raise NotImplementedError(
                 "Automatic stacking of single pointing not yet implemented."
             )
-    cutout_name = f"cutout_name_{filter}"
+    cutout_name = f"{cutout_name}_{filter}"
     fn, position = get_cutout_and_save(
         fn, size, output_path, cutout_name, ra=ra, dec=dec
     )

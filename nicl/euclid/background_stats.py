@@ -23,6 +23,8 @@ from photutils.aperture import (
 )
 from tqdm import tqdm
 
+from ..mask import fast_mask, plot_mask
+
 # %% ../../nbs/euclid/background_stats.ipynb 4
 def aperture_stats(
     data,
@@ -126,7 +128,7 @@ def stats_versus_size(
     return results
 
 # %% ../../nbs/euclid/background_stats.ipynb 6
-def background_stats_plot(results, true_bkg_std=None):
+def background_stats_plot(results, true_bkg_std=None, errorbars=False):
     fig, ax = plt.subplots()
     ax.plot(
         results["sqrt_n_pix"],
@@ -134,18 +136,39 @@ def background_stats_plot(results, true_bkg_std=None):
         "--",
         label="expected std(mean)",
     )
-    ax.plot(
-        results["sqrt_n_pix"], results["std_mean"], "-o", label="measured std(mean)"
-    )
+    if errorbars:
+        ax.errorbar(
+            results["sqrt_n_pix"],
+            results["std_mean"],
+            results["err_std_mean"],
+            fmt="-o",
+            label="measured std(mean)",
+        )
+    else:
+        ax.plot(
+            results["sqrt_n_pix"], results["std_mean"], "-o", label="measured std(mean)"
+        )
     ax.plot(
         results["sqrt_n_pix"],
         results["expected_std_median"],
         "--",
         label="expected std(median)",
     )
-    ax.plot(
-        results["sqrt_n_pix"], results["std_median"], "-o", label="measured std(median)"
-    )
+    if errorbars:
+        ax.errorbar(
+            results["sqrt_n_pix"],
+            results["std_median"],
+            results["err_std_mean"],
+            fmt="-o",
+            label="measured std(median)",
+        )
+    else:
+        ax.plot(
+            results["sqrt_n_pix"],
+            results["std_median"],
+            "-o",
+            label="measured std(median)",
+        )
     if true_bkg_std is not None:
         ax.axhline(true_bkg_std, ls=":", label="true bkg std")
     ax.set_yscale("log")
@@ -162,6 +185,8 @@ def background_stats_plot(results, true_bkg_std=None):
 def measure(
     filename,  # the filename to test
     path,  # the folder containing the images
+    create_mask=True,  # generate and apply a mask
+    estimate_background=True,  # allow masking to estimate the background from the median of the image
     plots=True,  # output plots
     outpath=None,  # the folder where all output plots should be placed
     separate_detectors=True,  # consider multiple science extensions individually
@@ -178,15 +203,18 @@ def measure(
         outpath = os.path.abspath(os.path.expanduser(outpath))
     else:
         outpath = os.path.join(path, "background_stats")
-
     results = {}
     fn = os.path.join(path, filename)
     with fits.open(fn, memmap=True) as hdul:
         sci_ext = [hdu.name for hdu in hdul if "SCI" in hdu.name]
         for ext in sci_ext:
             data = hdul[ext].data
-            # TODO masking
-            mask = np.zeros(data.shape, dtype=bool)
+            rms = hdul[ext.replace("SCI", "RMS")].data
+            data[rms > 1e6] = np.nan
+            if create_mask:
+                mask, _ = fast_mask(data, estimate_background=estimate_background)
+            else:
+                mask = np.zeros(data.shape, dtype=bool)
             ext_results = stats_versus_size(
                 data,
                 mask,

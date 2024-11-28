@@ -284,7 +284,7 @@ class DataAccess:
         file_info = self.get_raw_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
-        outpath = Path(outpath, "NIR", f"{obs_id:n}")
+        outpath = Path(outpath, "RAW", f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 

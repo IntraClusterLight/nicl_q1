@@ -217,7 +217,9 @@ class Combiner:
     def get_dithers(self, obs_ids, filt):
         dithers = []
         for obs_id in obs_ids:
-            dithers.extend(self.in_path.glob(f"EUC_*CAL-IMAGE_{filt}-{obs_id}-*Z.fits"))
+            dithers.extend(
+                self.in_path.glob(f"**/EUC_*CAL-IMAGE_{filt}-{obs_id}-*Z.fits")
+            )
         n_dithers = len(dithers)
         n_det = 36 if filt == "VIS" else 4
         n_obs = len(obs_ids)

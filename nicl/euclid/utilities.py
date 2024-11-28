@@ -23,19 +23,12 @@ def get_nisp_images_for_observation(
     n_prior=0,  # number of previous observations to include
     n_after=0,  # number of subsequent observations to include
     path=None,  # base path to search
-    recursive=False,  # search recursively
-    download=True,  # attempt to download if not found
 ):
     """Find NISP images for the specified obs_id and optionally n_prior and n_after observations."""
     info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[])
     obs_id = int(obs_id)
     for i in range(obs_id - n_prior, obs_id + n_after + 1):
-        if recursive:
-            fns = glob(
-                os.path.join(path, "**", f"EUC_NIR*-{i}-*Z.fits"), recursive=True
-            )
-        else:
-            fns = glob(os.path.join(path, f"EUC_NIR*-{i}-*Z.fits"))
+        fns = Path(path).glob("**/EUC_NIR*-{i}-*Z.fits")
         if len(fns) == 0:
             print(f"Found no files for observation id {i}.")
         if len(fns) < 12:
@@ -115,7 +108,7 @@ def fits_append(fn, data, ext, primary_header, exthdr=None):
 
 # %% ../../nbs/euclid/utilities.ipynb 6
 def remove_if_necessary(path, fnglob):
-    fns = glob(os.path.join(path, fnglob))
+    fns = Path(path).glob(fnglob)
     for fn in fns:
         os.remove(fn)
 
@@ -152,8 +145,7 @@ class TooManyFilesFoundError(Exception):
 
 
 def find_single_file(fn, path):
-    fn = Path(path) / "**" / fn
-    fns = glob(fn, recursive=True)
+    fns = list(Path(path).glob(f"**/{fn}"))
     if len(fns) == 0:
         raise FileNotFoundError(f"No files found matching {fn}")
     elif len(fns) > 1:
@@ -163,11 +155,11 @@ def find_single_file(fn, path):
 
 def get_nisp_tile(tile_index, filter, path):
     filter = filter.replace("NIR_", "")
-    fn = "EUC_MER_BGSUB-MOSAIC-NIR_{filter}_TILE{tile_index}*.fits"
+    fn = f"EUC_MER_BGSUB-MOSAIC-NIR-{filter}_TILE{tile_index}*.fits"
     return find_single_file(fn, path)
 
 
 def get_nisp_stack(obs_id, filter, path):
     filter = filter.replace("NIR_", "")
-    fn = "EUC_NIR_W-STK-IMAGE_{filter}-{obs_id}.fits"
+    fn = f"EUC_NIR_W-STK-IMAGE_{filter}-{obs_id}.fits"
     return find_single_file(fn, path)
