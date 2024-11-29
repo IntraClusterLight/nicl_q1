@@ -12,6 +12,10 @@ from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
+from astropy.stats import SigmaClip
+from photutils.background import Background2D
+
+from nicl.mask import fast_mask
 
 # %% ../../nbs/euclid/combine.ipynb 3
 swarp_config_nisp = """
@@ -238,7 +242,22 @@ class Combiner:
             with fits.open(dither) as hdul:
                 for det in detectors:
                     extension = f"{det}.SCI"
-                    frame = fits.HDUList([hdul[0], hdul[extension]])
+                    data = hdul[extension].data
+                    primary_hdr = hdul[0].header
+                    dq = hdul[det + ".DQ"].data
+                    obj_mask, _ = fast_mask(data, estimate_background=True)
+                    bad_pix_mask = np.any(
+                        [(dq & 2**bit > 0) for bit in self.bits_to_mask], axis=0
+                    )
+                    # combine the bad pixel mask and the object mask to form a final mask
+                    mask = bad_pix_mask | obj_mask
+                    # 10 x 10 mesh
+                    mesh_size = (data.shape[0] // 10, data.shape[1] // 10)
+                    bg = Background2D(data, mesh_size, mask=mask, filter_size=(3, 3), sigma_clip=SigmaClip(sigma=3), exclude_percentile=90.0)
+                    # subtract the background and modify the header
+                    data -= bg.background
+                    primary_hdr.add_history(f"Background modeled and subtracted using {mesh_size[0]} x {mesh_size[1]} boxes.")
+                    frame = fits.HDUList([fits.PrimaryHDU(header=primary_hdr), fits.ImageHDU(data, hdul[extension].header)])
                     if det.startswith("DET"):
                         primary_hdr = hdul[0].header
                         ext_hdr = hdul[extension].header
