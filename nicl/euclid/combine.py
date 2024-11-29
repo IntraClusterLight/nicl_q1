@@ -191,9 +191,9 @@ class Combiner:
         else:
             det_ids = [f"{col}{row}" for row in range(1, 5) for col in range(1, 5)]
             detectors = [f"DET{i}" for i in det_ids]
-        out_fn = dithers[0].name.split("-")[0] + "-STK-IMAGE"
-        if name is None and len(obs_ids) == 1:
-            name = obs_ids[0]
+        out_fn = dithers[0].name.split("-")[0] + "-STK-IMAGE" + f"_{filt}"
+        if name is None and len(obs_ids) >= 1:
+            name = "-".join([str(obs_id) for obs_id in obs_ids])
         if name is not None:
             out_fn += f"-{name}"
         out_fn += ".fits"
