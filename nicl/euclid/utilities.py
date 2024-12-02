@@ -28,7 +28,7 @@ def get_nisp_images_for_observation(
     info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[])
     obs_id = int(obs_id)
     for i in range(obs_id - n_prior, obs_id + n_after + 1):
-        fns = Path(path).glob("**/EUC_NIR*-{i}-*Z.fits")
+        fns = list(Path(path).glob(f"**/EUC_NIR*-{i}-*Z.fits"))
         if len(fns) == 0:
             print(f"Found no files for observation id {i}.")
         elif len(fns) < 12:

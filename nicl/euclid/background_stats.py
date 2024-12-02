@@ -13,7 +13,10 @@ import numpy as np
 
 from astropy.io import fits
 from astropy import table
+from astropy.convolution import convolve, TrapezoidDisk2DKernel
 from matplotlib.ticker import FuncFormatter, NullLocator
+from matplotlib import patheffects as pe
+
 from photutils.aperture import (
     CircularAperture,
     CircularAnnulus,
@@ -45,6 +48,10 @@ def aperture_stats(
     outer_size /= np.sqrt(unmasked_frac)
 
     annulus = annular_thickness is not None and annular_thickness < 1
+    if sqrt_n_pix < 3:
+        # does not make sense to use an annulus for small numbers of pixels
+        annulus = False
+    
     if annulus:
         outer_size = outer_size / np.sqrt(1 - (1 - annular_thickness) ** 2)
         inner_size = (1 - annular_thickness) * outer_size
@@ -72,7 +79,7 @@ def aperture_stats(
         else:
             ap = CircularAperture(positions, r=outer_size / 2)
 
-    stats = ApertureStats(data, ap, mask=mask)
+    stats = ApertureStats(data, ap, mask=mask, sum_method="center")
     stats = stats.to_table(columns=("sum_aper_area", "mean", "median"))
     n_pix = sqrt_n_pix**2
     achieved_n_pix = stats["sum_aper_area"].value
@@ -179,6 +186,7 @@ def background_stats_plot(results, true_bkg_std=None, errorbars=False):
     ax.xaxis.set_minor_locator(NullLocator())
     ax.set_xlabel("sqrt(n_pix)")
     ax.set_ylabel("std(average)")
+    ax.tick_params(axis='x', labelrotation=90)
     ax.legend()
 
 # %% ../../nbs/euclid/background_stats.ipynb 7
