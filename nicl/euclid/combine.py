@@ -147,6 +147,8 @@ class Combiner:
             "H",
         ],  # default filters to process, if not specified further
         name=None,  # default name for the output image
+        bkg_sub=True,  # subtract background
+        bkg_mesh_size=None,  # size of the background mesh
         bits_to_mask=None,  # list of DQ bits to mask
         overwrite=False,  # overwrite existing files
         debug=False,  # retain intermediate files for checking
@@ -244,23 +246,23 @@ class Combiner:
                     extension = f"{det}.SCI"
                     data = hdul[extension].data
                     primary_hdr = hdul[0].header
-                    dq = hdul[det + ".DQ"].data
-                    obj_mask, _ = fast_mask(data, estimate_background=True)
-                    bad_pix_mask = np.any(
-                        [(dq & 2**bit > 0) for bit in self.bits_to_mask], axis=0
-                    )
-                    # combine the bad pixel mask and the object mask to form a final mask
-                    mask = bad_pix_mask | obj_mask
-                    # 10 x 10 mesh
-                    mesh_size = (data.shape[0] // 10, data.shape[1] // 10)
-                    bg = Background2D(data, mesh_size, mask=mask, filter_size=(3, 3), sigma_clip=SigmaClip(sigma=3), exclude_percentile=90.0)
-                    # subtract the background and modify the header
-                    data -= bg.background
-                    primary_hdr.add_history(f"Background modeled and subtracted using {mesh_size[0]} x {mesh_size[1]} boxes.")
-                    frame = fits.HDUList([fits.PrimaryHDU(header=primary_hdr), fits.ImageHDU(data, hdul[extension].header)])
+                    ext_hdr = hdul[extension].header
+                    if self.bkg_sub:
+                        dq = hdul[det + ".DQ"].data
+                        obj_mask, _ = fast_mask(data, estimate_background=True)
+                        bad_pix_mask = np.any(
+                            [(dq & 2**bit > 0) for bit in self.bits_to_mask], axis=0
+                        )
+                        # combine the bad pixel mask and the object mask to form a final mask
+                        mask = bad_pix_mask | obj_mask
+                        # 10 x 10 mesh by default if not specified
+                        if self.bkg_mesh_size is None:
+                            self.bkg_mesh_size = (data.shape[0] // 10, data.shape[1] // 10)
+                        bg = Background2D(data, self.bkg_mesh_size, mask=mask, filter_size=(3, 3), sigma_clip=SigmaClip(sigma=3), exclude_percentile=90.0)
+                        # subtract the background and modify the header
+                        data -= bg.background
+                        primary_hdr.add_history(f"Background modeled and subtracted using {self.bkg_mesh_size} pixel boxes.")
                     if det.startswith("DET"):
-                        primary_hdr = hdul[0].header
-                        ext_hdr = hdul[extension].header
                         exptime = primary_hdr["EXPTIME"]
                         photfnu = primary_hdr["PHOTFNU"]
                         phrelex = primary_hdr["PHRELEX"]
@@ -276,6 +278,7 @@ class Combiner:
                     else:
                         # may need to subtract background from VIS images here
                         pass
+                    frame = fits.HDUList([fits.PrimaryHDU(header=primary_hdr), fits.ImageHDU(data, ext_hdr)])
                     tmp_fn = f"sci_{i}_{det}.fits"
                     tmp_fns.append(tmp_fn)
                     frame.writeto(tmp_fn)
