@@ -159,6 +159,8 @@ class Combiner:
         self.obs_ids = obs_ids
         self.filters = filters
         self.name = name
+        self.bkg_sub = bkg_sub
+        self.bkg_mesh_size = bkg_mesh_size
         self.overwrite = overwrite
         self.debug = debug
         if bits_to_mask is not None:
