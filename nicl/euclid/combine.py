@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 from astropy.io import fits
 from astropy.stats import SigmaClip
+from astropy import units as u
 from photutils.background import Background2D
 
 from nicl.mask import fast_mask
@@ -149,6 +150,7 @@ class Combiner:
         name=None,  # default name for the output image
         bkg_sub=True,  # subtract background
         bkg_mesh_size=None,  # size of the background mesh
+        cutout_size=None,  # size of the cutout from the stack in angular units; should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified swarp will produce a full-size stack
         bits_to_mask=None,  # list of DQ bits to mask
         overwrite=False,  # overwrite existing files
         debug=False,  # retain intermediate files for checking
@@ -163,6 +165,38 @@ class Combiner:
         self.bkg_mesh_size = bkg_mesh_size
         self.overwrite = overwrite
         self.debug = debug
+        if cutout_size is not None:
+            if isinstance(cutout_size, (int, float)):
+                self.cutout_size = (cutout_size * u.arcsec, cutout_size * u.arcsec)
+            if isinstance(cutout_size, u.Quantity) and cutout_size.unit.is_equivalent(
+                u.arcsec
+            ):
+                self.cutout_size = tuple(cutout_size, cutout_size)
+            elif len(cutout_size) == 2:
+                if isinstance(cutout_size[0], (int, float)) and isinstance(
+                    cutout_size[1], (int, float)
+                ):
+                    self.cutout_size = (
+                        cutout_size[0] * u.arcsec,
+                        cutout_size[1] * u.arcsec,
+                    )
+                elif (
+                    isinstance(cutout_size[0], u.Quantity)
+                    and cutout_size[0].unit.is_equivalent(u.arcsec)
+                    and isinstance(cutout_size[1], u.Quantity)
+                    and cutout_size[1].unit.is_equivalent(u.arcsec)
+                ):
+                    self.cutout_size = cutout_size
+                else:
+                    raise ValueError(
+                        "cutout_size is inhomogeneous. it should be either plain numbers or astropy.units.Quantity."
+                    )
+            else:
+                raise ValueError(
+                    "cutout_size must be a single quantity or a tuple of two quantities."
+                )
+        else:
+            self.cutout_size = cutout_size
         if bits_to_mask is not None:
             self.bits_to_mask = bits_to_mask
         else:
@@ -192,9 +226,13 @@ class Combiner:
         if filt == "VIS":
             det_ids = [f"{col}-{row}" for row in range(1, 7) for col in range(1, 7)]
             detectors = [f"CCDID{i}" for i in det_ids]
+            swarp_config = swarp_config_vis
+            pix_scale = 0.1  # arcsec per pixel
         else:
             det_ids = [f"{col}{row}" for row in range(1, 5) for col in range(1, 5)]
             detectors = [f"DET{i}" for i in det_ids]
+            swarp_config = swarp_config_nisp
+            pix_scale = 0.3  # arcsec per pixel
         out_fn = dithers[0].name.split("-")[0] + "-STK-IMAGE" + f"_{filt}"
         if name is None and len(obs_ids) >= 1:
             name = "-".join([str(obs_id) for obs_id in obs_ids])
@@ -212,11 +250,19 @@ class Combiner:
                 with open("images.lis", "w") as file:
                     for fn in tmp_fns_sci:
                         file.write(f"{fn}[1]\n")
+                # calculate the cutout size in pixels, only if it is specified
+                if self.cutout_size is not None:
+                    cutout_size_pix = [
+                        round(cutsize.to(u.arcsec) / pix_scale)
+                        for cutsize in self.cutout_size
+                    ]
+                    # TODO: the string replace method is not robust, should be replaced with a better approach in the future
+                    swarp_config = swarp_config.replace(
+                        "IMAGE_SIZE             0",
+                        f"IMAGE_SIZE             {cutout_size_pix[0]},{cutout_size_pix[1]}",
+                    )
                 with open("config.swarp", "w") as file:
-                    if filt == "VIS":
-                        file.write(swarp_config_vis)
-                    else:
-                        file.write(swarp_config_nisp)
+                    file.write(swarp_config)
                 os.system("swarp @images.lis -c config.swarp")
                 self.copy_swarp_to_output(out_fn)
         finally:
@@ -259,11 +305,23 @@ class Combiner:
                         mask = bad_pix_mask | obj_mask
                         # 10 x 10 mesh by default if not specified
                         if self.bkg_mesh_size is None:
-                            self.bkg_mesh_size = (data.shape[0] // 10, data.shape[1] // 10)
-                        bg = Background2D(data, self.bkg_mesh_size, mask=mask, filter_size=(3, 3), sigma_clip=SigmaClip(sigma=3), exclude_percentile=90.0)
+                            self.bkg_mesh_size = (
+                                data.shape[0] // 10,
+                                data.shape[1] // 10,
+                            )
+                        bg = Background2D(
+                            data,
+                            self.bkg_mesh_size,
+                            mask=mask,
+                            filter_size=(3, 3),
+                            sigma_clip=SigmaClip(sigma=3),
+                            exclude_percentile=90.0,
+                        )
                         # subtract the background and modify the header
                         data -= bg.background
-                        primary_hdr.add_history(f"Background modeled and subtracted using {self.bkg_mesh_size} pixel boxes.")
+                        primary_hdr.add_history(
+                            f"Background modeled and subtracted using {self.bkg_mesh_size} pixel boxes."
+                        )
                     if det.startswith("DET"):
                         exptime = primary_hdr["EXPTIME"]
                         photfnu = primary_hdr["PHOTFNU"]
@@ -280,7 +338,12 @@ class Combiner:
                     else:
                         # may need to subtract background from VIS images here
                         pass
-                    frame = fits.HDUList([fits.PrimaryHDU(header=primary_hdr), fits.ImageHDU(data, ext_hdr)])
+                    frame = fits.HDUList(
+                        [
+                            fits.PrimaryHDU(header=primary_hdr),
+                            fits.ImageHDU(data, ext_hdr),
+                        ]
+                    )
                     tmp_fn = f"sci_{i}_{det}.fits"
                     tmp_fns.append(tmp_fn)
                     frame.writeto(tmp_fn)
