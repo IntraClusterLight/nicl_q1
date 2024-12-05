@@ -149,7 +149,7 @@ class Combiner:
         ],  # default filters to process, if not specified further
         name=None,  # default name for the output image
         bkg_sub=True,  # subtract background
-        bkg_mesh_size=None,  # size of the background mesh
+        bkg_mesh_size=None,  # size of the background mesh in angular units: should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified will use a 10x10 mesh for each chip
         cutout_size=None,  # size of the cutout from the stack in angular units; should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified swarp will produce a full-size stack
         bits_to_mask=None,  # list of DQ bits to mask
         overwrite=False,  # overwrite existing files
@@ -162,7 +162,6 @@ class Combiner:
         self.filters = filters
         self.name = name
         self.bkg_sub = bkg_sub
-        self.bkg_mesh_size = bkg_mesh_size
         self.overwrite = overwrite
         self.debug = debug
         if cutout_size is not None:
@@ -171,7 +170,7 @@ class Combiner:
             if isinstance(cutout_size, u.Quantity) and cutout_size.unit.is_equivalent(
                 u.arcsec
             ):
-                self.cutout_size = tuple(cutout_size, cutout_size)
+                self.cutout_size = (cutout_size, cutout_size)
             elif len(cutout_size) == 2:
                 if isinstance(cutout_size[0], (int, float)) and isinstance(
                     cutout_size[1], (int, float)
@@ -197,6 +196,41 @@ class Combiner:
                 )
         else:
             self.cutout_size = cutout_size
+        if bkg_mesh_size is not None:
+            if isinstance(bkg_mesh_size, (int, float)):
+                self.bkg_mesh_size = (
+                    bkg_mesh_size * u.arcsec,
+                    bkg_mesh_size * u.arcsec,
+                )
+            if isinstance(
+                bkg_mesh_size, u.Quantity
+            ) and bkg_mesh_size.unit.is_equivalent(u.arcsec):
+                self.bkg_mesh_size = (bkg_mesh_size, bkg_mesh_size)
+            elif len(bkg_mesh_size) == 2:
+                if isinstance(bkg_mesh_size[0], (int, float)) and isinstance(
+                    bkg_mesh_size[1], (int, float)
+                ):
+                    self.bkg_mesh_size = (
+                        bkg_mesh_size[0] * u.arcsec,
+                        bkg_mesh_size[1] * u.arcsec,
+                    )
+                elif (
+                    isinstance(bkg_mesh_size[0], u.Quantity)
+                    and bkg_mesh_size[0].unit.is_equivalent(u.arcsec)
+                    and isinstance(bkg_mesh_size[1], u.Quantity)
+                    and bkg_mesh_size[1].unit.is_equivalent(u.arcsec)
+                ):
+                    self.bkg_mesh_size = bkg_mesh_size
+                else:
+                    raise ValueError(
+                        "bkg_mesh_size is inhomogeneous. it should be either plain numbers or astropy.units.Quantity."
+                    )
+            else:
+                raise ValueError(
+                    "bkg_mesh_size must be a single quantity or a tuple of two quantities."
+                )
+        else:
+            self.bkg_mesh_size = bkg_mesh_size
         if bits_to_mask is not None:
             self.bits_to_mask = bits_to_mask
         else:
@@ -245,7 +279,7 @@ class Combiner:
                 if self.debug:
                     print(f"Intermediate files can be found in {tmpdirname}/.")
                 os.chdir(tmpdirname)
-                tmp_fns_sci = self.prepare_sci_dithers(dithers, detectors)
+                tmp_fns_sci = self.prepare_sci_dithers(dithers, detectors, pix_scale)
                 self.prepare_weight_dithers(dithers, detectors)
                 with open("images.lis", "w") as file:
                     for fn in tmp_fns_sci:
@@ -253,7 +287,7 @@ class Combiner:
                 # calculate the cutout size in pixels, only if it is specified
                 if self.cutout_size is not None:
                     cutout_size_pix = [
-                        round(cutsize.to(u.arcsec) / pix_scale)
+                        round(cutsize.to(u.arcsec).value / pix_scale)
                         for cutsize in self.cutout_size
                     ]
                     # TODO: the string replace method is not robust, should be replaced with a better approach in the future
@@ -285,7 +319,7 @@ class Combiner:
             print("Found too many files.")
         return dithers
 
-    def prepare_sci_dithers(self, dithers, detectors):
+    def prepare_sci_dithers(self, dithers, detectors, pix_scale):
         print("Preparing science dithers for swarp...")
         tmp_fns = []
         for i, dither in enumerate(dithers):
@@ -305,13 +339,20 @@ class Combiner:
                         mask = bad_pix_mask | obj_mask
                         # 10 x 10 mesh by default if not specified
                         if self.bkg_mesh_size is None:
-                            self.bkg_mesh_size = (
+                            bkg_mesh_size_pix = (
                                 data.shape[0] // 10,
                                 data.shape[1] // 10,
                             )
+                        else:
+                            bkg_mesh_size_pix = tuple(
+                                [
+                                    round(meshsize.to(u.arcsec).value / pix_scale)
+                                    for meshsize in self.bkg_mesh_size
+                                ]
+                            )
                         bg = Background2D(
                             data,
-                            self.bkg_mesh_size,
+                            bkg_mesh_size_pix,
                             mask=mask,
                             filter_size=(3, 3),
                             sigma_clip=SigmaClip(sigma=3),
