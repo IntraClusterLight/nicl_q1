@@ -151,7 +151,7 @@ class Combiner:
         name=None,  # default name for the output image
         bkg_sub=True,  # subtract background
         bkg_mesh_size=None,  # size of the background mesh in angular units: should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified will use a 10x10 mesh for each chip
-        cutout_cen=None,   # center of the cutout; astropy.coordinates.SkyCoord object or a string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
+        cutout_cen=None,  # center of the cutout; astropy.coordinates.SkyCoord object or a string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
         cutout_size=None,  # size of the cutout from the stack in angular units; should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified swarp will produce a full-size stack
         bits_to_mask=None,  # list of DQ bits to mask
         overwrite=False,  # overwrite existing files
@@ -314,7 +314,7 @@ class Combiner:
                     )
                     swarp_config = swarp_config.replace(
                         "CENTER         00:00:00.0, +00:00:00.0",
-                        f"CENTER         {self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}"
+                        f"CENTER         {self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}",
                     )
                 with open("config.swarp", "w") as file:
                     file.write(swarp_config)
@@ -432,32 +432,34 @@ class Combiner:
                     frame.writeto(tmp_fn)
 
     def copy_swarp_to_output(self, out_fn):
-        with fits.open("coadd.weight.fits", memmap=True) as hdul_weights:
-            hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
-        with np.errstate(divide="ignore"):
-            np.divide(1.0, hdu_rms.data, out=hdu_rms.data)
-        hdu_rms.data[hdu_rms.data == np.inf] = 1.0e16
-        np.sqrt(hdu_rms.data, out=hdu_rms.data)
-        hdu_pri = fits.PrimaryHDU()
-        hdul_rms = fits.HDUList([hdu_pri, hdu_rms])
-        hdul_rms.writeto("rms.fits")
-        with fits.open("coadd.fits", memmap=True) as hdul_sci:
+        with fits.open("coadd.fits", memmap=True) as hdul_sci, fits.open(
+            "coadd.weight.fits", memmap=True
+        ) as hdul_weights:
+            # this is necessary because they are both PrimaryHDU objects
             hdu_sci = fits.ImageHDU(hdul_sci[0].data, hdul_sci[0].header)
-        hdu_sci.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
-        hdu_sci.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
-        hdu_sci.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
-        hdu_sci.header.set("EXTNAME", "SCI", "Extension name", after="GCOUNT")
-        hdu_sci.header.set("ZPAB", 23.9)
-        hdu_sci.header.set("ZPABE", 0.0)
-        hdu_sci.header.set("ZPVEGA", 1.0)
-        hdu_sci.header.set("ZPVEGAE", 0.0)
-        hdu_rms.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
-        hdu_rms.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
-        hdu_rms.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
-        hdu_rms.header.set("EXTNAME", "RMS", "Extension name", after="GCOUNT")
-        hdu_sci.header.remove("SIMPLE", ignore_missing=True)
-        for key in ("SIMPLE", "ZPAB", "ZPAB", "ZPVEGA", "ZPVEGAE"):
-            hdu_rms.header.remove(key, ignore_missing=True)
-        hdulist_combined = fits.HDUList([hdu_pri, hdu_sci, hdu_rms])
-        os.makedirs(self.out_path, exist_ok=True)
-        hdulist_combined.writeto(self.out_path / out_fn, overwrite=self.overwrite)
+            hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
+            # set science image to NaN where the weight is zero
+            hdu_sci.data[hdu_rms.data == 0] = np.nan
+            # convert the weight to RMS
+            with np.errstate(divide="ignore"):
+                np.divide(1.0, hdu_rms.data, out=hdu_rms.data)
+            np.sqrt(hdu_rms.data, out=hdu_rms.data)
+            # clean up the headers
+            hdu_sci.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
+            hdu_sci.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
+            hdu_sci.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
+            hdu_sci.header.set("EXTNAME", "SCI", "Extension name", after="GCOUNT")
+            hdu_sci.header.set("ZPAB", 23.9)
+            hdu_sci.header.set("ZPABE", 0.0)
+            hdu_sci.header.set("ZPVEGA", 1.0)
+            hdu_sci.header.set("ZPVEGAE", 0.0)
+            hdu_sci.header.remove("SIMPLE", ignore_missing=True)
+            hdu_rms.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
+            hdu_rms.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
+            hdu_rms.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
+            hdu_rms.header.set("EXTNAME", "RMS", "Extension name", after="GCOUNT")
+            for key in ("SIMPLE", "ZPAB", "ZPAB", "ZPVEGA", "ZPVEGAE"):
+                hdu_rms.header.remove(key, ignore_missing=True)
+            hdul = fits.HDUList([fits.PrimaryHDU(), hdu_sci, hdu_rms])
+            self.out_path.mkdir(parents=True, exist_ok=True)
+            hdul.writeto(self.out_path / out_fn, overwrite=self.overwrite)
