@@ -14,6 +14,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.stats import SigmaClip
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 from photutils.background import Background2D
 
 from nicl.mask import fast_mask
@@ -150,6 +151,7 @@ class Combiner:
         name=None,  # default name for the output image
         bkg_sub=True,  # subtract background
         bkg_mesh_size=None,  # size of the background mesh in angular units: should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified will use a 10x10 mesh for each chip
+        cutout_cen=None,   # center of the cutout; astropy.coordinates.SkyCoord object or a string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
         cutout_size=None,  # size of the cutout from the stack in angular units; should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified swarp will produce a full-size stack
         bits_to_mask=None,  # list of DQ bits to mask
         overwrite=False,  # overwrite existing files
@@ -164,6 +166,15 @@ class Combiner:
         self.bkg_sub = bkg_sub
         self.overwrite = overwrite
         self.debug = debug
+        if cutout_cen is not None:
+            if isinstance(cutout_cen, str):
+                self.cutout_cen = SkyCoord(cutout_cen, unit=(u.hourangle, u.deg))
+            elif isinstance(cutout_cen, SkyCoord):
+                self.cutout_cen = cutout_cen
+            else:
+                raise ValueError(
+                    "cutout_cen must be a string in the format 'ra dec' or an astropy.coordinates.SkyCoord object."
+                )
         if cutout_size is not None:
             if isinstance(cutout_size, (int, float)):
                 self.cutout_size = (cutout_size * u.arcsec, cutout_size * u.arcsec)
@@ -294,6 +305,16 @@ class Combiner:
                     swarp_config = swarp_config.replace(
                         "IMAGE_SIZE             0",
                         f"IMAGE_SIZE             {cutout_size_pix[0]},{cutout_size_pix[1]}",
+                    )
+                # specify the cutout center, only if it is specified by user
+                if self.cutout_cen is not None:
+                    swarp_config = swarp_config.replace(
+                        "CENTER_TYPE            ALL",
+                        "CENTER_TYPE            MANUAL",
+                    )
+                    swarp_config = swarp_config.replace(
+                        "CENTER         00:00:00.0, +00:00:00.0",
+                        f"CENTER         {self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}"
                     )
                 with open("config.swarp", "w") as file:
                     file.write(swarp_config)
