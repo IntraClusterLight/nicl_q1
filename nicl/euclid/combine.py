@@ -158,8 +158,8 @@ class Combiner:
         debug=False,  # retain intermediate files for checking
     ):
         """Create an object for accessing data and log in to the ESA server."""
-        self.in_path = Path(in_path)
-        self.out_path = Path(out_path)
+        self.in_path = Path(in_path).expanduser()
+        self.out_path = Path(out_path).expanduser()
         self.obs_ids = obs_ids
         self.filters = filters
         self.name = name
