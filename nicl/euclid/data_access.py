@@ -16,7 +16,7 @@ from astropy import table
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from .utilities import euclid_credentials
+from .utilities import default_data_path, euclid_credentials
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
