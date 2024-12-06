@@ -6,15 +6,18 @@
 __all__ = ['DataAccess']
 
 # %% ../../nbs/euclid/data_access.ipynb 2
+import re
 from getpass import getpass
+import os
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from astropy import table
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from .utilities import euclid_credentials
+from .utilities import default_data_path, euclid_credentials
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
@@ -48,6 +51,7 @@ class DataAccess:
         self.overwrite = overwrite
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
+        self.mer_filename_lookup = self.get_mer_filename_lookup()
 
     def tap_login(self):
         self.tap.login(user=self.esa_username, password=self.esa_password)
@@ -59,6 +63,54 @@ class DataAccess:
         self.tap_login()
         job = self.tap.launch_job(query)
         return job.get_results()
+
+    def get_mer_filename_lookup(self):
+        """Build a DataFrame of MER files.
+
+        This assumes there is a file named "filelist" in the MER folder, containing
+        a listing of the MER files in archive, created by running `find .` in the
+        MER folder in DataLabs. This is a workaround, due to the normal ways of
+        accessing non-STK MER files not currently working.
+        """
+
+        def get_mer_info(row):
+            fn = row["filename"]
+            matched = re.search("EUC_MER_(.+)_TILE", fn)[1]
+            if matched.endswith("RMS") or matched.endswith("FLAG"):
+                match = re.search("MOSAIC-(.+)-(RMS|FLAG)", matched)
+                filt, file_type = match.groups()
+            else:
+                match = re.search("(.+)-(.+-?.)", matched)
+                file_type, filt = match.groups()
+            if file_type == "BGSUB-MOSAIC":
+                t = "STK"
+            elif file_type == "BGMOD":
+                t = "BKG"
+            else:
+                t = file_type
+            filt = filt.replace("-", "_")
+            return t, filt
+
+        path = default_data_path("Q1_R1", "MER")
+        fn = path / "filelist"
+        if fn.exists():
+            table = pd.read_table(
+                fn,
+                header=None,
+                names=["dot", "tile_index", "instrument", "filename"],
+                dtype=str,
+                sep="/",
+            )
+            table = table.drop(columns="dot").dropna()
+            table = table[table["filename"].str.startswith("EUC")]
+            cols = table.apply(get_mer_info, axis="columns", result_type="expand")
+            cols.columns = ["mer_file_type", "filter"]
+            table = pd.concat((table, cols), axis="columns")
+            table = table.groupby(
+                ["tile_index", "instrument", "mer_file_type", "filter"]
+            ).first()
+            table = table["filename"]
+            return table
 
     def build_instrument_condition(self, instrument, filter, raw=False):
         release_condition = "1=1" if raw else f"(release_name='{self.release_name}')"
@@ -87,7 +139,7 @@ class DataAccess:
         results = self.tap_query(query)
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
         return obs_ids
-    
+
     def find_all_tiles(
         self,
     ):  # returns a list of observation_ids
@@ -99,7 +151,7 @@ class DataAccess:
         results = self.tap_query(query)
         tile_indexes = np.unique(list(results["tile_index"])).astype(int)
         return tile_indexes
-    
+
     def find_observations_for_target(
         self,
         ra,  # RA of the target, as an angular quantity or in decimal degrees
@@ -165,7 +217,7 @@ class DataAccess:
                     WHERE (observation_id = '{obs_id}')"""
         file_info = self.tap_query(query)
         return file_info
-    
+
     def get_raw_files_for_observation(
         self,
         obs_id,  # observation_id for which to find files
@@ -182,7 +234,6 @@ class DataAccess:
                     FROM sedm.raw_frame
                     WHERE {condition}
                     AND (observation_id = '{obs_id}')"""
-        # (observation_mode='{LE1type}')
         file_info = self.tap_query(query)
         return file_info
 
@@ -235,7 +286,12 @@ class DataAccess:
         self.data_login()
         if not self.dry_run:
             if not outfn.exists() or self.overwrite:
-                self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+                try:
+                    self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+                except (Exception, KeyboardInterrupt):
+                    if outfn.exists():
+                        os.remove(outfn)
+                    raise
             else:
                 print(f"File already exists, skipping: {outfn}")
 
@@ -246,16 +302,19 @@ class DataAccess:
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
         verbose=True,  # print information to the screen
     ):
-        """Download multiple Euclid mosaics to outpath, using an alternative method."""
+        """Download multiple Euclid mosaics to outpath."""
         outpath.mkdir(parents=True, exist_ok=True)
         print(f"Downloading {len(file_info)} files to {outpath}")
+        filenames = []
         for info in file_info:
             t = info["tile_index"]
             i = info["instrument_name"]
             f = info["filter_name"]
-            self.download_mosaic_file(
-                t, i, f, mer_file_type, outpath=outpath, verbose=verbose
+            fn = self.download_mosaic_file(
+                t, i, f, outpath, mer_file_type, verbose=verbose
             )
+            filenames.append(fn)
+        return filenames
 
     def download_mosaic_file(
         self,
@@ -266,7 +325,30 @@ class DataAccess:
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
         verbose=True,  # print information to the screen
     ):
-        """Download Euclid mosaic to outpath, using an alternative method."""
+        """Download Euclid mosaic to outpath, using a workaround method."""
+        if self.mer_filename_lookup is None:
+            raise FileNotFoundError("MER filename lookup file was not found.")
+        fn = self.mer_filename_lookup.loc[
+            f"{tile_index}", instrument, mer_file_type, filter
+        ]
+        if verbose:
+            print(f"Downloading {fn}")
+        self.download_file(fn, outpath)
+        return fn
+
+    def download_mosaic_file_alt(
+        self,
+        tile_index,
+        instrument,  # NISP or VIS
+        filter,  # VIS, NIR_Y, NIR_J or NIR_H
+        outpath,  # the folder in which to save the downloaded files
+        mer_file_type="STK",  # STK, BKG, RMS or FLAG
+        verbose=True,  # print information to the screen
+    ):
+        """Download Euclid mosaic to outpath, using an alternative method.
+
+        This is currently not supported by SAS for file types other than STK.
+        """
         params_dict = dict(RETRIEVAL_TYPE="MOSAIC", RELEASE="sedm")
         params_dict.update(
             TILE_INDEX=tile_index,
@@ -350,7 +432,7 @@ class DataAccess:
         outpath,  # the base folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-        mer_file_type="STK",  # "STK", BKG, RMS or FLAG
+        mer_file_type="STK",  # STK, BKG, RMS or FLAG
         verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all files for a Euclid MER tile, optionally restricted by instrument or filter.
@@ -361,9 +443,17 @@ class DataAccess:
         file_info = self.get_files_for_tile(
             tile_index, instrument=instrument, filter=filter
         )
-        outpath = Path(outpath, "MER", f"{tile_index:n}", "NIR")
-        # self.download_mosaic_files(file_info, mer_file_type, outpath=outpath, verbose=verbose)
-        self.download_files(file_info, outpath=outpath, verbose=verbose)
+        if instrument == "NISP":
+            instrument_folder = "NIR"
+        elif instrument == "VIS":
+            instrument_folder = "VIS"
+        else:
+            raise ValueError("The instrument must be NISP or VIS.")
+        outpath = Path(outpath, "MER", f"{tile_index:n}", instrument_folder)
+        filenames = self.download_mosaic_files(
+            file_info, outpath=outpath, mer_file_type=mer_file_type, verbose=verbose
+        )
+        file_info["file_name"] = filenames
         return file_info
 
     def download_files_for_target(
