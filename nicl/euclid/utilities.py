@@ -5,11 +5,13 @@
 # %% auto 0
 __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask', 'get_persistence_mask', 'get_invalid_mask',
            'get_rms', 'fits_append', 'remove_if_necessary', 'default_data_path', 'euclid_credentials',
-           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_stack']
+           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_stack',
+           'get_tile_index_from_filename', 'get_obs_id_from_filename', 'get_dither_id_from_filename',
+           'get_filter_from_filename']
 
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
-from glob import glob
+import re
 from pathlib import Path
 
 import numpy as np
@@ -23,26 +25,40 @@ def get_nisp_images_for_observation(
     n_prior=0,  # number of previous observations to include
     n_after=0,  # number of subsequent observations to include
     path=None,  # base path to search
+    include_sir=False,  # include SIR files
 ):
     """Find NISP images for the specified obs_id and optionally n_prior and n_after observations."""
-    info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[])
+    info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[], exptime=[])
     obs_id = int(obs_id)
+    path = Path(path)
     for i in range(obs_id - n_prior, obs_id + n_after + 1):
-        fns = list(Path(path).glob(f"**/EUC_NIR*-{i}-*Z.fits"))
+        fns = list(path.glob(f"**/EUC_NIR*-{i}-*Z.fits"))
+        if include_sir:
+            sir_fns = list(path.glob(f"**/EUC_SIR*_{i}_*Z.fits"))
+            fns += sir_fns
+            n_expected = 16
+        else:
+            n_expected = 12
         if len(fns) == 0:
             print(f"Found no files for observation id {i}.")
-        elif len(fns) < 12:
+        elif len(fns) < n_expected:
             print(f"Missing some files for observation id {i}.")
-        elif len(fns) > 12:
+            if include_sir and len(sir_fns) == 0:
+                print("No SIR files found.")
+        elif len(fns) > n_expected:
             print(f"Found too many files for observation id {i}.")
         for fn in fns:
             with fits.open(fn) as f:
                 h = f[0].header
                 info["filename"].append(fn)
-                info["filter"].append(h["FILTER"])
+                if include_sir and fn in sir_fns:
+                    info["filter"].append("SIR")
+                else:
+                    info["filter"].append(h["FILTER"])
                 info["dithobs"].append(h["DITHOBS"])
                 info["obs_id"].append(h["OBS_ID"])
                 info["mjd"].append(h["MJD-OBS"])
+                info["exptime"].append(h["EXPTIME"])
     info = pd.DataFrame(info)
     info = info.sort_values("mjd").reset_index(drop=True)
     return info
@@ -163,3 +179,35 @@ def get_nisp_stack(obs_id, filter, path):
     filter = filter.replace("NIR_", "")
     fn = f"EUC_NIR_W-STK-IMAGE_{filter}-{obs_id}.fits"
     return find_single_file(fn, path)
+
+# %% ../../nbs/euclid/utilities.ipynb 11
+def get_tile_index_from_filename(fn):
+    fn = os.path.basename(fn)
+    match = re.search(r"TILE(?P<id>(\d)*)[-_.]", fn)
+    tile_index = int(match.group("id")) if match else None
+    return tile_index
+
+
+def get_obs_id_from_filename(fn):
+    fn = os.path.basename(fn)
+    match = re.search(r"[-_](?P<id>(\d)*)[-_.]", fn)
+    obs_id = match.group("id") if match else None
+    obs_id = int(obs_id) if obs_id else None
+    return obs_id
+
+
+def get_dither_id_from_filename(fn):
+    fn = os.path.basename(fn)
+    match = re.search(r"[-_]0?(?P<id>\d)[-_]", fn)
+    dither_id = match.group("id") if match else None
+    dither_id = int(dither_id) if dither_id else None
+    return dither_id
+
+
+def get_filter_from_filename(fn):
+    fn = os.path.basename(fn)
+    match = re.search(r"_(?P<filter>(VIS|SIR))[-_]", fn)
+    if match is None:
+        match = re.search(r"[-_]NIR.*[-_](?P<filter>[YJH])[-_]", fn)
+    filter = match.group("filter") if match else None
+    return filter
