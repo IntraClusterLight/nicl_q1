@@ -8,6 +8,7 @@ __all__ = ['DataAccess']
 # %% ../../nbs/euclid/data_access.ipynb 2
 import re
 from getpass import getpass
+import os
 from pathlib import Path
 
 import numpy as np
@@ -285,7 +286,12 @@ class DataAccess:
         self.data_login()
         if not self.dry_run:
             if not outfn.exists() or self.overwrite:
-                self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+                try:
+                    self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+                except (Exception, KeyboardInterrupt):
+                    if outfn.exists():
+                        os.remove(outfn)
+                    raise
             else:
                 print(f"File already exists, skipping: {outfn}")
 
