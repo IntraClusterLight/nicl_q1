@@ -10,6 +10,7 @@ import json
 from warnings import catch_warnings, filterwarnings
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 from astropy.io import fits
 from kerchunk.combine import MultiZarrToZarr
@@ -55,7 +56,7 @@ def _get_ext_det(x):
         return x.split(".")[0] if "." in x else x
 
 # %% ../../nbs/euclid/xarray.ipynb 7
-def create_zarr_ref_from_fits(fns):
+def create_zarr_ref_from_fits(fns, return_wcs=False):
     """Create a zarr reference from a set of Euclid fits files.
 
     This uses kerchunk to build a zarr reference file for accessing data directly from fits files.
@@ -76,7 +77,17 @@ def create_zarr_ref_from_fits(fns):
     product_ids = []
     dither_ids = []
     filters = []
+    wcs_list = []
     for fn in fns:
+        product_id = get_product_id(fn)
+        product_ids.append(product_id)
+        dither_id = get_dither_id_from_filename(fn)
+        if dither_id is not None:
+            dither_ids.append(dither_id)
+        filter = get_filter_from_filename(fn)
+        if dither_id is not None:
+            filters.append(filter)
+        print(fn, product_id, dither_id, filter)
         ref_exts = []
         coords = []
         coord_name = "extension"
@@ -88,7 +99,20 @@ def create_zarr_ref_from_fits(fns):
                 coord_name = "detector"
             out = _fix_byte_order(out)
             ref_exts.append(out)
-            coords.append(_get_ext_det(ext))
+            coord = _get_ext_det(ext)
+            coords.append(coord)
+            hdr = fits.getheader(fn, ext)
+            if return_wcs:
+                wcs = {k: hdr[k] for k in ("CTYPE1", "CTYPE2",
+                                           "CD1_1", "CD1_2", "CD2_1", "CD2_2",
+                                           "CRPIX1", "CRPIX2", "CRVAL1", "CRVAL2",
+                                           "NAXIS1", "NAXIS2")}
+                wcs[coord_name] = coord
+                if dither_id is not None:
+                    wcs["dither"] = dither_id
+                if dither_id is not None:
+                    wcs[product_id_name] = product_id
+                wcs_list.append(wcs)
         mzz = MultiZarrToZarr(
             ref_exts,
             coo_map = {coord_name: coords},
@@ -97,15 +121,6 @@ def create_zarr_ref_from_fits(fns):
         )
         ref_exts = mzz.translate()
         ref_files.append(ref_exts)
-        product_id = get_product_id(fn)
-        product_ids.append(product_id)
-        dither_id = get_dither_id_from_filename(fn)
-        if dither_id is not None:
-            dither_ids.append(dither_id)
-        filter = get_filter_from_filename(fn)
-        if dither_id is not None:
-            filters.append(filter)
-        print(fn, product_id, dither_id, filter)
     coo_map = {}
     concat_dims = []
     if len(np.unique(product_ids)) > 0:
@@ -126,7 +141,13 @@ def create_zarr_ref_from_fits(fns):
     with catch_warnings():
         filterwarnings("ignore", "Concatenated coordinate .* contains less than expected")
         out = mzz.translate()
-    return out
+    if return_wcs:
+        wcs = pd.DataFrame(wcs_list)
+        wcs = wcs.groupby([coord_name, "dither", product_id_name]).first()
+        wcs = wcs.to_xarray()
+        return out, wcs
+    else:
+        return out
 
 # %% ../../nbs/euclid/xarray.ipynb 8
 def open_zarr_ref_as_dataset(ref):
