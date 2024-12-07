@@ -24,7 +24,6 @@ from photutils.segmentation import (
 from scipy.ndimage import binary_closing, median_filter
 
 from nicl.euclid.utilities import (
-    default_data_path,
     get_nisp_images_for_observation,
     get_primary_header,
     get_persistence_mask,
@@ -582,21 +581,27 @@ def correct_persistence(
         if estimate_decay:
             print("Estimating persistence decay")
             for form in ("powerlaw",):
-                slope, n_features = estimate_persistence_decay(
-                    minimum_images,
-                    dt_lp_images,
-                    ext=ext,
-                    mjd=mjd,
-                    primary_header=primary_header,
-                    outpath=outpath,
-                    form=form,
-                    debug=debug,
-                )
-                print(
-                    f"Estimated persistence {form} decay slope from {n_features} features ({ext}): {slope:.2e}"
-                )
-                if use_estimated_decay == form:
-                    decay_slope = slope
+                try:
+                    slope, n_features = estimate_persistence_decay(
+                        minimum_images,
+                        dt_lp_images,
+                        ext=ext,
+                        mjd=mjd,
+                        primary_header=primary_header,
+                        outpath=outpath,
+                        form=form,
+                        debug=debug,
+                    )
+                    print(
+                        f"Estimated persistence {form} decay slope from {n_features} features ({ext}): {slope:.2e}"
+                    )
+                    if use_estimated_decay == form:
+                        decay_slope = slope
+                except Exception as e:
+                    print("Encountered error when estimate_persistence_decay:")
+                    print(e)
+                    if use_estimated_decay == form:
+                        print(f"Using default decay slope: {decay_slope:.2e}")
         decay_form = (
             use_estimated_decay if use_estimated_decay is not None else "powerlaw"
         )
