@@ -17,9 +17,10 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from photutils.background import Background2D
 
+from nicl.euclid.data_access import DataAccess
 from nicl.mask import fast_mask
 
-# %% ../../nbs/euclid/combine.ipynb 3
+# %% ../../nbs/euclid/combine.ipynb 4
 swarp_config_nisp = """
 #----------------------------------- Output -----------------------------------
 IMAGEOUT_NAME          coadd.fits      # Output filename
@@ -133,7 +134,7 @@ NTHREADS               0               # Number of simultaneous threads for
 # The VIS config may need some customisations
 swarp_config_vis = swarp_config_nisp
 
-# %% ../../nbs/euclid/combine.ipynb 4
+# %% ../../nbs/euclid/combine.ipynb 5
 class Combiner:
     """Combines Euclid calibrated dithers."""
 
@@ -150,20 +151,30 @@ class Combiner:
         ],  # default filters to process, if not specified further
         name=None,  # default name for the output image
         bkg_sub=True,  # subtract background
-        bkg_mesh_size=None,  # size of the background mesh in angular units: should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified will use a 10x10 mesh for each chip
-        cutout_cen=None,  # center of the cutout; astropy.coordinates.SkyCoord object or a string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
-        cutout_size=None,  # size of the cutout from the stack in angular units; should be provided with one (equal dimension) or two quantities; can accept astropy.units.Quanity with angular units (e.g. 60 * u.arcsec) and plain numbers will be interpreted as in arcsec; if not specified swarp will produce a full-size stack
+        bkg_mesh_size=None,  # size of the background mesh in angular units
+        cutout_cen=None,  # center of the cutout; SkyCoord object or string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
+        cutout_size=None,  # size of the cutout from the stack in angular units
         bits_to_mask=None,  # list of DQ bits to mask
+        release_name="Q1_R1",  # the data release to use to find obs_ids if required
         overwrite=False,  # overwrite existing files
         debug=False,  # retain intermediate files for checking
     ):
-        """Create an object for accessing data and log in to the ESA server."""
+        """Create an object for combining images.
+
+        The `bkg_mesh_size` and `cutout_size` should be provided with one (equal dimension) or two quantities;
+        they can accept astropy.units.Quantity with angular units (e.g. 60 * u.arcsec) or plain numbers that
+        will be interpreted as in arcsec.
+
+        If `bkg_mesh_size is not specified, will use a 10x10 mesh for each detector chip.
+
+        If `cutout_size` is not specified, will produce a full-size stack.
+        """
         self.in_path = Path(in_path).expanduser()
         self.out_path = Path(out_path).expanduser()
-        self.obs_ids = obs_ids
         self.filters = filters
         self.name = name
         self.bkg_sub = bkg_sub
+        self.release_name = release_name
         self.overwrite = overwrite
         self.debug = debug
         if cutout_cen is not None:
@@ -175,6 +186,8 @@ class Combiner:
                 raise ValueError(
                     "cutout_cen must be a string in the format 'ra dec' or an astropy.coordinates.SkyCoord object."
                 )
+        else:
+            self.cutout_cen = None
         if cutout_size is not None:
             if isinstance(cutout_size, (int, float)):
                 self.cutout_size = (cutout_size * u.arcsec, cutout_size * u.arcsec)
@@ -206,7 +219,11 @@ class Combiner:
                     "cutout_size must be a single quantity or a tuple of two quantities."
                 )
         else:
-            self.cutout_size = cutout_size
+            self.cutout_size = None
+        if obs_ids is None and self.cutout_cen is not None:
+            self.obs_ids = self.determine_required_obs_ids()
+        else:
+            self.obs_ids = obs_ids
         if bkg_mesh_size is not None:
             if isinstance(bkg_mesh_size, (int, float)):
                 self.bkg_mesh_size = (
@@ -241,7 +258,7 @@ class Combiner:
                     "bkg_mesh_size must be a single quantity or a tuple of two quantities."
                 )
         else:
-            self.bkg_mesh_size = bkg_mesh_size
+            self.bkg_mesh_size = None
         if bits_to_mask is not None:
             self.bits_to_mask = bits_to_mask
         else:
@@ -289,6 +306,7 @@ class Combiner:
             with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdirname:
                 if self.debug:
                     print(f"Intermediate files can be found in {tmpdirname}/.")
+                    print("You must delete this folder manually when done.")
                 os.chdir(tmpdirname)
                 tmp_fns_sci = self.prepare_sci_dithers(dithers, detectors, pix_scale)
                 self.prepare_weight_dithers(dithers, detectors)
@@ -322,6 +340,15 @@ class Combiner:
                 self.copy_swarp_to_output(out_fn)
         finally:
             os.chdir(cwd)
+
+    def determine_required_obs_ids(self):
+        da = DataAccess(release_name=self.release_name)
+        radius = 0.5 * max(*self.cutout_size)
+        obs_ids = da.find_observations_for_target(
+            self.cutout_cen.ra, self.cutout_cen.dec, radius, fully_contained=False
+        )
+        print(f"Determined required observation ids: {obs_ids}")
+        return obs_ids
 
     def get_dithers(self, obs_ids, filt):
         dithers = []
