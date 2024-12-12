@@ -12,6 +12,7 @@ from warnings import catch_warnings, filterwarnings
 
 from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU
 from astropy.io import fits
+from astropy.wcs import WCS
 import numpy as np
 import pandas as pd
 import xarray as xr
