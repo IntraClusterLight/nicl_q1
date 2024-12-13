@@ -12,8 +12,15 @@ from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
+from astropy.stats import SigmaClip
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+from photutils.background import Background2D
 
-# %% ../../nbs/euclid/combine.ipynb 3
+from nicl.euclid.data_access import DataAccess
+from nicl.mask import fast_mask
+
+# %% ../../nbs/euclid/combine.ipynb 4
 swarp_config_nisp = """
 #----------------------------------- Output -----------------------------------
 IMAGEOUT_NAME          coadd.fits      # Output filename
@@ -127,7 +134,7 @@ NTHREADS               0               # Number of simultaneous threads for
 # The VIS config may need some customisations
 swarp_config_vis = swarp_config_nisp
 
-# %% ../../nbs/euclid/combine.ipynb 4
+# %% ../../nbs/euclid/combine.ipynb 5
 class Combiner:
     """Combines Euclid calibrated dithers."""
 
@@ -143,18 +150,115 @@ class Combiner:
             "H",
         ],  # default filters to process, if not specified further
         name=None,  # default name for the output image
+        bkg_sub=True,  # subtract background
+        bkg_mesh_size=None,  # size of the background mesh in angular units
+        cutout_cen=None,  # center of the cutout; SkyCoord object or string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
+        cutout_size=None,  # size of the cutout from the stack in angular units
         bits_to_mask=None,  # list of DQ bits to mask
+        release_name="Q1_R1",  # the data release to use to find obs_ids if required
         overwrite=False,  # overwrite existing files
         debug=False,  # retain intermediate files for checking
     ):
-        """Create an object for accessing data and log in to the ESA server."""
-        self.in_path = Path(in_path)
-        self.out_path = Path(out_path)
-        self.obs_ids = obs_ids
+        """Create an object for combining images.
+
+        The `bkg_mesh_size` and `cutout_size` should be provided with one (equal dimension) or two quantities;
+        they can accept astropy.units.Quantity with angular units (e.g. 60 * u.arcsec) or plain numbers that
+        will be interpreted as in arcsec.
+
+        If `bkg_mesh_size is not specified, will use a 10x10 mesh for each detector chip.
+
+        If `cutout_size` is not specified, will produce a full-size stack.
+        """
+        self.in_path = Path(in_path).expanduser()
+        self.out_path = Path(out_path).expanduser()
         self.filters = filters
         self.name = name
+        self.bkg_sub = bkg_sub
+        self.release_name = release_name
         self.overwrite = overwrite
         self.debug = debug
+        if cutout_cen is not None:
+            if isinstance(cutout_cen, str):
+                self.cutout_cen = SkyCoord(cutout_cen, unit=(u.hourangle, u.deg))
+            elif isinstance(cutout_cen, SkyCoord):
+                self.cutout_cen = cutout_cen
+            else:
+                raise ValueError(
+                    "cutout_cen must be a string in the format 'ra dec' or an astropy.coordinates.SkyCoord object."
+                )
+        else:
+            self.cutout_cen = None
+        if cutout_size is not None:
+            if isinstance(cutout_size, (int, float)):
+                self.cutout_size = (cutout_size * u.arcsec, cutout_size * u.arcsec)
+            if isinstance(cutout_size, u.Quantity) and cutout_size.unit.is_equivalent(
+                u.arcsec
+            ):
+                self.cutout_size = (cutout_size, cutout_size)
+            elif len(cutout_size) == 2:
+                if isinstance(cutout_size[0], (int, float)) and isinstance(
+                    cutout_size[1], (int, float)
+                ):
+                    self.cutout_size = (
+                        cutout_size[0] * u.arcsec,
+                        cutout_size[1] * u.arcsec,
+                    )
+                elif (
+                    isinstance(cutout_size[0], u.Quantity)
+                    and cutout_size[0].unit.is_equivalent(u.arcsec)
+                    and isinstance(cutout_size[1], u.Quantity)
+                    and cutout_size[1].unit.is_equivalent(u.arcsec)
+                ):
+                    self.cutout_size = cutout_size
+                else:
+                    raise ValueError(
+                        "cutout_size is inhomogeneous. it should be either plain numbers or astropy.units.Quantity."
+                    )
+            else:
+                raise ValueError(
+                    "cutout_size must be a single quantity or a tuple of two quantities."
+                )
+        else:
+            self.cutout_size = None
+        if obs_ids is None and self.cutout_cen is not None:
+            self.obs_ids = self.determine_required_obs_ids()
+        else:
+            self.obs_ids = obs_ids
+        if bkg_mesh_size is not None:
+            if isinstance(bkg_mesh_size, (int, float)):
+                self.bkg_mesh_size = (
+                    bkg_mesh_size * u.arcsec,
+                    bkg_mesh_size * u.arcsec,
+                )
+            if isinstance(
+                bkg_mesh_size, u.Quantity
+            ) and bkg_mesh_size.unit.is_equivalent(u.arcsec):
+                self.bkg_mesh_size = (bkg_mesh_size, bkg_mesh_size)
+            elif len(bkg_mesh_size) == 2:
+                if isinstance(bkg_mesh_size[0], (int, float)) and isinstance(
+                    bkg_mesh_size[1], (int, float)
+                ):
+                    self.bkg_mesh_size = (
+                        bkg_mesh_size[0] * u.arcsec,
+                        bkg_mesh_size[1] * u.arcsec,
+                    )
+                elif (
+                    isinstance(bkg_mesh_size[0], u.Quantity)
+                    and bkg_mesh_size[0].unit.is_equivalent(u.arcsec)
+                    and isinstance(bkg_mesh_size[1], u.Quantity)
+                    and bkg_mesh_size[1].unit.is_equivalent(u.arcsec)
+                ):
+                    self.bkg_mesh_size = bkg_mesh_size
+                else:
+                    raise ValueError(
+                        "bkg_mesh_size is inhomogeneous. it should be either plain numbers or astropy.units.Quantity."
+                    )
+            else:
+                raise ValueError(
+                    "bkg_mesh_size must be a single quantity or a tuple of two quantities."
+                )
+        else:
+            self.bkg_mesh_size = None
         if bits_to_mask is not None:
             self.bits_to_mask = bits_to_mask
         else:
@@ -184,12 +288,16 @@ class Combiner:
         if filt == "VIS":
             det_ids = [f"{col}-{row}" for row in range(1, 7) for col in range(1, 7)]
             detectors = [f"CCDID{i}" for i in det_ids]
+            swarp_config = swarp_config_vis
+            pix_scale = 0.1  # arcsec per pixel
         else:
             det_ids = [f"{col}{row}" for row in range(1, 5) for col in range(1, 5)]
             detectors = [f"DET{i}" for i in det_ids]
-        out_fn = dithers[0].name.split("-")[0] + "-STK-IMAGE"
-        if name is None and len(obs_ids) == 1:
-            name = obs_ids[0]
+            swarp_config = swarp_config_nisp
+            pix_scale = 0.3  # arcsec per pixel
+        out_fn = dithers[0].name.split("-")[0] + "-STK-IMAGE" + f"_{filt}"
+        if name is None and len(obs_ids) >= 1:
+            name = "-".join([str(obs_id) for obs_id in obs_ids])
         if name is not None:
             out_fn += f"-{name}"
         out_fn += ".fits"
@@ -198,21 +306,49 @@ class Combiner:
             with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdirname:
                 if self.debug:
                     print(f"Intermediate files can be found in {tmpdirname}/.")
+                    print("You must delete this folder manually when done.")
                 os.chdir(tmpdirname)
-                tmp_fns_sci = self.prepare_sci_dithers(dithers, detectors)
+                tmp_fns_sci = self.prepare_sci_dithers(dithers, detectors, pix_scale)
                 self.prepare_weight_dithers(dithers, detectors)
                 with open("images.lis", "w") as file:
                     for fn in tmp_fns_sci:
                         file.write(f"{fn}[1]\n")
+                # calculate the cutout size in pixels, only if it is specified
+                if self.cutout_size is not None:
+                    cutout_size_pix = [
+                        round(cutsize.to(u.arcsec).value / pix_scale)
+                        for cutsize in self.cutout_size
+                    ]
+                    # TODO: the string replace method is not robust, should be replaced with a better approach in the future
+                    swarp_config = swarp_config.replace(
+                        "IMAGE_SIZE             0",
+                        f"IMAGE_SIZE             {cutout_size_pix[0]},{cutout_size_pix[1]}",
+                    )
+                # specify the cutout center, only if it is specified by user
+                if self.cutout_cen is not None:
+                    swarp_config = swarp_config.replace(
+                        "CENTER_TYPE            ALL",
+                        "CENTER_TYPE            MANUAL",
+                    )
+                    swarp_config = swarp_config.replace(
+                        "CENTER         00:00:00.0, +00:00:00.0",
+                        f"CENTER         {self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}",
+                    )
                 with open("config.swarp", "w") as file:
-                    if filt == "VIS":
-                        file.write(swarp_config_vis)
-                    else:
-                        file.write(swarp_config_nisp)
+                    file.write(swarp_config)
                 os.system("swarp @images.lis -c config.swarp")
                 self.copy_swarp_to_output(out_fn)
         finally:
             os.chdir(cwd)
+
+    def determine_required_obs_ids(self):
+        da = DataAccess(release_name=self.release_name)
+        radius = 0.5 * max(*self.cutout_size)
+        obs_ids = da.find_observations_for_target(
+            self.cutout_cen.ra, self.cutout_cen.dec, radius, fully_contained=False
+        )
+        print(f"Determined required observation ids: {obs_ids}")
+        return obs_ids
 
     def get_dithers(self, obs_ids, filt):
         dithers = []
@@ -231,17 +367,51 @@ class Combiner:
             print("Found too many files.")
         return dithers
 
-    def prepare_sci_dithers(self, dithers, detectors):
+    def prepare_sci_dithers(self, dithers, detectors, pix_scale):
         print("Preparing science dithers for swarp...")
         tmp_fns = []
         for i, dither in enumerate(dithers):
             with fits.open(dither) as hdul:
                 for det in detectors:
                     extension = f"{det}.SCI"
-                    frame = fits.HDUList([hdul[0], hdul[extension]])
+                    data = hdul[extension].data
+                    primary_hdr = hdul[0].header
+                    ext_hdr = hdul[extension].header
+                    if self.bkg_sub:
+                        dq = hdul[det + ".DQ"].data
+                        obj_mask, _ = fast_mask(data, estimate_background=True)
+                        bad_pix_mask = np.any(
+                            [(dq & 2**bit > 0) for bit in self.bits_to_mask], axis=0
+                        )
+                        # combine the bad pixel mask and the object mask to form a final mask
+                        mask = bad_pix_mask | obj_mask
+                        # 10 x 10 mesh by default if not specified
+                        if self.bkg_mesh_size is None:
+                            bkg_mesh_size_pix = (
+                                data.shape[0] // 10,
+                                data.shape[1] // 10,
+                            )
+                        else:
+                            bkg_mesh_size_pix = tuple(
+                                [
+                                    round(meshsize.to(u.arcsec).value / pix_scale)
+                                    for meshsize in self.bkg_mesh_size
+                                ]
+                            )
+                        bg = Background2D(
+                            data,
+                            bkg_mesh_size_pix,
+                            mask=mask,
+                            filter_size=(3, 3),
+                            sigma_clip=SigmaClip(sigma=3),
+                            exclude_percentile=90.0,
+                        )
+                        # subtract the background and modify the header
+                        data -= bg.background
+                        primary_hdr.add_history(
+                            f"Background modeled and subtracted using {self.bkg_mesh_size} pixel boxes."
+                        )
                     if det.startswith("DET"):
-                        primary_hdr = hdul[0].header
-                        ext_hdr = hdul[extension].header
                         exptime = primary_hdr["EXPTIME"]
                         photfnu = primary_hdr["PHOTFNU"]
                         phrelex = primary_hdr["PHRELEX"]
@@ -257,6 +427,12 @@ class Combiner:
                     else:
                         # may need to subtract background from VIS images here
                         pass
+                    frame = fits.HDUList(
+                        [
+                            fits.PrimaryHDU(header=primary_hdr),
+                            fits.ImageHDU(data, ext_hdr),
+                        ]
+                    )
                     tmp_fn = f"sci_{i}_{det}.fits"
                     tmp_fns.append(tmp_fn)
                     frame.writeto(tmp_fn)
@@ -283,32 +459,34 @@ class Combiner:
                     frame.writeto(tmp_fn)
 
     def copy_swarp_to_output(self, out_fn):
-        with fits.open("coadd.weight.fits", memmap=True) as hdul_weights:
-            hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
-        with np.errstate(divide="ignore"):
-            np.divide(1.0, hdu_rms.data, out=hdu_rms.data)
-        hdu_rms.data[hdu_rms.data == np.inf] = 1.0e16
-        np.sqrt(hdu_rms.data, out=hdu_rms.data)
-        hdu_pri = fits.PrimaryHDU()
-        hdul_rms = fits.HDUList([hdu_pri, hdu_rms])
-        hdul_rms.writeto("rms.fits")
-        with fits.open("coadd.fits", memmap=True) as hdul_sci:
+        with fits.open("coadd.fits", memmap=True) as hdul_sci, fits.open(
+            "coadd.weight.fits", memmap=True
+        ) as hdul_weights:
+            # this is necessary because they are both PrimaryHDU objects
             hdu_sci = fits.ImageHDU(hdul_sci[0].data, hdul_sci[0].header)
-        hdu_sci.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
-        hdu_sci.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
-        hdu_sci.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
-        hdu_sci.header.set("EXTNAME", "SCI", "Extension name", after="GCOUNT")
-        hdu_sci.header.set("ZPAB", 23.9)
-        hdu_sci.header.set("ZPABE", 0.0)
-        hdu_sci.header.set("ZPVEGA", 1.0)
-        hdu_sci.header.set("ZPVEGAE", 0.0)
-        hdu_rms.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
-        hdu_rms.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
-        hdu_rms.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
-        hdu_rms.header.set("EXTNAME", "RMS", "Extension name", after="GCOUNT")
-        hdu_sci.header.remove("SIMPLE", ignore_missing=True)
-        for key in ("SIMPLE", "ZPAB", "ZPAB", "ZPVEGA", "ZPVEGAE"):
-            hdu_rms.header.remove(key, ignore_missing=True)
-        hdulist_combined = fits.HDUList([hdu_pri, hdu_sci, hdu_rms])
-        os.makedirs(self.out_path, exist_ok=True)
-        hdulist_combined.writeto(self.out_path / out_fn, overwrite=self.overwrite)
+            hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
+            # set science image to NaN where the weight is zero
+            hdu_sci.data[hdu_rms.data == 0] = np.nan
+            # convert the weight to RMS
+            with np.errstate(divide="ignore"):
+                np.divide(1.0, hdu_rms.data, out=hdu_rms.data)
+            np.sqrt(hdu_rms.data, out=hdu_rms.data)
+            # clean up the headers
+            hdu_sci.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
+            hdu_sci.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
+            hdu_sci.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
+            hdu_sci.header.set("EXTNAME", "SCI", "Extension name", after="GCOUNT")
+            hdu_sci.header.set("ZPAB", 23.9)
+            hdu_sci.header.set("ZPABE", 0.0)
+            hdu_sci.header.set("ZPVEGA", 1.0)
+            hdu_sci.header.set("ZPVEGAE", 0.0)
+            hdu_sci.header.remove("SIMPLE", ignore_missing=True)
+            hdu_rms.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
+            hdu_rms.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
+            hdu_rms.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
+            hdu_rms.header.set("EXTNAME", "RMS", "Extension name", after="GCOUNT")
+            for key in ("SIMPLE", "ZPAB", "ZPAB", "ZPVEGA", "ZPVEGAE"):
+                hdu_rms.header.remove(key, ignore_missing=True)
+            hdul = fits.HDUList([fits.PrimaryHDU(), hdu_sci, hdu_rms])
+            self.out_path.mkdir(parents=True, exist_ok=True)
+            hdul.writeto(self.out_path / out_fn, overwrite=self.overwrite)
