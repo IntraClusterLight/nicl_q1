@@ -254,16 +254,6 @@ class DataAccess:
         file_info = self.tap_query(query)
         return file_info
 
-    @staticmethod
-    def get_instrument_folder(instrument):
-        if instrument == "NISP":
-            instrument_folder = "NIR"
-        elif instrument == "VIS":
-            instrument_folder = "VIS"
-        else:
-            raise ValueError("The instrument must be NISP or VIS.")
-        return instrument_folder
-
     def download_files(
         self,
         filenames,  #  list of filenames or Table containing "file_name" column
@@ -401,10 +391,15 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter."""
-        instrument_folder = self.get_instrument_folder(instrument)
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
+        if instrument == "NISP":
+            instrument_folder = "NIR"
+        elif instrument == "VIS":
+            instrument_folder = "VIS_QUAD"
+        else:
+            raise ValueError("The instrument must be NISP or VIS.")
         outpath = Path(outpath, instrument_folder, f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
@@ -454,7 +449,12 @@ class DataAccess:
         file_info = self.get_files_for_tile(
             tile_index, instrument=instrument, filter=filter
         )
-        instrument_folder = self.get_instrument_folder(instrument)
+        if instrument == "NISP":
+            instrument_folder = "NIR"
+        elif instrument == "VIS":
+            instrument_folder = "VIS"
+        else:
+            raise ValueError("The instrument must be NISP or VIS.")
         outpath = Path(outpath, "MER", f"{tile_index:n}", instrument_folder)
         filenames = self.download_mosaic_files(
             file_info, outpath=outpath, mer_file_type=mer_file_type, verbose=verbose
