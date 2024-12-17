@@ -25,15 +25,15 @@ class Camera:
 VIS = Camera(
     name="VIS",
     chips=tuple(f"{x}-{y}" for x in range(1, 7) for y in range(1, 7)),
-    chip_subdivisions=tuple(["E", "F", "G", "H"]),
-    filters=("vis",),
+    chip_subdivisions=("E", "F", "G", "H"),
+    filters=("I",),
     pix_scale=0.1,
 )
 NISP = Camera(
     name="NISP",
     chips=tuple(f"DET{x}{y}" for x in range(1, 5) for y in range(1, 5)),
     filters=("Y", "J", "H"),
-    pix_scale=0.298925548730467,
+    pix_scale=0.3,
 )
 
 # %% ../../nbs/euclid/constants.ipynb 4
