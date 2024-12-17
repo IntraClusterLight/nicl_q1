@@ -22,6 +22,15 @@ class Camera:
     bad_pix_bits: Tuple[int, ...] = None
     chip_subdivisions: Tuple[str, ...] = None
 
+    @property
+    def extnames(self):
+        if self.chip_subdivisions is None:
+            return self.chips
+        else:
+            return tuple(
+                f"{chip}.{sub}" for chip in self.chips for sub in self.chip_subdivisions
+            )
+
 
 VIS = Camera(
     name="VIS",
