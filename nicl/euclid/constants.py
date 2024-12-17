@@ -19,6 +19,7 @@ class Camera:
     chips: Tuple[str, ...]
     filters: Tuple[str, ...]
     pix_scale: float
+    bad_pix_bits: Tuple[int, ...] = None
     chip_subdivisions: Tuple[str, ...] = None
 
 
@@ -33,6 +34,7 @@ NISP = Camera(
     name="NISP",
     chips=tuple(f"DET{x}{y}" for x in range(1, 5) for y in range(1, 5)),
     filters=("Y", "J", "H"),
+    bad_pix_bits=(2, 3, 4, 6, 8, 9, 10, 12, 13, 16, 18, 23),
     pix_scale=0.3,
 )
 
