@@ -159,6 +159,11 @@ class Combiner(ABC):
                 raise ValueError(
                     "Either out_dir or release_name must be specified to infer where to place the output images."
                 )
+        else:
+            out_dir = Path(out_dir).expanduser()
+            if out_dir.exists() and out_dir.is_file():
+                raise ValueError("The output directory points to a file.")
+            self.out_dir = out_dir
         if bkg_mesh_size is not None:
             if isinstance(bkg_mesh_size, (int, float)):
                 self.bkg_mesh_size = (
