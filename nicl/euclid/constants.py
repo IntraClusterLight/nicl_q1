@@ -37,13 +37,14 @@ VIS = Camera(
     chips=tuple(f"{x}-{y}" for x in range(1, 7) for y in range(1, 7)),
     chip_subdivisions=("E", "F", "G", "H"),
     filters=("I",),
+    bad_pix_bits=(0,),  # 0 is the common flag for all invlid pixels
     pix_scale=0.1,
 )
 NISP = Camera(
     name="NISP",
     chips=tuple(f"DET{x}{y}" for x in range(1, 5) for y in range(1, 5)),
     filters=("Y", "J", "H"),
-    bad_pix_bits=(2, 3, 4, 6, 8, 9, 10, 12, 13, 16, 18, 23),
+    bad_pix_bits=(0,),  # 0 is the common flag for all invlid pixels
     pix_scale=0.3,
 )
 
@@ -206,7 +207,7 @@ PROJECTION_ERR         0.001           # Maximum projection error (in output
 CENTER_TYPE            ALL             # MANUAL, ALL or MOST
 CENTER         00:00:00.0, +00:00:00.0 # Coordinates of the image center
 PIXELSCALE_TYPE        MANUAL          # MANUAL,FIT,MIN,MAX or MEDIAN
-PIXEL_SCALE            0.3             # Pixel scale
+PIXEL_SCALE            0.1             # Pixel scale
 IMAGE_SIZE             0               # Image size (0 = AUTOMATIC)
  
 #-------------------------------- Resampling ----------------------------------
@@ -223,7 +224,7 @@ INTERPOLATE            N               # Interpolate bad input pixels (Y/N)?
                                        # (all or for each image)
  
 FSCALASTRO_TYPE        VARIABLE            # NONE,FIXED, or VARIABLE
-FSCALE_KEYWORD         PHOSCALE            # FITS keyword for the multiplicative
+FSCALE_KEYWORD         FLXSCALE            # FITS keyword for the multiplicative
                                        # factor applied to each input image
 FSCALE_DEFAULT         1.0             # Default FSCALE value if not in header
  

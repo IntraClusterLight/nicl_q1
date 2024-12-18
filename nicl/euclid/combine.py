@@ -6,7 +6,6 @@
 __all__ = ['Combiner', 'NISPCombiner']
 
 # %% ../../nbs/euclid/combine.ipynb 2
-import os
 import tempfile
 from pathlib import Path
 from abc import ABC, abstractmethod
