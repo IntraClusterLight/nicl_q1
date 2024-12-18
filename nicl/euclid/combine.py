@@ -425,7 +425,7 @@ class NISPCombiner(Combiner):
                 check=True,
             )
             if self.debug:
-                print(run_swarp.stdout)
+                print(run_swarp.stderr)
             print("SWarp finished successfully.")
         except subprocess.CalledProcessError as e:
             print(
