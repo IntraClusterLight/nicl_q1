@@ -290,6 +290,8 @@ class NISPCombiner(Combiner):
 
     def combine_per_filter(self, filter):
         images = self._find_images(filter)
+        if len(images) == 0:
+            return
         out_fn = images[0].name.split("-")[0] + "-STK-IMAGE_" + filter
         if len(self.name) > 0:
             out_fn += f"-{self.name}"
@@ -482,6 +484,8 @@ class VISCombiner(Combiner):
 
     def combine_per_filter(self, filter):
         images = self._find_images()
+        if len(images) == 0:
+            return
         out_fn = images[0].name.split("-")[0] + "-STK_" + filter
         if len(self.name) > 0:
             out_fn += f"-{self.name}"
