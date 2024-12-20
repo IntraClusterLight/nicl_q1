@@ -21,7 +21,7 @@ from photutils.background import Background2D
 from nicl.euclid.data_access import DataAccess
 from nicl.mask import fast_mask
 from nicl.euclid.constants import VIS, NISP, SWARP_CONFIG_NISP, SWARP_CONFIG_VIS
-from nicl.euclid.utilities import default_data_path
+from nicl.euclid.utilities import default_data_path, round_up_box_size
 
 # %% ../../nbs/euclid/combine.ipynb 4
 # base class for combining images
@@ -352,14 +352,17 @@ class NISPCombiner(Combiner):
                                 sci_data.shape[1] // 10,
                             )
                         else:
-                            bkg_mesh_size_pix = tuple(
-                                [
-                                    round(
-                                        meshsize.to(u.arcsec).value
-                                        / self.instrument.pix_scale
-                                    )
-                                    for meshsize in self.bkg_mesh_size
-                                ]
+                            bkg_mesh_size_pix = (
+                                round_up_box_size(
+                                    sci_data.shape[0],
+                                    self.bkg_mesh_size[0].to(u.arcsec).value
+                                    / self.instrument.pix_scale,
+                                ),
+                                round_up_box_size(
+                                    sci_data.shape[1],
+                                    self.bkg_mesh_size[0].to(u.arcsec).value
+                                    / self.instrument.pix_scale,
+                                ),
                             )
                         bg = Background2D(
                             sci_data,

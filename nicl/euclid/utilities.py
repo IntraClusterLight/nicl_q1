@@ -7,7 +7,7 @@ __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask
            'get_rms', 'fits_append', 'remove_if_necessary', 'default_data_path', 'euclid_credentials',
            'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_stack',
            'get_tile_index_from_filename', 'get_obs_id_from_filename', 'get_dither_id_from_filename',
-           'get_filter_from_filename']
+           'get_filter_from_filename', 'round_up_box_size']
 
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
@@ -211,3 +211,26 @@ def get_filter_from_filename(fn):
         match = re.search(r"[-_]NIR.*[-_](?P<filter>[YJH])[-_]", fn)
     filter = match.group("filter") if match else None
     return filter
+
+# %% ../../nbs/euclid/utilities.ipynb 13
+def round_up_box_size(x, y):
+    """Return an integer z closest to y that approximate integer * z = x."""
+
+    if not isinstance(x, int) or x < 0:
+        raise ValueError("x must be a positive integer")
+    if y > x:
+        return x
+    if y <= 1:
+        return 1
+    if x % y == 0:
+        return y
+    frac_upper = np.round(x / np.floor(x / y)).astype(int)
+    frac_lower = np.round(x / np.ceil(x / y)).astype(int)
+    if np.abs(frac_upper - y) < np.abs(frac_lower - y):
+        z = frac_upper
+    else:
+        z = frac_lower
+    # check if z actually reduces the padding/cropping compared to y
+    if np.min([x % z, z - (x % z)]) > np.min([x % y, y - (x % y)]):
+        raise ValueError("This should not happen")
+    return z
