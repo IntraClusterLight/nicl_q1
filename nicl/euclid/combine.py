@@ -47,6 +47,7 @@ class Combiner(ABC):
         swarp_config=None,  # SWarp configuration file content
         overwrite=False,  # overwrite existing combined image files
         debug=False,  # retain intermediate files for checking
+        **kwargs,  # command line arguments to pass to SWarp, will override the defaults
     ):
         """
         Initialize the Combine class.
@@ -132,7 +133,6 @@ class Combiner(ABC):
                 )
         else:
             self.cutout_size = None
-        self.update_swarp_config()
         if (
             obs_ids is None
             and self.cutout_cen is not None
@@ -215,32 +215,7 @@ class Combiner(ABC):
                     )
             else:
                 self.filters = filters
-
-    def update_swarp_config(self):
-        """update the swarp config with cutout center and size if necessary"""
-        if self.swarp_config is None:
-            return
-        # calculate the cutout size in pixels, only if it is specified
-        if self.cutout_size is not None:
-            cutout_size_pix = [
-                round(cutsize.to(u.arcsec).value / self.instrument.pix_scale)
-                for cutsize in self.cutout_size
-            ]
-            # TODO: the string replace method is not robust, should be replaced with a better approach in the future
-            self.swarp_config = self.swarp_config.replace(
-                "IMAGE_SIZE             0",
-                f"IMAGE_SIZE             {cutout_size_pix[0]},{cutout_size_pix[1]}",
-            )
-        # specify the cutout center, only if it is specified by user
-        if self.cutout_cen is not None:
-            self.swarp_config = self.swarp_config.replace(
-                "CENTER_TYPE            ALL",
-                "CENTER_TYPE            MANUAL",
-            )
-            self.swarp_config = self.swarp_config.replace(
-                "CENTER         00:00:00.0, +00:00:00.0",
-                f"CENTER         {self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}",
-            )
+        self._swarp_extra_args = self._parse_swarp_args(kwargs)
 
     def combine(self):
         for filter in np.atleast_1d(self.filters):
@@ -249,6 +224,38 @@ class Combiner(ABC):
     @abstractmethod
     def combine_per_filter(self, filter):
         pass
+
+    def _parse_swarp_args(self, kwargs):
+        kwargs = {k.upper(): v for k, v in kwargs.items()}
+        swarp_args = []
+        for key, value in kwargs.items():
+            if key in ["CENTER", "IMAGE_SIZE"]:
+                raise ValueError(
+                    f"{key} should be supplied as input arguments to {self.__class__.__name__}"
+                )
+            swarp_args.extend([f"-{key}", str(value)])
+        if self.cutout_size is not None:
+            if "PIXEL_SCALE" in kwargs:
+                pixel_scale = kwargs["PIXEL_SCALE"]
+            else:
+                pixel_scale = self.instrument.pix_scale
+            cutout_size_pix = [
+                round(cutsize.to(u.arcsec).value / pixel_scale)
+                for cutsize in self.cutout_size
+            ]
+            swarp_args.extend(
+                ["-IMAGE_SIZE", f"{cutout_size_pix[0]},{cutout_size_pix[1]}"]
+            )
+        if self.cutout_cen is not None:
+            swarp_args.extend(
+                [
+                    "-CENTER",
+                    f"{self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}",
+                    "-CENTER_TYPE",
+                    "MANUAL",
+                ]
+            )
+        return swarp_args
 
     def _get_obs_ids(self):
         da = DataAccess(release_name=self.release_name)
@@ -421,6 +428,7 @@ class NISPCombiner(Combiner):
         with open(tmpdir / "config.swarp", "w") as f:
             f.write(self.swarp_config)
         swarp_cmd = ["swarp", "@images.list", "-c", "config.swarp"]
+        swarp_cmd.extend(self._swarp_extra_args)
         try:
             run_swarp = subprocess.run(
                 swarp_cmd,
@@ -600,6 +608,7 @@ class VISCombiner(Combiner):
         with open(tmpdir / "config.swarp", "w") as f:
             f.write(self.swarp_config)
         swarp_cmd = ["swarp", "@images.list", "-c", "config.swarp"]
+        swarp_cmd.extend(self._swarp_extra_args)
         try:
             run_swarp = subprocess.run(
                 swarp_cmd,
