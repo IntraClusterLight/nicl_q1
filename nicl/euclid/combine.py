@@ -10,6 +10,8 @@ import tempfile
 from pathlib import Path
 from abc import ABC, abstractmethod
 import subprocess
+import socket
+import getpass
 
 import numpy as np
 from astropy.io import fits
@@ -498,7 +500,20 @@ class VISCombiner(Combiner):
         if len(self.name) > 0:
             out_fn += f"-{self.name}"
         out_fn += ".fits"
-        with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
+        # the default temporary directory may not have enough space for VIS
+        # determine the parent directory for the temporary directory based on the host
+        hostname = socket.gethostname()
+        username = getpass.getuser()
+        match hostname:
+            case "odhar":
+                tmp_dir_parent = Path(f"/data/{username}")
+            case "captain":
+                tmp_dir_parent = Path("~").expanduser()
+            case _:
+                tmp_dir_parent = None
+        with tempfile.TemporaryDirectory(
+            dir=tmp_dir_parent, delete=(not self.debug)
+        ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
@@ -628,9 +643,10 @@ class VISCombiner(Combiner):
 
     def _post_process(self, tmpdir, out_fn):
         """clean up FITS headers and copy the output to the desired directory"""
-        with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci, fits.open(
-            tmpdir / "coadd.weight.fits", memmap=True
-        ) as hdul_weights:
+        with (
+            fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci,
+            fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights,
+        ):
             # this is necessary because they are both PrimaryHDU objects
             hdu_sci = fits.ImageHDU(hdul_sci[0].data, hdul_sci[0].header)
             hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
