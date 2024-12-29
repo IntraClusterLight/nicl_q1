@@ -9,6 +9,7 @@ __all__ = ['correct_persistence']
 import os
 import numpy as np
 import sqlite3
+from functools import partial
 from astropy.io import fits
 from astropy.convolution import convolve
 from astropy.modeling import models, fitting
@@ -46,13 +47,12 @@ def forward_fill(arr, axis=-1):
 # %% ../../nbs/euclid/persistence.ipynb 9
 def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=0):
     images = np.array([fits.getdata(fn, extname=extname) for fn in fns])
-    rms = np.median(get_rms(fns.iloc[n_leading], extname))
     # add invalid pixels to the mask
     masked = np.array([get_invalid_mask(fn, extname) for fn in fns])
     # add the input mask to the mask, this is used to mask pixels prior to the
     # appearance of a persistence feature that affects some of the images
     masked |= mask
-    # if there are less than three unmasked pixels after the target image
+    # if there are less than `n_ok_min` unmasked pixels after the target image
     # then the minimum will not work for rejecting on-sky sources, mask the
     # pixels completely to reflect our lack of knowledge
     n_ok = (~masked).sum(axis=0)
@@ -69,6 +69,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     if correct:
         # correct the bias due to using the minimum of different numbers of
         # samples to estimate the median
+        rms = np.median(get_rms(fns.iloc[n_leading], extname))
         for n in range(n_ok_min, n_ok.max() + 1):
             r = np.random.normal(size=(n, 100000))
             m = np.sort(r, axis=0)[take]
@@ -89,7 +90,17 @@ def mjd_of_last_persistence(image_info, ext, threshold=10000):
     # take the mjd as the end of the exposure
     mjd = np.dstack(image_info["mjd"] + 0.5 * image_info["exptime"] / 86400)
     # create map of features in each frame that are strong enough to cause persistence
-    img = np.dstack([fits.getdata(fn, extname=ext) for fn in image_info["filename"]])
+    img = []
+    for fn in image_info["filename"]:
+        if fn:
+            data = fits.getdata(fn, extname=ext)
+            img.append(data)
+        else:
+            img.append(None)
+    for i in range(len(img)):
+        if img[i] is None:
+            img[i] = np.zeros_like(data)
+    img = np.dstack(img)
     p = img > threshold
     for i, filt in enumerate(image_info["filter"]):
         # SIR images are rotated with respect to NIR images
@@ -139,12 +150,14 @@ def calc_rolling_minimum(
     dt_images = {}
     for i in range(n_leading * n_filters, len(image_info) - (n_roll - 1) * n_filters):
         target = image_info.iloc[i]
-        if obs_id is None or target["obs_id"] == obs_id:
+        if (obs_id is None and target["obs_id"] > obs_id) or target["obs_id"] == obs_id:
             filt = target["filter"]
             filter_index = filter_sequence.index(filt)
             filter_image_info = image_info[
                 i - n_leading * n_filters : i + n_roll * n_filters : n_filters
             ]
+            # remove missing images
+            filter_image_info = filter_image_info[filter_image_info["filename"] != ""]
             lp = last_persistence[i + (n_roll - 1) * n_filters]
             if debug:
                 print(filt, i, os.path.basename(target["filename"]), target["mjd"])
@@ -521,22 +534,18 @@ def correct_persistence(
             raise FileExistsError("outpath cannot be the same as the path")
     else:
         outpath = os.path.join(path, "persistence")
-    image_info = get_nisp_images_for_observation(
-        obs_id, n_prior=1, n_after=1, path=path, include_sir=True
-    )
+    get_nisp_images_for_this_observation = partial(get_nisp_images_for_observation,
+                                                   obs_id, path=path, include_sir=True, fill_missing=True)
+    image_info = get_nisp_images_for_this_observation(n_prior=1, n_after=1)
     n_per_obs = 16
     if len(image_info) == n_per_obs * 3:
         n_leading = 4
     elif len(image_info) == n_per_obs * 2:
-        image_info = get_nisp_images_for_observation(
-            obs_id, n_prior=1, n_after=0, path=path, include_sir=True
-        )
+        image_info = get_nisp_images_for_this_observation(n_prior=1, n_after=0)
         if len(image_info) == n_per_obs * 2:
             n_leading = 4
         else:
-            image_info = get_nisp_images_for_observation(
-                obs_id, n_prior=0, n_after=1, path=path, include_sir=True
-            )
+            image_info = get_nisp_images_for_this_observation(n_prior=0, n_after=1)
             n_leading = 0
     else:
         print("Wrong number of files found.")
@@ -553,9 +562,10 @@ def correct_persistence(
         remove_if_necessary(outpath, f"seg*_{obs_id}.fits")
         remove_if_necessary(outpath, f"decay*_{obs_id}*.pdf")
         for fn in image_info["filename"]:
-            basename = os.path.basename(fn)
-            if str(obs_id) in basename:
-                remove_if_necessary(outpath, basename)
+            if fn is not None:
+                basename = os.path.basename(fn)
+                if str(obs_id) in basename:
+                    remove_if_necessary(outpath, basename)
     else:
         os.makedirs(outpath)
     obs_image_info = image_info[
