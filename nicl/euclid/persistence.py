@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['correct_persistence']
 
-# %% ../../nbs/euclid/persistence.ipynb 6
+# %% ../../nbs/euclid/persistence.ipynb 5
 import os
 import numpy as np
 import sqlite3
@@ -34,7 +34,7 @@ from nicl.euclid.utilities import (
     remove_if_necessary,
 )
 
-# %% ../../nbs/euclid/persistence.ipynb 8
+# %% ../../nbs/euclid/persistence.ipynb 7
 def forward_fill(arr, axis=-1):
     arr = np.atleast_1d(arr)
     mask = np.isnan(arr)
@@ -44,7 +44,7 @@ def forward_fill(arr, axis=-1):
     out = arr[tuple(idx)]
     return out
 
-# %% ../../nbs/euclid/persistence.ipynb 9
+# %% ../../nbs/euclid/persistence.ipynb 8
 def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=0):
     images = np.array([fits.getdata(fn, extname=extname) for fn in fns])
     # add invalid pixels to the mask
@@ -85,7 +85,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     minimum[invalid] = 0
     return minimum, minimum_err, minimum_idx
 
-# %% ../../nbs/euclid/persistence.ipynb 10
+# %% ../../nbs/euclid/persistence.ipynb 9
 def mjd_of_last_persistence(image_info, ext, threshold=10000):
     # take the mjd as the end of the exposure
     mjd = np.dstack(image_info["mjd"] + 0.5 * image_info["exptime"] / 86400)
@@ -114,7 +114,7 @@ def mjd_of_last_persistence(image_info, ext, threshold=10000):
     last = np.moveaxis(last, -1, 0)
     return last
 
-# %% ../../nbs/euclid/persistence.ipynb 11
+# %% ../../nbs/euclid/persistence.ipynb 10
 def calc_rolling_minimum(
     obs_id,  # the observation_id on which to operate, if None operate on all in `image_info`
     image_info,  # a DataFrame of image information
@@ -221,7 +221,7 @@ def calc_rolling_minimum(
             dt_images[image_id] = dt
     return minimum_images, dt_lp_images, dt_images
 
-# %% ../../nbs/euclid/persistence.ipynb 12
+# %% ../../nbs/euclid/persistence.ipynb 11
 def _average_over_filters(images):
     images = images.copy()
     new_images = {}
@@ -300,7 +300,7 @@ def calc_persistence_correction(
         persistence_images[(obs_id, dithobs, filt)] = corr_flux
     return persistence_images
 
-# %% ../../nbs/euclid/persistence.ipynb 13
+# %% ../../nbs/euclid/persistence.ipynb 12
 def apply_persistence_correction(
     image_info,  # a DataFrame of image information for the images to correct
     persistence_images,  # a dictionary of persistence images
@@ -325,7 +325,7 @@ def apply_persistence_correction(
             hdr = fits.getheader(fn, extname=extra_ext)
             fits_append(outfn, img, extra_ext, primary_header, hdr)
 
-# %% ../../nbs/euclid/persistence.ipynb 14
+# %% ../../nbs/euclid/persistence.ipynb 13
 def fit_persistence_decay(dt, flux):
     slope = -10
     fit = fitting.LinearLSQFitter()
@@ -334,7 +334,7 @@ def fit_persistence_decay(dt, flux):
     fit_result, mask = or_fit(line_init, dt, flux)
     return fit_result, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 15
+# %% ../../nbs/euclid/persistence.ipynb 14
 def fit_powerlaw_persistence_decay(log_dt, log_flux):
     dt = 10**log_dt
     flux = 10**log_flux
@@ -350,7 +350,7 @@ def fit_powerlaw_persistence_decay(log_dt, log_flux):
     fit_result, mask = or_fit(model, dt, flux)
     return fit_result, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 16
+# %% ../../nbs/euclid/persistence.ipynb 15
 def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
     # if necessary create a sqlite database and table, then insert data
     dbfn = os.path.join(outpath, "decay_db.sqlite")
@@ -363,7 +363,7 @@ def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
                 f"INSERT INTO {form} VALUES ({mjd}, '{ext}', {x}, {y}, {slope}, {offset})"
             )
 
-# %% ../../nbs/euclid/persistence.ipynb 17
+# %% ../../nbs/euclid/persistence.ipynb 16
 def estimate_persistence_decay(
     minimum_images,  # the minimum estimates of the persistence
     dt_lp_images,  # the times since the last persistence feature appeared
@@ -513,7 +513,7 @@ def estimate_persistence_decay(
     n_features = (~np.isnan(slope)).sum()
     return average_slope, n_features
 
-# %% ../../nbs/euclid/persistence.ipynb 18
+# %% ../../nbs/euclid/persistence.ipynb 17
 def correct_persistence(
     obs_id,  # the observation_id to process
     path,  # the folder containing the downloaded calibrated images
