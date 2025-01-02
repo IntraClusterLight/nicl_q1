@@ -394,7 +394,13 @@ class DataAccess:
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
-        outpath = Path(outpath, "NIR", f"{obs_id:n}")
+        if instrument == "NISP":
+            instrument_folder = "NIR"
+        elif instrument == "VIS":
+            instrument_folder = "VIS_QUAD"
+        else:
+            raise ValueError("The instrument must be NISP or VIS.")
+        outpath = Path(outpath, instrument_folder, f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 

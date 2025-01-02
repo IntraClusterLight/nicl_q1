@@ -253,6 +253,7 @@ def create_faint_mask(
         threshold=threshold,
         npixels=params["npixels"],
     )
+    print(f"Deblending {segm.nlabels} sources")
     with catch_warnings():
         filterwarnings("ignore", ".*[Dd]eblending mode.*changed.*")
         segm_deblend = deblend_sources(

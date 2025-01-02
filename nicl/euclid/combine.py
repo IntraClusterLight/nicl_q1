@@ -151,7 +151,8 @@ class Combiner:
         ],  # default filters to process, if not specified further
         name=None,  # default name for the output image
         bkg_sub=True,  # subtract background
-        bkg_mesh_size=None,  # size of the background mesh in angular units
+        bkg_mesh_size=None,  # size of the background mesh boxes in angular units
+        filter_size=3,  # median filter background over `filter_size` x `filter_size` boxes
         cutout_cen=None,  # center of the cutout; SkyCoord object or string in the format "ra dec" (e.g. "00:00:00.0 +00:00:00.0")
         cutout_size=None,  # size of the cutout from the stack in angular units
         bits_to_mask=None,  # list of DQ bits to mask
@@ -174,6 +175,7 @@ class Combiner:
         self.filters = filters
         self.name = name
         self.bkg_sub = bkg_sub
+        self.filter_size = filter_size
         self.release_name = release_name
         self.overwrite = overwrite
         self.debug = debug
@@ -402,7 +404,7 @@ class Combiner:
                             data,
                             bkg_mesh_size_pix,
                             mask=mask,
-                            filter_size=(3, 3),
+                            filter_size=(self.filter_size, self.filter_size),
                             sigma_clip=SigmaClip(sigma=3),
                             exclude_percentile=90.0,
                         )
