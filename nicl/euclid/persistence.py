@@ -36,6 +36,7 @@ from nicl.euclid.utilities import (
 
 # %% ../../nbs/euclid/persistence.ipynb 7
 def forward_fill(arr, axis=-1):
+    """Forward fill NaNs in array `arr` along the specified `axis`."""
     arr = np.atleast_1d(arr)
     mask = np.isnan(arr)
     idx = np.indices(arr.shape)
@@ -44,7 +45,7 @@ def forward_fill(arr, axis=-1):
     out = arr[tuple(idx)]
     return out
 
-# %% ../../nbs/euclid/persistence.ipynb 8
+# %% ../../nbs/euclid/persistence.ipynb 9
 def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=0):
     images = np.array([fits.getdata(fn, extname=extname) for fn in fns])
     # add invalid pixels to the mask
@@ -52,7 +53,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     # add the input mask to the mask, this is used to mask pixels prior to the
     # appearance of a persistence feature that affects some of the images
     masked |= mask
-    # if there are less than `n_ok_min` unmasked pixels after the target image
+    # if there are less than `n_ok_min` unmasked pixels
     # then the minimum will not work for rejecting on-sky sources, mask the
     # pixels completely to reflect our lack of knowledge
     n_ok = (~masked).sum(axis=0)
@@ -85,9 +86,9 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     minimum[invalid] = 0
     return minimum, minimum_err, minimum_idx
 
-# %% ../../nbs/euclid/persistence.ipynb 9
+# %% ../../nbs/euclid/persistence.ipynb 10
 def mjd_of_last_persistence(image_info, ext, threshold=10000):
-    # take the mjd as the end of the exposure
+    # take the mjd as the middle of the exposure
     mjd = np.dstack(image_info["mjd"] + 0.5 * image_info["exptime"] / 86400)
     # create map of features in each frame that are strong enough to cause persistence
     img = []
@@ -101,20 +102,24 @@ def mjd_of_last_persistence(image_info, ext, threshold=10000):
         if img[i] is None:
             img[i] = np.zeros_like(data)
     img = np.dstack(img)
-    p = img > threshold
     for i, filt in enumerate(image_info["filter"]):
         # SIR images are rotated with respect to NIR images
         if filt == "SIR":
-            p[..., i] = np.rot90(p[..., i], -1)
+            img[..., i] = np.rot90(img[..., i], -1)
+    p = img > threshold
+    for i, filt in enumerate(image_info["filter"]):
         # ignore cosmics
         p[..., i] = binary_closing(p[..., i], iterations=2)
     # determine the mjd of the last
     last = np.where(p, mjd, np.nan)
     last = forward_fill(last)
     last = np.moveaxis(last, -1, 0)
-    return last
+    flux = np.where(p, img, np.nan)
+    flux = forward_fill(flux)
+    flux = np.moveaxis(flux, -1, 0)
+    return last, flux
 
-# %% ../../nbs/euclid/persistence.ipynb 10
+# %% ../../nbs/euclid/persistence.ipynb 11
 def calc_rolling_minimum(
     obs_id,  # the observation_id on which to operate, if None operate on all in `image_info`
     image_info,  # a DataFrame of image information
@@ -139,18 +144,19 @@ def calc_rolling_minimum(
     """
     filter_sequence = "JHY"
     n_filters = len(filter_sequence)
-    last_persistence = mjd_of_last_persistence(image_info, ext)
+    last_persistence, source_flux = mjd_of_last_persistence(image_info, ext)
     # now remove SIR files
     not_sir = image_info["filter"] != "SIR"
     image_info = image_info[not_sir].reset_index(drop=True)
     last_persistence = last_persistence[not_sir]
+    source_flux = source_flux[not_sir]
     eps = 1  # second
     minimum_images = {}
     dt_lp_images = {}
     dt_images = {}
     for i in range(n_leading * n_filters, len(image_info) - (n_roll - 1) * n_filters):
         target = image_info.iloc[i]
-        if (obs_id is None and target["obs_id"] > obs_id) or target["obs_id"] == obs_id:
+        if obs_id is None or target["obs_id"] == obs_id:
             filt = target["filter"]
             filter_index = filter_sequence.index(filt)
             filter_image_info = image_info[
@@ -158,22 +164,26 @@ def calc_rolling_minimum(
             ]
             # remove missing images
             filter_image_info = filter_image_info[filter_image_info["filename"] != ""]
-            lp = last_persistence[i + (n_roll - 1) * n_filters]
+            lp_post = last_persistence[i + (n_roll - 1) * n_filters]
+            lp_prior = last_persistence[i]
+            lp_prior_flux = source_flux[i]
             if debug:
                 print(filt, i, os.path.basename(target["filename"]), target["mjd"])
             # the time of each stack pixel since it was last flagged for persistence
             mjd = np.reshape(filter_image_info["mjd"], (-1, 1, 1))
             exptime = np.reshape(filter_image_info["exptime"], (-1, 1, 1))
-            dt_lp = (mjd - lp) * 24 * 60 * 60  # seconds
+            dt_lp_prior = (mjd - lp_prior) * 24 * 60 * 60  # seconds
+            dt_lp_post = (mjd - lp_post) * 24 * 60 * 60  # seconds
             # the time between the target image and when each pixel was last flagged for persistence
-            dt_lp_target = (target["mjd"] - lp) * 24 * 60 * 60  # seconds
-            # if a persistence feature appears in or prior to the target, mask pixels before the appearence of the feature
-            mask = (dt_lp_target + 0.5 * target["exptime"] > -eps) & (
-                dt_lp + 0.5 * exptime < -eps
+            dt_lp_prior_target = (target["mjd"] - lp_prior) * 24 * 60 * 60  # seconds
+            dt_lp_post_target = (target["mjd"] - lp_post) * 24 * 60 * 60  # seconds
+            # if a persistence feature appears prior to the target, mask pixels before the appearence of the feature
+            mask = (dt_lp_prior_target + 0.5 * target["exptime"] > eps) & (
+                dt_lp_prior + 0.5 * exptime < -eps
             )
-            # if a persistence feature appears after the target, mask pixels after the appearence of the feature
-            mask |= (dt_lp_target + 0.5 * target["exptime"] < -eps) & (
-                dt_lp + 0.5 * exptime > -eps
+            # if a persistence feature appears in or after the target, mask pixels after the appearence of the feature
+            mask |= (dt_lp_post_target + 0.5 * target["exptime"] < eps) & (
+                dt_lp_post + 0.5 * exptime > -eps
             )
             # do not mask if no persistence feature appears in the stack
             mask[np.isnan(mask)] = False
@@ -186,12 +196,14 @@ def calc_rolling_minimum(
                 correct=correct_min,
                 take=take,
             )
-            # the time between the minimum for each pixel and when it was last flagged for persistence
-            dt_lp = np.take_along_axis(
-                dt_lp, np.expand_dims(minimum_idx, 0), axis=0
+            # the time between the minimum for each pixel and when it was last flagged for persistence prior to the target
+            dt_lp_post = np.take_along_axis(
+                dt_lp_post, np.expand_dims(minimum_idx, 0), axis=0
+            ).squeeze()
+            dt_lp_prior = np.take_along_axis(
+                dt_lp_prior, np.expand_dims(minimum_idx, 0), axis=0
             ).squeeze()
             # the time between the minimum for each pixel and the target image
-            # dt = dt_lp - dt_lp_target  # this contains NaNs for pixels with no persistence flag
             dt = (mjd - target["mjd"]) * 24 * 60 * 60  # seconds
             dt = np.take_along_axis(
                 dt, np.expand_dims(minimum_idx, 0), axis=0
@@ -200,28 +212,32 @@ def calc_rolling_minimum(
                 image_name = (
                     f'{target["obs_id"]}_{target["dithobs"]}_{filter_index}_{filt}'
                 )
+                mask_fn = os.path.join(outpath, f"mask_{image_name}.fits")
+                fits_append(mask_fn, mask.astype(int), ext, primary_header)
                 min_fn = os.path.join(outpath, f"min_{image_name}.fits")
                 fits_append(min_fn, minimum, ext, primary_header)
-                lp_fn = os.path.join(outpath, f"lp_{image_name}.fits")
-                fits_append(lp_fn, lp, ext, primary_header)
-                dt_lp_fn = os.path.join(outpath, f"dt_lp_{image_name}.fits")
-                fits_append(dt_lp_fn, dt_lp, ext, primary_header)
+                dt_lp_post_fn = os.path.join(outpath, f"dt_lp_post_{image_name}.fits")
+                fits_append(dt_lp_post_fn, dt_lp_post, ext, primary_header)
+                dt_lp_prior_fn = os.path.join(outpath, f"dt_lp_prior_{image_name}.fits")
+                fits_append(dt_lp_prior_fn, dt_lp_prior, ext, primary_header)
+                dt_lp_post_target_fn = os.path.join(outpath, f"dt_lp_post_target_{image_name}.fits")
+                fits_append(dt_lp_post_target_fn, dt_lp_post_target, ext, primary_header)
+                dt_lp_prior_target_fn = os.path.join(outpath, f"dt_lp_prior_target_{image_name}.fits")
+                fits_append(dt_lp_prior_target_fn, dt_lp_prior_target, ext, primary_header)
+                lp_prior_flux_fn = os.path.join(outpath, f"lp_prior_flux_{image_name}.fits")
+                fits_append(lp_prior_flux_fn, lp_prior_flux, ext, primary_header)
                 dt_fn = os.path.join(outpath, f"dt_{image_name}.fits")
                 fits_append(dt_fn, dt, ext, primary_header)
                 img = fits.getdata(target["filename"], extname=ext)
                 img_fn = os.path.join(outpath, f"img_{image_name}.fits")
                 fits_append(img_fn, img, ext, primary_header)
-                dqp = get_persistence_mask(target["filename"], extname=ext)
-                dqp = dqp.astype(int)
-                dqp_fn = os.path.join(outpath, f"dqp_{image_name}.fits")
-                fits_append(dqp_fn, dqp, ext, primary_header)
             image_id = (target["obs_id"], target["dithobs"], filter_index, filt)
             minimum_images[image_id] = minimum
-            dt_lp_images[image_id] = dt_lp
+            dt_lp_images[image_id] = dt_lp_prior
             dt_images[image_id] = dt
     return minimum_images, dt_lp_images, dt_images
 
-# %% ../../nbs/euclid/persistence.ipynb 11
+# %% ../../nbs/euclid/persistence.ipynb 12
 def _average_over_filters(images):
     images = images.copy()
     new_images = {}
@@ -258,12 +274,11 @@ def calc_persistence_correction(
         minimum_images = _average_over_filters(minimum_images)
         dt_images = _average_over_filters(dt_images)
     persistence_images = {}
+    previous_flux = {}
     for image_id in minimum_images:
         obs_id, dithobs, filter_index, filt = image_id
         flux = minimum_images[image_id]
         dt = dt_images[image_id]
-        if form == "powerlaw":
-            dt_lp = dt_lp_images[image_id]
         if debug and not per_filter:
             out_fn = os.path.join(
                 outpath, f"min_combined_{obs_id}_{dithobs}_{filter_index}_{filt}.fits"
@@ -273,7 +288,17 @@ def calc_persistence_correction(
                 outpath, f"dt_combined_{obs_id}_{dithobs}_{filter_index}_{filt}.fits"
             )
             fits_append(out_fn, dt, ext, primary_header)
+        if debug:
+            if filt in previous_flux:
+                diff_flux = flux - previous_flux[filt]
+                out_fn = os.path.join(
+                    outpath, f"min_diff_{obs_id}_{dithobs}_{filter_index}_{filt}.fits"
+                )
+                fits_append(out_fn, diff_flux, ext, primary_header)
+            previous_flux[filt] = flux
         dt = np.nan_to_num(dt)
+        if form == "powerlaw":
+            dt_lp = dt_lp_images[image_id]
         if form == "exponential":
             corr_flux = flux * 10 ** (-decay_slope * dt)
         elif form == "powerlaw":
@@ -300,7 +325,7 @@ def calc_persistence_correction(
         persistence_images[(obs_id, dithobs, filt)] = corr_flux
     return persistence_images
 
-# %% ../../nbs/euclid/persistence.ipynb 12
+# %% ../../nbs/euclid/persistence.ipynb 13
 def apply_persistence_correction(
     image_info,  # a DataFrame of image information for the images to correct
     persistence_images,  # a dictionary of persistence images
@@ -325,7 +350,7 @@ def apply_persistence_correction(
             hdr = fits.getheader(fn, extname=extra_ext)
             fits_append(outfn, img, extra_ext, primary_header, hdr)
 
-# %% ../../nbs/euclid/persistence.ipynb 13
+# %% ../../nbs/euclid/persistence.ipynb 14
 def fit_persistence_decay(dt, flux):
     slope = -10
     fit = fitting.LinearLSQFitter()
@@ -334,7 +359,7 @@ def fit_persistence_decay(dt, flux):
     fit_result, mask = or_fit(line_init, dt, flux)
     return fit_result, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 14
+# %% ../../nbs/euclid/persistence.ipynb 15
 def fit_powerlaw_persistence_decay(log_dt, log_flux):
     dt = 10**log_dt
     flux = 10**log_flux
@@ -350,7 +375,7 @@ def fit_powerlaw_persistence_decay(log_dt, log_flux):
     fit_result, mask = or_fit(model, dt, flux)
     return fit_result, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 15
+# %% ../../nbs/euclid/persistence.ipynb 16
 def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
     # if necessary create a sqlite database and table, then insert data
     dbfn = os.path.join(outpath, "decay_db.sqlite")
@@ -363,7 +388,7 @@ def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
                 f"INSERT INTO {form} VALUES ({mjd}, '{ext}', {x}, {y}, {slope}, {offset})"
             )
 
-# %% ../../nbs/euclid/persistence.ipynb 16
+# %% ../../nbs/euclid/persistence.ipynb 17
 def estimate_persistence_decay(
     minimum_images,  # the minimum estimates of the persistence
     dt_lp_images,  # the times since the last persistence feature appeared
@@ -513,7 +538,7 @@ def estimate_persistence_decay(
     n_features = (~np.isnan(slope)).sum()
     return average_slope, n_features
 
-# %% ../../nbs/euclid/persistence.ipynb 17
+# %% ../../nbs/euclid/persistence.ipynb 18
 def correct_persistence(
     obs_id,  # the observation_id to process
     path,  # the folder containing the downloaded calibrated images
@@ -557,7 +582,7 @@ def correct_persistence(
         dets = [f"DET{detector}"]
     sci_exts = [f"{d}.SCI" for d in dets]
     if os.path.isdir(outpath):
-        for img_name in ("dqp", "min", "lp", "dt_lp", "dt", "img", "corr", "pers"):
+        for img_name in ("dqp", "min", "lp", "dt", "img", "corr", "pers"):
             remove_if_necessary(outpath, f"{img_name}*{obs_id}*.fits")
         remove_if_necessary(outpath, f"seg*_{obs_id}.fits")
         remove_if_necessary(outpath, f"decay*_{obs_id}*.pdf")
@@ -579,7 +604,7 @@ def correct_persistence(
             f"Calculating rolling minimum for obs {obs_id} with {len(image_info)} images"
         )
         minimum_images, dt_lp_images, dt_images = calc_rolling_minimum(
-            obs_id,
+            None if debug else obs_id,
             image_info,
             ext=ext,
             n_leading=n_leading,
