@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask', 'get_persistence_mask', 'get_invalid_mask',
            'get_rms', 'fits_append', 'remove_if_necessary', 'default_data_path', 'euclid_credentials',
-           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_stack',
+           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_dither', 'get_nisp_stack',
            'get_tile_index_from_filename', 'get_obs_id_from_filename', 'get_dither_id_from_filename',
            'get_filter_from_filename']
 
@@ -172,6 +172,12 @@ def find_single_file(fn, path):
 def get_nisp_tile(tile_index, filter, path):
     filter = filter.replace("NIR_", "")
     fn = f"EUC_MER_BGSUB-MOSAIC-NIR-{filter}_TILE{tile_index}*.fits"
+    return find_single_file(fn, path)
+
+
+def get_nisp_dither(obs_id, dither, filter, path):
+    filter = filter.replace("NIR_", "")
+    fn = f"EUC_NIR_W-CAL-IMAGE_{filter}-{obs_id}-{dither}*.fits"
     return find_single_file(fn, path)
 
 
