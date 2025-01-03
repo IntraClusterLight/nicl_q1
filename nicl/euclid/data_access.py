@@ -261,6 +261,7 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid filenames to outpath."""
+        outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         if isinstance(filenames, Table):
             filenames = filenames["file_name"]
@@ -303,6 +304,7 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid mosaics to outpath."""
+        outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         print(f"Downloading {len(file_info)} files to {outpath}")
         filenames = []
