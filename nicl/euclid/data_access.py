@@ -62,7 +62,10 @@ class DataAccess:
     def tap_query(self, query):
         self.tap_login()
         job = self.tap.launch_job(query)
-        return job.get_results()
+        results = job.get_results()
+        if len(results) == 2000:
+            print("Warning: query results may be truncated.")
+        return results
 
     def get_mer_filename_lookup(self):
         """Build a DataFrame of MER files.
