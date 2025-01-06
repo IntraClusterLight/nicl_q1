@@ -261,6 +261,7 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid filenames to outpath."""
+        outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         if isinstance(filenames, Table):
             filenames = filenames["file_name"]
@@ -303,6 +304,7 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid mosaics to outpath."""
+        outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         print(f"Downloading {len(file_info)} files to {outpath}")
         filenames = []
@@ -394,7 +396,13 @@ class DataAccess:
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
-        outpath = Path(outpath, "NIR", f"{obs_id:n}")
+        if instrument == "NISP":
+            instrument_folder = "NIR"
+        elif instrument == "VIS":
+            instrument_folder = "VIS_QUAD"
+        else:
+            raise ValueError("The instrument must be NISP or VIS.")
+        outpath = Path(outpath, instrument_folder, f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 

@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'get_dq_mask', 'get_persistence_mask', 'get_invalid_mask',
            'get_rms', 'fits_append', 'remove_if_necessary', 'default_data_path', 'euclid_credentials',
-           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_stack',
+           'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_dither', 'get_nisp_stack',
            'get_tile_index_from_filename', 'get_obs_id_from_filename', 'get_dither_id_from_filename',
            'get_filter_from_filename']
 
@@ -26,6 +26,7 @@ def get_nisp_images_for_observation(
     n_after=0,  # number of subsequent observations to include
     path=None,  # base path to search
     include_sir=False,  # include SIR files
+    fill_missing=True,  # fill missing images with None
 ):
     """Find NISP images for the specified obs_id and optionally n_prior and n_after observations."""
     info = dict(filename=[], filter=[], dithobs=[], obs_id=[], mjd=[], exptime=[])
@@ -61,6 +62,17 @@ def get_nisp_images_for_observation(
                 info["exptime"].append(h["EXPTIME"])
     info = pd.DataFrame(info)
     info = info.sort_values("mjd").reset_index(drop=True)
+    if fill_missing:
+        info["obs_id"] = info["obs_id"].astype('Int64')
+        obs_ids = info["obs_id"].unique()
+        filters = ["J", "H", "Y"]
+        if include_sir:
+            filters = ["SIR"] + filters
+        info = info.set_index(["obs_id", "dithobs", "filter"])
+        expected_index = pd.MultiIndex.from_product([obs_ids, range(4), filters], names=["obs_id", "dithobs", "filter"])
+        info = info.reindex(expected_index).reset_index()
+        info[["mjd", "exptime", "obs_id"]] = info[["mjd", "exptime", "obs_id"]].fillna(0)
+        info["filename"] = info["filename"].fillna("")
     return info
 
 # %% ../../nbs/euclid/utilities.ipynb 4
@@ -75,15 +87,16 @@ def get_primary_header(
     hdr = fits.Header()
     mismatch = set()
     for fn in fns:
-        newhdr = fits.getheader(fn)
-        for h in newhdr:
-            if h not in hdr:
-                try:
-                    hdr[h] = newhdr[h]
-                except ValueError:
-                    pass
-            elif hdr[h] != newhdr[h]:
-                mismatch.add(h)
+        if fn:
+            newhdr = fits.getheader(fn)
+            for h in newhdr:
+                if h not in hdr:
+                    try:
+                        hdr[h] = newhdr[h]
+                    except ValueError:
+                        pass
+                elif hdr[h] != newhdr[h]:
+                    mismatch.add(h)
     for h in mismatch:
         hdr.remove(h)
     return hdr
@@ -104,7 +117,9 @@ def get_persistence_mask(fn, extname):
 
 
 def get_invalid_mask(fn, extname):
-    return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16])
+    if fn:
+        return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16])
+    return np.array([x for x in g if x is not None])
 
 
 def get_rms(fn, extname):
@@ -172,6 +187,12 @@ def find_single_file(fn, path):
 def get_nisp_tile(tile_index, filter, path):
     filter = filter.replace("NIR_", "")
     fn = f"EUC_MER_BGSUB-MOSAIC-NIR-{filter}_TILE{tile_index}*.fits"
+    return find_single_file(fn, path)
+
+
+def get_nisp_dither(obs_id, dither, filter, path):
+    filter = filter.replace("NIR_", "")
+    fn = f"EUC_NIR_W-CAL-IMAGE_{filter}-{obs_id}-{dither}*.fits"
     return find_single_file(fn, path)
 
 
