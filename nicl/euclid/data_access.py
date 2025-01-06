@@ -62,7 +62,10 @@ class DataAccess:
     def tap_query(self, query):
         self.tap_login()
         job = self.tap.launch_job(query)
-        return job.get_results()
+        results = job.get_results()
+        if len(results) == 2000:
+            print("Warning: query results may be truncated.")
+        return results
 
     def get_mer_filename_lookup(self):
         """Build a DataFrame of MER files.
@@ -131,7 +134,7 @@ class DataAccess:
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all survey obs_ids for observations in the current release."""
-        query = f"""SELECT observation_id
+        query = f"""SELECT DISTINCT observation_id
                     FROM sedm.calibrated_frame
                     WHERE (product_type like '%Calibrated%')
                     AND release_name='{self.release_name}'
@@ -144,7 +147,7 @@ class DataAccess:
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all MER tile_indexes for tiles in the current release."""
-        query = f"""SELECT tile_index
+        query = f"""SELECT DISTINCT tile_index
                     FROM sedm.mosaic_product
                     WHERE release_name='{self.release_name}'
                     ORDER BY tile_index ASC"""
@@ -162,7 +165,7 @@ class DataAccess:
     ):  # returns a list of observation_ids
         """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
         condition = self.build_fov_condition(ra, dec, radius, fully_contained)
-        query = f"""SELECT observation_id
+        query = f"""SELECT DISTINCT observation_id
                     FROM sedm.calibrated_frame
                     WHERE (product_type like '%Calibrated%')
                     AND {condition}
@@ -181,7 +184,7 @@ class DataAccess:
     ):  # returns a list of tile_indexes
         """Obtain a list of survey MER tile_indexes for tiles that entirely contain or intersect the specified target region."""
         condition = self.build_fov_condition(ra, dec, radius, fully_contained)
-        query = f"""SELECT tile_index
+        query = f"""SELECT DISTINCT tile_index
                     FROM sedm.mosaic_product
                     WHERE {condition}
                     ORDER BY tile_index ASC"""
