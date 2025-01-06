@@ -336,12 +336,16 @@ def apply_persistence_correction(
         target = image_info.iloc[i]
         fn = target["filename"]
         primary_header = fits.getheader(fn, 0)
-        pers = persistence_images[
-            (target["obs_id"], target["dithobs"], target["filter"])
-        ]
         hdr = fits.getheader(fn, extname=ext)
         img = fits.getdata(fn, extname=ext)
-        img -= pers
+        key = (target["obs_id"], target["dithobs"], target["filter"])
+        if key in persistence_images:
+            pers = persistence_images[
+                (target["obs_id"], target["dithobs"], target["filter"])
+            ]
+            img -= pers
+        else:
+            print(f"No persistence correction for {key}")
         outfn = os.path.join(outpath, os.path.basename(fn))
         fits_append(outfn, img, ext, primary_header, hdr)
         for extra in ("RMS", "DQ"):
