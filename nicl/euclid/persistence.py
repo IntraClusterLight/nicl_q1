@@ -553,6 +553,7 @@ def correct_persistence(
     debug=False,  # print debugging information and save intermediate files to `outpath`
     assumed_decay_slope=1.0,  # the decay slope to assume, if `use_estimated_decay=False`
     per_filter=True,  # if False, then combine the persistence estimates for each filter
+    overwrite=False,  # if True, then delete and recreate existing files in `outpath`
 ):
     if use_estimated_decay:
         estimate_decay = True
@@ -563,6 +564,22 @@ def correct_persistence(
             raise FileExistsError("outpath cannot be the same as the path")
     else:
         outpath = os.path.join(path, "persistence")
+    if os.path.isdir(outpath):
+        if overwrite:
+            for img_name in ("dqp", "min", "lp", "dt", "img", "corr", "pers"):
+                remove_if_necessary(outpath, f"{img_name}*{obs_id}*.fits")
+            remove_if_necessary(outpath, f"seg*_{obs_id}.fits")
+            remove_if_necessary(outpath, f"decay*_{obs_id}*.pdf")
+            for fn in image_info["filename"]:
+                if fn is not None:
+                    basename = os.path.basename(fn)
+                    if str(obs_id) in basename:
+                        remove_if_necessary(outpath, basename)
+        else:
+            print(f"Folder for {obs_id} already exists, skipping.")
+            return
+    else:
+        os.makedirs(outpath)
     get_nisp_images_for_this_observation = partial(get_nisp_images_for_observation,
                                                    obs_id, path=path, include_sir=True, fill_missing=True)
     image_info = get_nisp_images_for_this_observation(n_prior=1, n_after=1)
@@ -585,18 +602,6 @@ def correct_persistence(
     else:
         dets = [f"DET{detector}"]
     sci_exts = [f"{d}.SCI" for d in dets]
-    if os.path.isdir(outpath):
-        for img_name in ("dqp", "min", "lp", "dt", "img", "corr", "pers"):
-            remove_if_necessary(outpath, f"{img_name}*{obs_id}*.fits")
-        remove_if_necessary(outpath, f"seg*_{obs_id}.fits")
-        remove_if_necessary(outpath, f"decay*_{obs_id}*.pdf")
-        for fn in image_info["filename"]:
-            if fn is not None:
-                basename = os.path.basename(fn)
-                if str(obs_id) in basename:
-                    remove_if_necessary(outpath, basename)
-    else:
-        os.makedirs(outpath)
     obs_image_info = image_info[
         (image_info["obs_id"] == obs_id) & (image_info["filter"] != "SIR")
     ].reset_index()
