@@ -576,8 +576,9 @@ def correct_persistence(
     path,  # the folder containing the downloaded calibrated images
     outpath=None,  # the folder where all output files should be placed
     detector=None,  # the detector number to process, e.g. 44; if None processes all detectors
+    decay_form="powerlaw",  # the form of the persistence decay to assume
     estimate_decay=False,  # print an estimate of the persistence decay slope for each detector
-    use_estimated_decay=None,  # use the estimated persistence decay slope for each detector
+    use_estimated_decay=False,  # use the estimated persistence decay slope for each detector
     debug=False,  # print debugging information and save intermediate files to `outpath`
     assumed_decay_slope=1.0,  # the decay slope to assume, if `use_estimated_decay=False`
     per_filter=True,  # if False, then combine the persistence estimates for each filter
@@ -652,31 +653,27 @@ def correct_persistence(
         decay_slope = assumed_decay_slope
         if estimate_decay:
             print("Estimating persistence decay")
-            for form in ("powerlaw",):
-                try:
-                    slope, n_features = estimate_persistence_decay(
-                        minimum_images,
-                        dt_lp_images,
-                        ext=ext,
-                        mjd=mjd,
-                        primary_header=primary_header,
-                        outpath=outpath,
-                        form=form,
-                        debug=debug,
-                    )
-                    print(
-                        f"Estimated persistence {form} decay slope from {n_features} features ({ext}): {slope:.2e}"
-                    )
-                    if use_estimated_decay == form:
-                        decay_slope = slope
-                except Exception as e:
-                    print("Encountered error when estimate_persistence_decay:")
-                    print(e)
-                    if use_estimated_decay == form:
-                        print(f"Using default decay slope: {decay_slope:.2e}")
-        decay_form = (
-            use_estimated_decay if use_estimated_decay is not None else "powerlaw"
-        )
+            try:
+                slope, n_features = estimate_persistence_decay(
+                    minimum_images,
+                    dt_lp_images,
+                    ext=ext,
+                    mjd=mjd,
+                    primary_header=primary_header,
+                    outpath=outpath,
+                    form=decay_form,
+                    debug=debug,
+                )
+                print(
+                    f"Estimated persistence {decay_form} decay slope from {n_features} features ({ext}): {slope:.2e}"
+                )
+                if use_estimated_decay:
+                    decay_slope = slope
+            except Exception as e:
+                print("Encountered error when estimate_persistence_decay:")
+                print(e)
+                if use_estimated_decay:
+                    print(f"Using default decay slope: {decay_slope:.2e}")
         print("Calculating persistence correction")
         persistence_images = calc_persistence_correction(
             minimum_images,
