@@ -22,7 +22,7 @@ from photutils.segmentation import (
     make_2dgaussian_kernel,
     SourceCatalog,
 )
-from scipy.ndimage import binary_closing, median_filter
+from scipy.ndimage import binary_closing
 
 from nicl.euclid.utilities import (
     get_nisp_images_for_observation,
@@ -33,6 +33,7 @@ from nicl.euclid.utilities import (
     fits_append,
     remove_if_necessary,
 )
+from nicl.filter import sampled_median_filter
 
 # %% ../../nbs/euclid/persistence.ipynb 7
 def forward_fill(arr, axis=-1):
@@ -152,6 +153,7 @@ def calc_rolling_minimum(
     source_flux = source_flux[not_sir]
     eps = 1  # second
     minimum_images = {}
+    minimum_err_images = {}
     dt_lp_images = {}
     dt_images = {}
     for i in range(n_leading * n_filters, len(image_info) - (n_roll - 1) * n_filters):
@@ -216,6 +218,8 @@ def calc_rolling_minimum(
                 fits_append(mask_fn, mask.astype(int), ext, primary_header)
                 min_fn = os.path.join(outpath, f"min_{image_name}.fits")
                 fits_append(min_fn, minimum, ext, primary_header)
+                min_err_fn = os.path.join(outpath, f"min_err_{image_name}.fits")
+                fits_append(min_err_fn, minimum_err, ext, primary_header)
                 dt_lp_post_fn = os.path.join(outpath, f"dt_lp_post_{image_name}.fits")
                 fits_append(dt_lp_post_fn, dt_lp_post, ext, primary_header)
                 dt_lp_prior_fn = os.path.join(outpath, f"dt_lp_prior_{image_name}.fits")
@@ -228,11 +232,21 @@ def calc_rolling_minimum(
                 fits_append(lp_prior_flux_fn, lp_prior_flux, ext, primary_header)
                 dt_fn = os.path.join(outpath, f"dt_{image_name}.fits")
                 fits_append(dt_fn, dt, ext, primary_header)
+                dqp = get_persistence_mask(target["filename"], extname=ext)
+                dqp = dqp.astype(int)
+                dqp_fn = os.path.join(outpath, f"dqp_{image_name}.fits")
+                fits_append(dqp_fn, dqp, ext, primary_header)
                 img = fits.getdata(target["filename"], extname=ext)
                 img_fn = os.path.join(outpath, f"img_{image_name}.fits")
                 fits_append(img_fn, img, ext, primary_header)
+                img_masked = np.where(dqp, np.nan, img)
+                img_filtered = sampled_median_filter(img_masked, size=25)
+                img_masked = np.where(dqp, img_filtered, img)
+                img_masked_fn = os.path.join(outpath, f"img_masked_{image_name}.fits")
+                fits_append(img_masked_fn, img_masked, ext, primary_header)
             image_id = (target["obs_id"], target["dithobs"], filter_index, filt)
             minimum_images[image_id] = minimum
+            minimum_err_images[image_id] = minimum_err
             dt_lp_images[image_id] = dt_lp_prior
             dt_images[image_id] = dt
     return minimum_images, dt_lp_images, dt_images
@@ -331,6 +345,7 @@ def apply_persistence_correction(
     persistence_images,  # a dictionary of persistence images
     ext,  # the image extension
     outpath,  # path at which to save corrected images
+    debug=False,  # save masked corrected image
 ):
     for i in range(len(image_info)):
         target = image_info.iloc[i]
@@ -351,9 +366,21 @@ def apply_persistence_correction(
             fits_append(outfn, img, ext, primary_header, hdr)
             for extra in ("RMS", "DQ"):
                 extra_ext = ext.replace("SCI", extra)
-                img = fits.getdata(fn, extname=extra_ext)
-                hdr = fits.getheader(fn, extname=extra_ext)
-                fits_append(outfn, img, extra_ext, primary_header, hdr)
+                extra_img = fits.getdata(fn, extname=extra_ext)
+                extra_hdr = fits.getheader(fn, extname=extra_ext)
+                fits_append(outfn, extra_img, extra_ext, primary_header, extra_hdr)
+            if debug:
+                dqp = get_persistence_mask(fn, extname=ext)
+                img_masked = np.where(dqp, np.nan, img)
+                img_filtered = sampled_median_filter(img_masked, size=25)
+                img_masked = np.where(dqp, img_filtered, img)
+                filt = target["filter"]
+                filter_index = "JHY".index(filt)
+                image_name = (
+                    f'{target["obs_id"]}_{target["dithobs"]}_{filter_index}_{filt}'
+                )
+                outfn = os.path.join(outpath, f"corrimg_masked_{image_name}.fits")
+                fits_append(outfn, img_masked, ext, primary_header, hdr)
 
 # %% ../../nbs/euclid/persistence.ipynb 14
 def fit_persistence_decay(dt, flux):
@@ -415,7 +442,7 @@ def estimate_persistence_decay(
             mean_img += img
     mean_img /= len(minimum_images)
     obs_id = int(np.median(obs_ids))
-    bkg = median_filter(mean_img, 25)
+    bkg = sampled_median_filter(mean_img, 25)
     mean_img_bkg_sub = mean_img - bkg
 
     threshold = detect_threshold(mean_img_bkg_sub, nsigma=3.0)
@@ -567,7 +594,7 @@ def correct_persistence(
         outpath = os.path.join(path, "persistence")
     if os.path.isdir(outpath):
         if overwrite:
-            for img_name in ("dqp", "min", "lp", "dt", "img", "corr", "pers"):
+            for img_name in ("dqp", "min", "lp", "dt", "img", "corr", "pers", "mask"):
                 remove_if_necessary(outpath, f"{img_name}*{obs_id}*.fits")
             remove_if_necessary(outpath, f"seg*_{obs_id}.fits")
             remove_if_necessary(outpath, f"decay*_{obs_id}*.pdf")
@@ -669,4 +696,5 @@ def correct_persistence(
             persistence_images,
             ext=ext,
             outpath=outpath,
+            debug=debug,
         )
