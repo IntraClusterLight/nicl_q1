@@ -335,24 +335,25 @@ def apply_persistence_correction(
     for i in range(len(image_info)):
         target = image_info.iloc[i]
         fn = target["filename"]
-        primary_header = fits.getheader(fn, 0)
-        hdr = fits.getheader(fn, extname=ext)
-        img = fits.getdata(fn, extname=ext)
-        key = (target["obs_id"], target["dithobs"], target["filter"])
-        if key in persistence_images:
-            pers = persistence_images[
-                (target["obs_id"], target["dithobs"], target["filter"])
-            ]
-            img -= pers
-        else:
-            print(f"No persistence correction for {key}")
-        outfn = os.path.join(outpath, os.path.basename(fn))
-        fits_append(outfn, img, ext, primary_header, hdr)
-        for extra in ("RMS", "DQ"):
-            extra_ext = ext.replace("SCI", extra)
-            img = fits.getdata(fn, extname=extra_ext)
-            hdr = fits.getheader(fn, extname=extra_ext)
-            fits_append(outfn, img, extra_ext, primary_header, hdr)
+        if fn:
+            primary_header = fits.getheader(fn, 0)
+            hdr = fits.getheader(fn, extname=ext)
+            img = fits.getdata(fn, extname=ext)
+            key = (target["obs_id"], target["dithobs"], target["filter"])
+            if key in persistence_images:
+                pers = persistence_images[
+                    (target["obs_id"], target["dithobs"], target["filter"])
+                ]
+                img -= pers
+            else:
+                print(f"No persistence correction for {key}")
+            outfn = os.path.join(outpath, os.path.basename(fn))
+            fits_append(outfn, img, ext, primary_header, hdr)
+            for extra in ("RMS", "DQ"):
+                extra_ext = ext.replace("SCI", extra)
+                img = fits.getdata(fn, extname=extra_ext)
+                hdr = fits.getheader(fn, extname=extra_ext)
+                fits_append(outfn, img, extra_ext, primary_header, hdr)
 
 # %% ../../nbs/euclid/persistence.ipynb 14
 def fit_persistence_decay(dt, flux):
