@@ -377,6 +377,7 @@ def apply_persistence_correction(
             rms_ext = ext.replace("SCI", "RMS")
             rms_img = fits.getdata(fn, extname=rms_ext)
             rms_img = np.sqrt(rms_img**2 + pers_err**2)
+            rms_img = rms_img.astype(np.float32)
             rms_hdr = fits.getheader(fn, extname=rms_ext)
             fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
             dq_ext = ext.replace("SCI", "DQ")
