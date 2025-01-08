@@ -119,7 +119,6 @@ def get_persistence_mask(fn, extname):
 def get_invalid_mask(fn, extname):
     if fn:
         return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16])
-    return np.array([x for x in g if x is not None])
 
 
 def get_rms(fn, extname):
