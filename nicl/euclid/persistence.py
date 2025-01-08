@@ -28,7 +28,7 @@ from nicl.euclid.utilities import (
     get_nisp_images_for_observation,
     get_primary_header,
     get_persistence_mask,
-    get_invalid_mask,
+    get_invalid_mask_without_persistence,
     get_rms,
     fits_append,
     remove_if_necessary,
@@ -51,7 +51,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     images = np.array([fits.getdata(fn, extname=extname) for fn in fns])
     rms_images = np.array([get_rms(fn, extname) for fn in fns])
     # add invalid pixels to the mask
-    masked = np.array([get_invalid_mask(fn, extname) for fn in fns])
+    masked = np.array([get_invalid_mask_without_persistence(fn, extname) for fn in fns])
     # add the input mask to the mask, this is used to mask pixels prior to the
     # appearance of a persistence feature that affects some of the images
     masked |= mask
