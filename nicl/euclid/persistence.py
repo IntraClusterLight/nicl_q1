@@ -237,13 +237,14 @@ def calc_rolling_minimum(
                 _fits_append(os.path.join(outpath, f"lp_prior_flux_{image_name}.fits"), lp_prior_flux)
                 _fits_append(os.path.join(outpath, f"dt_{image_name}.fits"), dt)
                 dqp = get_persistence_mask(target["filename"], extname=ext)
-                dqp = dqp.astype(int)
-                _fits_append(os.path.join(outpath, f"dqp_{image_name}.fits"), dqp)
+                _fits_append(os.path.join(outpath, f"dqp_{image_name}.fits"), dqp.astype(int))
                 img = fits.getdata(target["filename"], extname=ext)
                 _fits_append(os.path.join(outpath, f"img_{image_name}.fits"), img)
-                img_masked = np.where(dqp, np.nan, img)
+                dq = get_invalid_mask_without_persistence(target["filename"], extname=ext)
+                dq = dq | dqp
+                img_masked = np.where(dq, np.nan, img)
                 img_filtered = sampled_median_filter(img_masked, size=101)
-                img_masked = np.where(dqp, img_filtered, img)
+                img_masked = np.where(dq, img_filtered, img)
                 _fits_append(os.path.join(outpath, f"img_masked_{image_name}.fits"), img_masked)
             image_id = (target["obs_id"], target["dithobs"], filter_index, filt)
             minimum_images[image_id] = minimum
@@ -384,9 +385,11 @@ def apply_persistence_correction(
             fits_append(outfn, dq_img, dq_ext, primary_header, dq_hdr)
             if debug:
                 dqp = get_persistence_mask(fn, extname=ext)
-                img_masked = np.where(dqp, np.nan, img)
+                dq = get_invalid_mask_without_persistence(target["filename"], extname=ext)
+                dq = dq | dqp
+                img_masked = np.where(dq, np.nan, img)
                 img_filtered = sampled_median_filter(img_masked, size=101)
-                img_masked = np.where(dqp, img_filtered, img)
+                img_masked = np.where(dq, img_filtered, img)
                 filt = target["filter"]
                 filter_index = "JHY".index(filt)
                 image_name = (
