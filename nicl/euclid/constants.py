@@ -19,8 +19,9 @@ class Camera:
     chips: Tuple[str, ...]
     filters: Tuple[str, ...]
     pix_scale: float
-    bad_pix_bits: Tuple[int, ...] = None
     chip_subdivisions: Tuple[str, ...] = None
+    bad_pix_bits: Tuple[int, ...] = None
+    n_dithers_per_obs: int = None
 
     @property
     def extnames(self):
@@ -39,6 +40,7 @@ VIS = Camera(
     filters=("I",),
     bad_pix_bits=(0,),  # 0 is the common flag for all invlid pixels
     pix_scale=0.1,
+    n_dithers_per_obs=6,
 )
 NISP = Camera(
     name="NISP",
@@ -46,6 +48,7 @@ NISP = Camera(
     filters=("Y", "J", "H"),
     bad_pix_bits=(0,),  # 0 is the common flag for all invlid pixels
     pix_scale=0.3,
+    n_dithers_per_obs=4,
 )
 
 MER = Camera(
