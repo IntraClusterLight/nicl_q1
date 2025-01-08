@@ -242,7 +242,7 @@ def calc_rolling_minimum(
                 img = fits.getdata(target["filename"], extname=ext)
                 _fits_append(os.path.join(outpath, f"img_{image_name}.fits"), img)
                 img_masked = np.where(dqp, np.nan, img)
-                img_filtered = sampled_median_filter(img_masked, size=25)
+                img_filtered = sampled_median_filter(img_masked, size=101)
                 img_masked = np.where(dqp, img_filtered, img)
                 _fits_append(os.path.join(outpath, f"img_masked_{image_name}.fits"), img_masked)
             image_id = (target["obs_id"], target["dithobs"], filter_index, filt)
@@ -385,7 +385,7 @@ def apply_persistence_correction(
             if debug:
                 dqp = get_persistence_mask(fn, extname=ext)
                 img_masked = np.where(dqp, np.nan, img)
-                img_filtered = sampled_median_filter(img_masked, size=25)
+                img_filtered = sampled_median_filter(img_masked, size=101)
                 img_masked = np.where(dqp, img_filtered, img)
                 filt = target["filter"]
                 filter_index = "JHY".index(filt)
