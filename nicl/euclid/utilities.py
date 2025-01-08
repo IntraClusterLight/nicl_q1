@@ -122,7 +122,7 @@ def get_persistence_mask(fn, extname):
 
 def get_invalid_mask_without_persistence(fn, extname):
     if fn:
-        return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16])
+        return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16, 23])
 
 
 def get_rms(fn, extname):
