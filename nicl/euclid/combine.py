@@ -33,7 +33,7 @@ from nicl.euclid.constants import (
     SWARP_CONFIG_VIS,
     SWARP_CONFIG_MER,
 )
-from nicl.euclid.utilities import default_data_path, round_up_box_size
+from nicl.euclid.utilities import default_data_path, round_up_box_size, get_dither_id_from_filename
 
 # %% ../../nbs/euclid/combine.ipynb 4
 # base class for combining images
@@ -51,6 +51,7 @@ class Combiner(ABC):
         cutout_cen=None,  # central coordinates of the cutout
         cutout_size=None,  # size of the cutout in angular units
         name=None,  # suffix for the output file basename.
+        individual_dithers=False,  # if True, dithers are combined separately
         bkg_sub=True,  # to subtract background or not
         bkg_mesh_size=None,  # size of the background mesh boxes in angular units
         filter_size=3,  # median filter background over `filter_size` x `filter_size` boxes
@@ -87,6 +88,7 @@ class Combiner(ABC):
         self.bkg_sub = bkg_sub
         self.filter_size = filter_size
         self.release_name = release_name
+        self.individual_dithers = individual_dithers
         self.overwrite = overwrite
         self.debug = debug
         if in_dir is None:
@@ -148,6 +150,8 @@ class Combiner(ABC):
         if ids is None and self.cutout_cen is not None and self.cutout_size is not None:
             self.ids = self._get_ids()
         else:
+            if isinstance(ids, (int, str)):
+                ids = [ids]
             self.ids = ids
         if self.ids is None or len(self.ids) == 0:
             raise ValueError(
@@ -486,6 +490,14 @@ class NISPCombiner(DithersMixin, Combiner):
         if len(self.name) > 0:
             out_fn += f"_{self.name}"
         out_fn += ".fits"
+        if self.individual_dithers:
+            for image in images:
+                dither = get_dither_id_from_filename(image)
+                self._combine_images([image], out_fn.replace(".fits", f"_{dither}.fits"))
+        else:
+            self._combine_images(images, out_fn)
+
+    def _combine_images(self, images, out_fn):
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
@@ -526,6 +538,14 @@ class VISCombiner(DithersMixin, Combiner):
         if len(self.name) > 0:
             out_fn += f"-{self.name}"
         out_fn += ".fits"
+        if self.individual_dithers:
+            for image in images:
+                dither = get_dither_id_from_filename(image)
+                self._combine_images([image], out_fn.replace(".fits", f"_{dither}.fits"))
+        else:
+            self._combine_images(images, out_fn)
+
+    def _combine_images(self, images, out_fn):
         # the default temporary directory may not have enough space for VIS
         # determine the parent directory for the temporary directory based on the host
         hostname = socket.gethostname()
