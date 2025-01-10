@@ -33,7 +33,11 @@ from nicl.euclid.constants import (
     SWARP_CONFIG_VIS,
     SWARP_CONFIG_MER,
 )
-from nicl.euclid.utilities import default_data_path, round_up_box_size, get_dither_id_from_filename
+from nicl.euclid.utilities import (
+    default_data_path,
+    round_up_box_size,
+    get_dither_id_from_filename,
+)
 
 # %% ../../nbs/euclid/combine.ipynb 4
 # base class for combining images
@@ -147,25 +151,29 @@ class Combiner(ABC):
                 )
         else:
             self.cutout_size = None
-        if ids is None and self.cutout_cen is not None and self.cutout_size is not None:
-            self.ids = self._get_ids()
+        if ids is None:
+            # try getting ids from cutout_cen and cutout_size
+            if self.cutout_cen is not None and self.cutout_size is not None:
+                self.ids = self._get_ids()
+                if not self.ids:
+                    raise ValueError(
+                        "No observations found for the given cutout parameters."
+                    )
+            else:
+                raise ValueError(
+                    "Either ids or cutout_cen and cutout_size must be specified."
+                )
         else:
             if isinstance(ids, (int, str)):
                 ids = [ids]
             self.ids = ids
-        if self.ids is None or len(self.ids) == 0:
-            raise ValueError(
-                "No observations found for the given cutout or no OBSIDs are provided."
-            )
         if name is None and len(ids) >= 1:
             self.name = "-".join([str(obs_id) for obs_id in ids])
         else:
             self.name = name
         if out_dir is None:
             if self.release_name is not None:
-                self.out_dir = default_data_path(
-                    f"{self.release_name}_clusters_test", name
-                )
+                self.out_dir = default_data_path(f"{self.release_name}_test", name)
             else:
                 raise ValueError(
                     "Either out_dir or release_name must be specified to infer where to place the output images."
@@ -218,6 +226,7 @@ class Combiner(ABC):
                     "Either filters or instrument must be specified to determine the filters."
                 )
         else:
+            filters = np.atleast_1d(filters)
             if self.instrument is not None:
                 if set(filters).issubset(self.instrument.filters):
                     self.filters = filters
@@ -493,7 +502,9 @@ class NISPCombiner(DithersMixin, Combiner):
         if self.individual_dithers:
             for image in images:
                 dither = get_dither_id_from_filename(image)
-                self._combine_images([image], out_fn.replace(".fits", f"_{dither}.fits"))
+                self._combine_images(
+                    [image], out_fn.replace(".fits", f"_{dither}.fits")
+                )
         else:
             self._combine_images(images, out_fn)
 
@@ -541,7 +552,9 @@ class VISCombiner(DithersMixin, Combiner):
         if self.individual_dithers:
             for image in images:
                 dither = get_dither_id_from_filename(image)
-                self._combine_images([image], out_fn.replace(".fits", f"_{dither}.fits"))
+                self._combine_images(
+                    [image], out_fn.replace(".fits", f"_{dither}.fits")
+                )
         else:
             self._combine_images(images, out_fn)
 
