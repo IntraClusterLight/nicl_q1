@@ -364,25 +364,25 @@ def apply_persistence_correction(
             primary_header = fits.getheader(fn, 0)
             hdr = fits.getheader(fn, extname=ext)
             img = fits.getdata(fn, extname=ext)
+            rms_ext = ext.replace("SCI", "RMS")
+            rms_img = fits.getdata(fn, extname=rms_ext)
+            rms_hdr = fits.getheader(fn, extname=rms_ext)
+            dq_ext = ext.replace("SCI", "DQ")
+            dq_img = fits.getdata(fn, extname=dq_ext)
+            dq_hdr = fits.getheader(fn, extname=dq_ext)
             key = (target["obs_id"], target["dithobs"], target["filter"])
             if key in persistence_images:
                 pers, pers_err = persistence_images[
                     (target["obs_id"], target["dithobs"], target["filter"])
                 ]
                 img -= pers
+                rms_img = np.sqrt(rms_img**2 + pers_err**2)
+                rms_img = rms_img.astype(np.float32)
             else:
                 print(f"No persistence correction for {key}")
             outfn = os.path.join(outpath, os.path.basename(fn))
             fits_append(outfn, img, ext, primary_header, hdr)
-            rms_ext = ext.replace("SCI", "RMS")
-            rms_img = fits.getdata(fn, extname=rms_ext)
-            rms_img = np.sqrt(rms_img**2 + pers_err**2)
-            rms_img = rms_img.astype(np.float32)
-            rms_hdr = fits.getheader(fn, extname=rms_ext)
             fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
-            dq_ext = ext.replace("SCI", "DQ")
-            dq_img = fits.getdata(fn, extname=dq_ext)
-            dq_hdr = fits.getheader(fn, extname=dq_ext)
             fits_append(outfn, dq_img, dq_ext, primary_header, dq_hdr)
             if debug:
                 dqp = get_persistence_mask(fn, extname=ext)
