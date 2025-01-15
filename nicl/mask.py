@@ -51,6 +51,7 @@ def fast_mask(
     estimate_background=False,  # estimate the background from the image median
     max_repeat=10,  # maximum number of masking iterations
     relative_rms_tolerance=0.01,  # relative tolerance in the rms required to stop iterating
+    return_threshold=True,  # return the threshold
 ):
     params = {
         "nsigma": 2.0,
@@ -76,15 +77,20 @@ def fast_mask(
         )
         threshold = rms * params["nsigma"] + bkg
         mask = image > threshold
-        mask = binary_erosion(mask, iterations=params["erosion_iterations"])
-        structure = circular_footprint(params["dilation_radius"])
-        mask = binary_dilation(
-            mask, structure=structure, iterations=params["dilation_iterations"]
-        )
+        if params["erosion_iterations"] > 0:
+            mask = binary_erosion(mask, iterations=params["erosion_iterations"])
+        if params["dilation_radius"] > 0 and params["dilation_iterations"] > 0:
+            structure = circular_footprint(params["dilation_radius"])
+            mask = binary_dilation(
+                mask, structure=structure, iterations=params["dilation_iterations"]
+            )
         if abs(rms - previous_rms) / rms < relative_rms_tolerance:
             break
         previous_rms = rms
-    return mask, threshold
+    if return_threshold:
+        return mask, threshold
+    else:
+        return mask
 
 # %% ../nbs/12_mask.ipynb 5
 def smooth_image(image, sigma):
