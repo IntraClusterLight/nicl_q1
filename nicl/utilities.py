@@ -4,13 +4,15 @@
 
 # %% auto 0
 __all__ = ['calc_kcorr', 'calc_sb_threshold', 'sb_to_adu', 'get_pixel_scale', 'get_img_centre_pixel', 'get_img_centre_world',
-           'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout', 'maybe_to_value']
+           'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout', 'maybe_to_value',
+           'parse_input_for_skycoord', 'parse_input_for_angular_size']
 
 # %% ../nbs/10_utilities.ipynb 2
 import numpy as np
 from astropy import units as u
 from astropy.cosmology import FlatLambdaCDM
 from astropy.nddata import CCDData, Cutout2D
+from astropy.coordinates import SkyCoord
 
 from . import ezgal
 
@@ -142,3 +144,91 @@ def get_cutout(image, size, position=None, mask=None, wcs=None):
 def maybe_to_value(x, unit):
     """Convert `x` to a value in specified `unit`, assuming in correct unit if `x` is not q Quantity."""
     return u.Quantity(x, unit).to_value(unit)
+
+# %% ../nbs/10_utilities.ipynb 9
+def parse_input_for_skycoord(skycoord):
+    """
+    Parse input to return a SkyCoord object.
+
+    Parameters
+    ----------
+    skycoord : str or SkyCoord
+        The input sky coordinate which can be either a string or a SkyCoord object.
+
+    Returns
+    -------
+    SkyCoord
+        A SkyCoord object representing the input sky coordinate.
+
+    Raises
+    ------
+    ValueError
+        If the input is neither a string nor a SkyCoord object.
+    """
+    if isinstance(skycoord, str):
+        return SkyCoord(skycoord, unit=(u.hourangle, u.deg))
+    elif isinstance(skycoord, SkyCoord):
+        return skycoord
+    else:
+        raise ValueError("Input must be a string or a SkyCoord object.")
+
+
+def parse_input_for_angular_size(angular_size, duplicate=False):
+    """
+    Parse input to return an angular size Quantity.
+
+    Parameters
+    ----------
+    angular_size : Quantity, list, tuple, ndarray, or str
+        The input angular size which can be a Quantity object, a list, tuple,
+        ndarray of values, or a string representing the angular size.
+    duplicate : bool or int, optional
+        If True or a number equivalent to True, the function will return a list
+        containing duplicated angular size values. The total number of elements
+        will be `duplicate + 1`. True is equal to 1 in this case. Only applicable
+        if the input is a scalar. Useful for turning a single angular size into
+        a pair or more. Default is False.
+
+    Returns
+    -------
+    Quantity or list of Quantity
+        The parsed angular size as a Quantity object. If `duplicate` is True,
+        returns a list of duplicated Quantity objects.
+
+    Raises
+    ------
+    ValueError
+        If the input is an empty list or tuple, or if the input type is not
+        supported.
+    """
+    # note that u.Quantity is also an instance of ndarray
+    if isinstance(angular_size, np.ndarray):
+        angular_size = np.atleast_1d(angular_size)
+        n_elem = angular_size.size
+        match n_elem:
+            case 1:
+                angular_size = u.Quantity(angular_size[0], unit=u.deg)
+            case x if x > 1:
+                return [u.Quantity(x, unit=u.deg) for x in angular_size.flat]
+            case 0:
+                raise ValueError("Input must contain at least one element.")
+    elif isinstance(angular_size, (list, tuple)):
+        n_elem = len(angular_size)
+        match n_elem:
+            case 1:
+                angular_size = u.Quantity(angular_size[0], unit=u.deg)
+            case x if x > 1:
+                return [u.Quantity(x, unit=u.deg) for x in angular_size]
+            case 0:
+                raise ValueError("Input must contain at least one element.")
+    elif isinstance(angular_size, (int, float, str)):
+        # unit=u.deg is safe because it does not make a difference if the input string has a unit
+        angular_size = u.Quantity(angular_size, unit=u.deg)
+    else:
+        raise ValueError(
+            "Input must be a string/int/float, a list/tuple/ndarray, or a Quantity object."
+        )
+    if duplicate:
+        return (int(duplicate) + 1) * [angular_size]
+    else:
+        return angular_size
