@@ -141,7 +141,7 @@ def correct_for_zp(data, zp):
 # %% ../../nbs/euclid/skyflat.ipynb 13
 def interpolate_skyflats(flat, data):
     """Interpolate the `flat` to the x, y coordinates of the `data`."""
-    return flat.interp(x=data.x.values, y=data.y.values, method="nearest",
+    return flat.interp(x=data.x.values, y=data.y.values, assume_sorted=True, method="nearest",
                        kwargs={"fill_value": "extrapolate"})
 
 # %% ../../nbs/euclid/skyflat.ipynb 14
