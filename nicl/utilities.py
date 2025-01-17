@@ -44,11 +44,13 @@ def sb_to_adu(sb, pix_scale, zp=27 * u.ABmag):
     return counts
 
 # %% ../nbs/10_utilities.ipynb 4
-def get_pixel_scale(img):
+def get_pixel_scale(img, wcs=None):
     """Calculate the average pixel scale of the supplied image."""
+    if wcs is None:
+        wcs = image.wcs
     return (
         np.mean(
-            [s.to_value("arcsec") for s in img.wcs.celestial.proj_plane_pixel_scales()]
+            [s.to_value("arcsec") for s in wcs.celestial.proj_plane_pixel_scales()]
         )
         * u.arcsec
     )
@@ -58,10 +60,12 @@ def get_img_centre_pixel(img):
     return (np.array(img.shape) - 1) / 2
 
 
-def get_img_centre_world(img):
+def get_img_centre_world(img, wcs=None):
     """Calculate the world coordinates at the centre of the supplied image."""
     centre_pixel = get_img_centre_pixel(img)
-    return img.wcs.pixel_to_world(*centre_pixel)
+    if wcs is None:
+        wcs = image.wcs
+    return wcs.pixel_to_world(*centre_pixel)
 
 
 def distance_from_coord(shape, coord):
