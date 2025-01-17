@@ -173,7 +173,7 @@ def create_zarr_ref_from_fits(fns, out_path=None):
         filterwarnings(
             "ignore", "Concatenated coordinate .* contains less than expected"
         )
-        ref = mzz.translate()            
+        ref = mzz.translate()
     wcs = pd.DataFrame(wcs_list)
     wcs = wcs.groupby([coord_name, product_id_name, "dither"]).first()
     wcs = wcs.to_xarray()
@@ -251,7 +251,6 @@ def load_zarr_ref(path):
     zp = xr.open_zarr(path / "zp.zarr")
     return ref, wcs, zp
 
-
 # %% ../../nbs/euclid/xarray.ipynb 12
 def _parse_wcs_dataset(wcs):
     """Parse a WCS Dataset into a DataArray of WCS objects."""
@@ -265,13 +264,12 @@ def load_wcs_from_zarr(fn):
     wcs = _parse_wcs_dataset(wcs)
     return wcs
 
-
 # %% ../../nbs/euclid/xarray.ipynb 13
 def create_all_zarr_refs(path, zarr_path, obs_id_glob="[23]*"):
     obs_ids = sorted([p.name for p in (path).glob(obs_id_glob)])
     for obs_id in obs_ids:
         fns = sorted([str(p) for p in (path / obs_id).glob("*.fits")])
-        zarrfn = zarr_path / f"{obs_id}" 
+        zarrfn = zarr_path / f"{obs_id}"
         if not zarrfn.exists():
             try:
                 create_zarr_ref_from_fits(fns, out_path=zarrfn)
@@ -294,12 +292,18 @@ def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
 
 # %% ../../nbs/euclid/xarray.ipynb 15
 def xr_fast_mask(data):
-    mask = xr.apply_ufunc(fast_mask, data,
-                        kwargs=dict(estimate_background=True,
-                                    return_threshold=False,
-                                    mask_params=dict(nsigma=2.0, erosion_iterations=1)),
-                        vectorize=True,
-                        dask="parallelized", input_core_dims=[["x", "y"]],
-                        output_core_dims=[["x", "y"]],
-                        output_dtypes=[bool])
+    mask = xr.apply_ufunc(
+        fast_mask,
+        data,
+        kwargs=dict(
+            estimate_background=True,
+            return_threshold=False,
+            mask_params=dict(nsigma=2.0, erosion_iterations=1),
+        ),
+        vectorize=True,
+        dask="parallelized",
+        input_core_dims=[["x", "y"]],
+        output_core_dims=[["x", "y"]],
+        output_dtypes=[bool],
+    )
     return mask
