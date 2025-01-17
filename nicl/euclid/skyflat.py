@@ -8,7 +8,7 @@ __all__ = ['create_coarse_data', 'group_obs_ids', 'construct_skyflats', 'constru
 
 # %% ../../nbs/euclid/skyflat.ipynb 4
 import numpy as np
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 import xarray as xr
 
 from .utilities import default_data_path
@@ -22,7 +22,7 @@ from nicl.euclid.xarray import (
 # %% ../../nbs/euclid/skyflat.ipynb 6
 def create_coarse_data(obs_id, zarr_path, n_pix=51):
     """Create and store the coarse data for a given observation ID.
-    
+
     Coarse data is computed by taking the median in boxes of size `n_pix` x `n_pix`.
     """
     coarse_path = zarr_path / f"{obs_id}/coarse_{n_pix}.zarr"
@@ -41,11 +41,11 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51):
 
 # %% ../../nbs/euclid/skyflat.ipynb 8
 def group_obs_ids(
-        obs_ids,  # list of observation IDs
-        half_window=3,  # half-window size for grouping
+    obs_ids,  # list of observation IDs
+    half_window=3,  # half-window size for grouping
 ) -> dict[int, list[int]]:  # dict of grouped observation IDs for each observation ID
     """Group the observation IDs around each observation ID.
-    
+
     Determines the best group of observations for characterising the skyflat for a given observation ID.
     For observations within a continuous sequence, the group comprises the `half_window` observations on
     either side of the given observation ID. The target observation itself is not included in the group.
@@ -54,15 +54,13 @@ def group_obs_ids(
     side is increased, to maintain a total group size of `2 * half_window`. However, for short sequences,
     the group may be smaller.
     """
-    
     obs_ids = sorted(obs_ids)
     gaps = np.where(np.diff(obs_ids) > 1)[0]
     group_starts = [0] + list(gaps + 1)
     group_ends = list(gaps) + [len(obs_ids)]
 
     sequential_groups = [
-        obs_ids[start:end+1] 
-        for start, end in zip(group_starts, group_ends)
+        obs_ids[start : end + 1] for start, end in zip(group_starts, group_ends)
     ]
 
     group_for_obs_id = {}
@@ -76,7 +74,9 @@ def group_obs_ids(
                     max_obs_id = min(max_obs_id_group, obs_id + hw)
                     if max_obs_id - min_obs_id >= 2 * half_window:
                         break
-                selected_obs_ids = [i for i in range(min_obs_id, max_obs_id + 1) if i != obs_id]
+                selected_obs_ids = [
+                    i for i in range(min_obs_id, max_obs_id + 1) if i != obs_id
+                ]
                 group_for_obs_id[obs_id] = selected_obs_ids
     return group_for_obs_id
 
@@ -88,6 +88,7 @@ def construct_skyflats(obs_id, data, group_for_obs_id):
     agg_dims = ["observation_id", "dither"]
     median = group_data.median(dim=agg_dims, keep_attrs=True)
     return median
+
 
 def construct_skyflats_err(obs_id, data, group_for_obs_id, median):
     """Construct the error on the skyflats for a given `obs_id`."""
@@ -134,15 +135,20 @@ def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None):
 # %% ../../nbs/euclid/skyflat.ipynb 12
 def correct_for_zp(data, zp):
     """Correct the data for the zero-point variations between detectors."""
-    zp_shift = 10**(-0.4 * zp["ZP"])
+    zp_shift = 10 ** (-0.4 * zp["ZP"])
     zp_shift /= zp_shift.mean(dim=["observation_id", "dither", "filter"])
     return data * zp_shift
 
 # %% ../../nbs/euclid/skyflat.ipynb 13
 def interpolate_skyflats(flat, data):
     """Interpolate the `flat` to the x, y coordinates of the `data`."""
-    return flat.interp(x=data.x.values, y=data.y.values, assume_sorted=True, method="nearest",
-                       kwargs={"fill_value": "extrapolate"})
+    return flat.interp(
+        x=data.x.values,
+        y=data.y.values,
+        assume_sorted=True,
+        method="nearest",
+        kwargs={"fill_value": "extrapolate"},
+    )
 
 # %% ../../nbs/euclid/skyflat.ipynb 14
 def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51):
@@ -150,7 +156,9 @@ def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51):
     group_obs_ids = group_for_obs_id[obs_id]
     for group_obs_id in group_obs_ids:
         create_coarse_data(group_obs_id, zarr_path, n_pix=n_pix)
-    coarse_data = xr.open_mfdataset(zarr_path.glob(f"*/coarse_{n_pix}.zarr"), engine="zarr")
+    coarse_data = xr.open_mfdataset(
+        zarr_path.glob(f"*/coarse_{n_pix}.zarr"), engine="zarr"
+    )
     coarse_data = coarse_data["SCI"]
     if zp is not None:
         coarse_data = correct_for_zp(coarse_data, zp)
