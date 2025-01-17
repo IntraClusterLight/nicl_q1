@@ -99,7 +99,7 @@ def create_zarr_ref_from_fits(fns, out_path=None):
         filter = get_filter_from_filename(fn)
         filters.append(filter)
         pbar.set_description(
-            f"{fn.split("/")[-1]}, {product_id}, {dither_id}, {filter}"
+            f"{fn.split('/')[-1]}, {product_id}, {dither_id}, {filter}"
         )
         ref_exts = []
         coords = []
