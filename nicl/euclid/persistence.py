@@ -36,7 +36,7 @@ from nicl.euclid.utilities import (
     fits_append,
     remove_if_necessary,
 )
-from nicl.euclid.debanding import correct_banding
+from nicl.euclid.debanding import banding_correction
 from nicl.filter import sampled_median_filter
 
 # %% ../../nbs/euclid/persistence.ipynb 7
@@ -72,7 +72,8 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
         if skyflat_path is not None:
             img = apply_skyflat(img, fn, skyflat_path, correct_banding=correct_banding)
         if correct_banding:
-            img = correct_banding(img)
+            correction = banding_correction(img)
+            img = img - correction
         images.append(img)
     images = np.array(images)
     rms_images = np.array([get_rms(fn, extname) for fn in fns])
