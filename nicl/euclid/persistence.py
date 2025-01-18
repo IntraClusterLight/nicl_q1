@@ -381,7 +381,8 @@ def calc_persistence_correction(
                 outpath, f"corr_err_{obs_id}_{dithobs}_{filter_index}_{filt}.fits"
             )
             fits_append(out_fn, corr_err, ext, primary_header)
-        persistence_images[(obs_id, dithobs, filt)] = (corr_flux, corr_err)
+            key = f"{obs_id}_{dithobs}_{filt}"
+        persistence_images[key] = (corr_flux, corr_err)
     return persistence_images
 
 # %% ../../nbs/euclid/persistence.ipynb 14
@@ -405,11 +406,9 @@ def apply_persistence_correction(
             dq_ext = ext.replace("SCI", "DQ")
             dq_img = fits.getdata(fn, extname=dq_ext)
             dq_hdr = fits.getheader(fn, extname=dq_ext)
-            key = (target["obs_id"], target["dithobs"], target["filter"])
+            key = f"{target['obs_id']}_{target['dithobs']}_{target['filter']}"
             if key in persistence_images:
-                pers, pers_err = persistence_images[
-                    (target["obs_id"], target["dithobs"], target["filter"])
-                ]
+                pers, pers_err = persistence_images[key]
                 img -= pers
                 rms_img = np.sqrt(rms_img**2 + pers_err**2)
                 rms_img = rms_img.astype(np.float32)
