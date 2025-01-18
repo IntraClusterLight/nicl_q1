@@ -51,10 +51,10 @@ def forward_fill(arr, axis=-1):
     return out
 
 # %% ../../nbs/euclid/persistence.ipynb 9
-def apply_skyflat(img, fn, skyflat_path, correct_banding=True):
+def apply_skyflat(img, fn, skyflat_path):
     obs_id = get_obs_id_from_filename(fn)
     filter = get_filter_from_filename(fn)
-    skyflat_fn = skyflat_path / f"flat-{obs_id}-{filter}.fits"
+    skyflat_fn = skyflat_path / f"{obs_id}/flat-{obs_id}-{filter}.fits"
     skyflat = fits.getdata(skyflat_fn)
     print(f"Applying skyflat {skyflat_fn} to {fn}")
     coarse_factor = np.array(img.shape) // np.array(skyflat.shape)
@@ -70,7 +70,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     for fn in fns:
         img = fits.getdata(fn, extname=extname)
         if skyflat_path is not None:
-            img = apply_skyflat(img, fn, skyflat_path, correct_banding=correct_banding)
+            img = apply_skyflat(img, fn, skyflat_path)
         if correct_banding:
             correction = banding_correction(img)
             img = img - correction

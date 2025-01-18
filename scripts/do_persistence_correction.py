@@ -22,11 +22,12 @@ def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
     obs_ids = da.find_all_observations()
     print(f"All {len(obs_ids)} obs_ids to process:")
     print(obs_ids)
-    print("Processing:")
+    print("Processing:", flush=True)
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for obs_id in obs_ids:
+            print(f"Processing {obs_id}...", flush=True)
             outpath = processed_path / f"persistence/NIR/{obs_id}/"
-            skyflat_path = processed_path / f"skyflat/skyflats/NIR/{obs_id}/"
+            skyflat_path = processed_path / f"skyflat/skyflats/NIR/"
             executor.submit(try_correct_persistence, obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
 
 if __name__ == '__main__':
