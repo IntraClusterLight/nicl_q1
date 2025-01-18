@@ -9,8 +9,11 @@ from nicl.euclid.persistence import correct_persistence
 from nicl.euclid.utilities import default_data_path
 
 def try_correct_persistence(*args, **kwargs):
+    obs_id = args[0]
     try:
+        print(f"Processing {obs_id}...")
         correct_persistence(*args, **kwargs)
+        print(f"Completed {obs_id}...", flush=True)
     except Exception as e:
         print(e)
         
@@ -25,7 +28,6 @@ def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
     print("Processing:", flush=True)
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for obs_id in obs_ids:
-            print(f"Processing {obs_id}...", flush=True)
             outpath = processed_path / f"persistence/NIR/{obs_id}/"
             skyflat_path = processed_path / f"skyflat/skyflats/NIR/"
             executor.submit(try_correct_persistence, obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
