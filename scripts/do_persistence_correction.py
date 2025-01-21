@@ -2,9 +2,7 @@
 
 from concurrent.futures import ProcessPoolExecutor
 import os
-import sys
 
-from nicl.euclid.data_access import DataAccess
 from nicl.euclid.persistence import correct_persistence
 from nicl.euclid.utilities import default_data_path
 
@@ -16,10 +14,9 @@ def try_correct_persistence(*args, **kwargs):
         
 def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
     print(f"{os.cpu_count()} CPUs available, using {max_workers}.")
-    da = DataAccess(release_name=release_name)
     path = default_data_path(release_name)
     processed_path = default_data_path(f"{release_name}_processed_{processed_version}")
-    obs_ids = da.find_all_observations()
+    obs_ids = sorted([int(p.stem) for p in (path / "NIR").glob("*") if p.stem[0] in '23'])
     print(f"All {len(obs_ids)} obs_ids to process:")
     print(obs_ids)
     print("Processing:", flush=True)
