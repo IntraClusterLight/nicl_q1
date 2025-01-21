@@ -174,7 +174,7 @@ def parse_input_for_skycoord(skycoord):
 
 
 def parse_input_for_angular_size(angular_size, duplicate=False):
-    """Parse input to return an angular size Quantity.
+    r"""Parse input to return an angular size Quantity.
 
     Parameters
     ----------
