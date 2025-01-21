@@ -10,12 +10,9 @@ from nicl.euclid.utilities import default_data_path
 
 def try_correct_persistence(*args, **kwargs):
     obs_id = args[0]
-    try:
-        print(f"Processing {obs_id}...")
-        correct_persistence(*args, **kwargs)
-        print(f"Completed {obs_id}...", flush=True)
-    except Exception as e:
-        print(e)
+    print(f"Processing {obs_id}...", flush=True)
+    correct_persistence(*args, **kwargs)
+    print(f"Completed {obs_id}...", flush=True)
         
 def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
     print(f"{os.cpu_count()} CPUs available, using {max_workers}.")
@@ -29,8 +26,8 @@ def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for obs_id in obs_ids:
             outpath = processed_path / f"persistence/NIR/{obs_id}/"
-            skyflat_path = processed_path / f"skyflat/skyflats/NIR/"
+            skyflat_path = processed_path / f"skyflat/NIR/"
             executor.submit(try_correct_persistence, obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
 
 if __name__ == '__main__':
-    main(max_workers=4)
+    main(max_workers=2)

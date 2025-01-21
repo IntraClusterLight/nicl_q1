@@ -3,7 +3,7 @@ from nicl.euclid.utilities import default_data_path
 from nicl.euclid.xarray import read_all_zarr_refs
 
 zarr_path = default_data_path("zarr", "Q1_R1", "NIR")
-outpath = default_data_path("Q1_R1_processed_v0.4", "skyflat", "skyflats", "NIR")
+outpath = default_data_path("Q1_R1_processed_v0.4", "skyflat", "NIR")
 
 n_pix = 51
 half_window = 3

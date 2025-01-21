@@ -5,7 +5,16 @@
 # %% auto 0
 __all__ = ['banding_correction']
 
-# %% ../../nbs/euclid/debanding.ipynb 7
+# %% ../../nbs/euclid/debanding.ipynb 2
+import warnings
+
+import numpy as np
+import xarray as xr
+
+from .xarray import xr_fast_mask
+from ..filter import sampled_median_filter
+
+# %% ../../nbs/euclid/debanding.ipynb 8
 def mask_data(data):
     mask = xr_fast_mask(data)
     # this currently doesn't work, apparently because of a bug in kerchunk, interpreting the type incorrectly (unsigned int32?)
@@ -15,18 +24,23 @@ def mask_data(data):
     masked_data = data.where(~mask)
     return masked_data
 
-# %% ../../nbs/euclid/debanding.ipynb 8
+# %% ../../nbs/euclid/debanding.ipynb 9
 def filter_data(data, scale=200):
     smoothed = sampled_median_filter(data, scale, dims=["x", "y"])
     filtered_data = data - smoothed
     return filtered_data
 
-# %% ../../nbs/euclid/debanding.ipynb 22
+# %% ../../nbs/euclid/debanding.ipynb 23
 def banding_correction(data, rows=True, cols=True, max_size=200):
-    masked_data = mask_data(data)
-    filtered_data = filter_data(masked_data, scale=max_size)
+    if isinstance(data, np.ndarray):
+        data = xr.DataArray(data, dims=["y", "x"])
+        return_numpy = True
+    else:
+        return_numpy = False
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", "invalid value encountered in reduce")
+        masked_data = mask_data(data)
+        filtered_data = filter_data(masked_data, scale=max_size)
         if rows:
             med_x = filtered_data.median("x")
             try:
@@ -42,4 +56,6 @@ def banding_correction(data, rows=True, cols=True, max_size=200):
                 med_med_y = med_y.as_numpy().median("x")
             med_y = med_y - med_med_y
     correction = med_x + med_y
+    if return_numpy:
+        correction = correction.to_numpy()
     return correction
