@@ -281,7 +281,11 @@ def create_all_zarr_refs(path, zarr_path, obs_id_glob="[23]*"):
 def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
     ref_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/ref.json")]
     out = MultiZarrToZarr(ref_files, concat_dims=["observation_id"])
-    ref = out.translate()
+    with catch_warnings():
+        filterwarnings(
+            "ignore", "Concatenated coordinate .* contains less than expected"
+        )
+        ref = out.translate()
     ds = open_zarr_ref_as_dataset(ref)
     ds = ds.assign_coords(y=("y", ds.y.values), x=("x", ds.x.values))
     wcs_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/wcs.zarr")]

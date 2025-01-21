@@ -7,6 +7,8 @@ __all__ = ['create_coarse_data', 'group_obs_ids', 'construct_skyflats', 'constru
            'read_skyflat', 'correct_for_zp', 'interpolate_skyflats', 'create_skyflats', 'apply_skyflat']
 
 # %% ../../nbs/euclid/skyflat.ipynb 4
+import warnings
+
 import numpy as np
 import xarray as xr
 import astropy.io.fits as fits
@@ -35,7 +37,9 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51):
         # invalid = invalid > 0
         # mask = mask | invalid
         masked_data = data.where(~mask)
-        coarse_data = masked_data.coarsen(dict(x=n_pix, y=n_pix)).median()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+            coarse_data = masked_data.coarsen(dict(x=n_pix, y=n_pix)).median()
         coarse_data.to_zarr(coarse_path)
 
 # %% ../../nbs/euclid/skyflat.ipynb 9
@@ -161,7 +165,7 @@ def interpolate_skyflats(flat, data):
         coarse_pix = [
             np.mean(p.reshape(-1, coarse_factor[i]), axis=1, dtype=np.float32) for i, p in enumerate(pix)
         ]
-        outpix = np.meshgrid(*pix, indexing="ij", dtype=np.float32)
+        outpix = np.meshgrid(*pix, indexing="ij")
         outpix = np.moveaxis(outpix, 0, -1)
         skyflat = interpn(
             coarse_pix,
