@@ -147,8 +147,7 @@ def maybe_to_value(x, unit):
 
 # %% ../nbs/10_utilities.ipynb 9
 def parse_input_for_skycoord(skycoord):
-    """
-    Parse input to return a SkyCoord object.
+    """Parse input to return a SkyCoord object.
 
     Parameters
     ----------
@@ -164,6 +163,7 @@ def parse_input_for_skycoord(skycoord):
     ------
     ValueError
         If the input is neither a string nor a SkyCoord object.
+
     """
     if isinstance(skycoord, str):
         return SkyCoord(skycoord, unit=(u.hourangle, u.deg))
@@ -174,8 +174,7 @@ def parse_input_for_skycoord(skycoord):
 
 
 def parse_input_for_angular_size(angular_size, duplicate=False):
-    """
-    Parse input to return an angular size Quantity.
+    """Parse input to return an angular size Quantity.
 
     Parameters
     ----------
@@ -200,6 +199,7 @@ def parse_input_for_angular_size(angular_size, duplicate=False):
     ValueError
         If the input is an empty list or tuple, or if the input type is not
         supported.
+
     """
     # note that u.Quantity is also an instance of ndarray
     if isinstance(angular_size, np.ndarray):

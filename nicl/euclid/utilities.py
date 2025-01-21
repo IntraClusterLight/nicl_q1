@@ -63,15 +63,19 @@ def get_nisp_images_for_observation(
     info = pd.DataFrame(info)
     info = info.sort_values("mjd").reset_index(drop=True)
     if fill_missing:
-        info["obs_id"] = info["obs_id"].astype('Int64')
+        info["obs_id"] = info["obs_id"].astype("Int64")
         obs_ids = info["obs_id"].unique()
         filters = ["J", "H", "Y"]
         if include_sir:
             filters = ["SIR"] + filters
         info = info.set_index(["obs_id", "dithobs", "filter"])
-        expected_index = pd.MultiIndex.from_product([obs_ids, range(4), filters], names=["obs_id", "dithobs", "filter"])
+        expected_index = pd.MultiIndex.from_product(
+            [obs_ids, range(4), filters], names=["obs_id", "dithobs", "filter"]
+        )
         info = info.reindex(expected_index).reset_index()
-        info[["mjd", "exptime", "obs_id"]] = info[["mjd", "exptime", "obs_id"]].fillna(0)
+        info[["mjd", "exptime", "obs_id"]] = info[["mjd", "exptime", "obs_id"]].fillna(
+            0
+        )
         info["filename"] = info["filename"].fillna("")
     return info
 
@@ -245,7 +249,6 @@ def get_filter_from_filename(fn):
 # %% ../../nbs/euclid/utilities.ipynb 13
 def round_up_box_size(x, y):
     """Return an integer z closest to y that approximate integer * z = x."""
-
     if not isinstance(x, int) or x < 0:
         raise ValueError("x must be a positive integer")
     if y > x:

@@ -20,7 +20,6 @@ import numpy as np
 from astropy.io import fits
 from astropy.stats import SigmaClip
 from astropy import units as u
-from astropy.coordinates import SkyCoord
 from photutils.background import Background2D
 from datetime import datetime
 
@@ -46,7 +45,7 @@ from nicl.utilities import parse_input_for_angular_size, parse_input_for_skycoor
 
 
 class Combiner(ABC):
-    """Combines Euclid images using SWarp"""
+    """Combines Euclid images using SWarp."""
 
     def __init__(
         self,
@@ -255,7 +254,7 @@ class DithersMixin:
         return ids
 
     def _find_dithers(self, pattern, filter):
-        """find paths to dithers for a given filter"""
+        """Find paths to dithers for a given filter."""
         image_paths = []
         for id in np.atleast_1d(self.ids):
             image_paths.extend(
@@ -372,7 +371,7 @@ class DithersMixin:
         print(f"Preparing science and weight images took {elapsed_mins:.1f} mins.")
 
     def _post_process_stack_and_weight(self, tmpdir, out_fn):
-        """clean up FITS headers and copy the output to the desired directory"""
+        """Clean up FITS headers and copy the output to the desired directory."""
         start_time = datetime.now()
         with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci, fits.open(
             tmpdir / "coadd.weight.fits", memmap=True
@@ -416,7 +415,7 @@ class DithersMixin:
 
 
 class NISPCombiner(DithersMixin, Combiner):
-    """Combine NISP images using SWarp"""
+    """Combine NISP images using SWarp."""
 
     def __init__(self, **kwargs):
         super().__init__(instrument=NISP, swarp_config=SWARP_CONFIG_NISP, **kwargs)
@@ -452,7 +451,7 @@ class NISPCombiner(DithersMixin, Combiner):
         return super()._get_obsids()
 
     def _find_images(self, filter):
-        """return a list of paths to the NISP dithers"""
+        """Return a list of paths to the NISP dithers."""
         return super()._find_dithers(
             pattern="**/{obsid}/EUC_NIR_W-CAL-IMAGE_{filter}-{obsid}-*_*.fits",
             filter=filter,
@@ -466,7 +465,7 @@ class NISPCombiner(DithersMixin, Combiner):
 
 # %% ../../nbs/euclid/combine.ipynb 7
 class VISCombiner(DithersMixin, Combiner):
-    """Combine VIS images using SWarp"""
+    """Combine VIS images using SWarp."""
 
     def __init__(self, **kwargs):
         super().__init__(instrument=VIS, swarp_config=SWARP_CONFIG_VIS, **kwargs)
@@ -515,7 +514,7 @@ class VISCombiner(DithersMixin, Combiner):
             self._post_process(tmpdir, out_fn)
 
     def _find_images(self):
-        """return a list of paths to the VIS dithers"""
+        """Return a list of paths to the VIS dithers."""
         return super()._find_dithers(
             pattern="**/{obsid}/EUC_VIS_SWL-DET-*{obsid}-*-*_*.fits",
             filter="I",
@@ -529,7 +528,7 @@ class VISCombiner(DithersMixin, Combiner):
 
 # %% ../../nbs/euclid/combine.ipynb 8
 class MerCombiner(Combiner):
-    """Combine MER stacks using SWarp"""
+    """Combine MER stacks using SWarp."""
 
     def __init__(self, **kwargs):
         if "add_bkg_mod" in kwargs:
@@ -598,7 +597,7 @@ class MerCombiner(Combiner):
         return ids
 
     def _find_images(self, filter):
-        """return a list of tuple of paths to the MER stacks and bkg models"""
+        """Return a list of tuple of paths to the MER stacks and bkg models."""
         images = []
         for tile_id in np.atleast_1d(self.ids):
             img_tpl = []
@@ -679,7 +678,7 @@ class MerCombiner(Combiner):
         print(f"Preparing MER stacks took {elapsed_mins:.1f} mins.")
 
     def _post_process(self, tmpdir, out_fn):
-        """copy the final stack to the desired directory"""
+        """Copy the final stack to the desired directory."""
         start_time = datetime.now()
         self.out_dir.mkdir(parents=True, exist_ok=True)
         if not self.overwrite and (self.out_dir / out_fn).exists():
@@ -717,7 +716,8 @@ def combine(
     dry_run=False,  # instantiate the classes without actually combining the images
     **kwargs,  # command line arguments to pass to SWarp
 ):
-    """
+    """Combine a variety of Euclid data products to produce mosaics.
+
     Combine Euclid calibrated dithers from different instruments (VIS or NISP) or
     MER stacks using SWarp. Input images are found based on input ids (obs_ids
     for VIS/NISP or tile_ids for MER) or cutout parameters (center and size).
@@ -787,6 +787,7 @@ def combine(
     ValueError
         If required parameters are missing or invalid directories/files are
         specified.
+
     """
     # check IO designations
     if in_dir is None:
