@@ -427,7 +427,7 @@ def calc_persistence_correction(
                 outpath, f"corr_err_{obs_id}_{dithobs}_{filter_index}_{filt}.fits"
             )
             fits_append(out_fn, corr_err, ext, primary_header)
-            key = f"{obs_id}_{dithobs}_{filt}"
+        key = f"{obs_id}_{dithobs}_{filt}"
         persistence_images[key] = (corr_flux, corr_err)
     return persistence_images
 
