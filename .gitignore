@@ -152,3 +152,6 @@ checklink/cookies.txt
 
 # presentations
 *.pptx
+
+# script output
+scripts/*.out
