@@ -25,7 +25,9 @@ from photutils.segmentation import (
 from scipy.ndimage import binary_closing
 
 from nicl.euclid.utilities import (
+    get_filter_from_filename,
     get_nisp_images_for_observation,
+    get_obs_id_from_filename,
     get_primary_header,
     get_persistence_mask,
     get_invalid_mask_without_persistence,
@@ -33,6 +35,8 @@ from nicl.euclid.utilities import (
     fits_append,
     remove_if_necessary,
 )
+from nicl.euclid.debanding import banding_correction
+from nicl.euclid.skyflat import read_skyflat, apply_skyflat
 from nicl.filter import sampled_median_filter
 
 # %% ../../nbs/euclid/persistence.ipynb 7
@@ -47,8 +51,37 @@ def forward_fill(arr, axis=-1):
     return out
 
 # %% ../../nbs/euclid/persistence.ipynb 9
-def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=0):
-    images = np.array([fits.getdata(fn, extname=extname) for fn in fns])
+def read_and_apply_skyflat(img, fn, extname, skyflat_path):
+    obs_id = get_obs_id_from_filename(fn)
+    filter = get_filter_from_filename(fn)
+    detector = extname.split(".")[0]
+    skyflat = read_skyflat(obs_id, filter, detector, skyflat_path)
+    print(f"Applying skyflat to {fn} for {extname}")
+    return apply_skyflat(img, skyflat)
+
+# %% ../../nbs/euclid/persistence.ipynb 10
+def minimum_map(
+    fns,
+    mask,
+    extname,
+    n_leading=0,
+    correct=True,
+    n_ok_min=3,
+    take=0,
+    skyflat_path=None,
+    correct_banding=True,
+):
+    images = []
+    for fn in fns:
+        img = fits.getdata(fn, extname=extname)
+        if skyflat_path is not None:
+            img = read_and_apply_skyflat(img, fn, extname, skyflat_path)
+        if correct_banding:
+            print(f"Applying banding correction to {fn} for {extname}")
+            correction = banding_correction(img)
+            img = img - correction
+        images.append(img)
+    images = np.array(images)
     rms_images = np.array([get_rms(fn, extname) for fn in fns])
     # add invalid pixels to the mask
     masked = np.array([get_invalid_mask_without_persistence(fn, extname) for fn in fns])
@@ -67,7 +100,9 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     images_sorted[np.isinf(images_sorted)] = np.nan
     minimum_idx = images_idx_sorted[take]
     minimum = images_sorted[take]
-    minimum_rms = np.take_along_axis(rms_images, np.expand_dims(minimum_idx, 0), axis=0).squeeze()
+    minimum_rms = np.take_along_axis(
+        rms_images, np.expand_dims(minimum_idx, 0), axis=0
+    ).squeeze()
     # estimate error on the minimum from difference versus next smallest value
     minimum_err = (images_sorted[take + 1] - minimum) / np.sqrt(2)
     if correct:
@@ -89,7 +124,7 @@ def minimum_map(fns, mask, extname, n_leading=0, correct=True, n_ok_min=3, take=
     minimum[invalid] = 0
     return minimum, minimum_err, minimum_rms, minimum_idx
 
-# %% ../../nbs/euclid/persistence.ipynb 10
+# %% ../../nbs/euclid/persistence.ipynb 11
 def mjd_of_last_persistence(image_info, ext, threshold=10000):
     # take the mjd as the middle of the exposure
     mjd = np.dstack(image_info["mjd"] + 0.5 * image_info["exptime"] / 86400)
@@ -122,7 +157,7 @@ def mjd_of_last_persistence(image_info, ext, threshold=10000):
     flux = np.moveaxis(flux, -1, 0)
     return last, flux
 
-# %% ../../nbs/euclid/persistence.ipynb 11
+# %% ../../nbs/euclid/persistence.ipynb 12
 def calc_rolling_minimum(
     obs_id,  # the observation_id on which to operate, if None operate on all in `image_info`
     image_info,  # a DataFrame of image information
@@ -134,6 +169,8 @@ def calc_rolling_minimum(
     debug=False,  # print some useful debugging information and save intermediate images
     primary_header=None,  # the primary header for debug images
     outpath=None,  # path at which to save debug images
+    skyflat_path=None,  # the folder containing the skyflats (atemporal background)
+    correct_banding=True,  # apply banding correction to the images
 ):
     """Determine the rolling minimum for each image in a sequence.
 
@@ -144,6 +181,10 @@ def calc_rolling_minimum(
     appearence of the feature are masked. The minimum value for each pixel is determined over the
     sequence, along with the time since the last persistence feature appeared and the elapsed time
     between the minimum and the target image.
+
+    If `skyflat_path` is provided, the skyflats (atemporal background models) are subtracted from the images.
+
+    If `correct_banding` is True, the banding correction is applied to the images.
     """
     filter_sequence = "JHY"
     n_filters = len(filter_sequence)
@@ -199,12 +240,16 @@ def calc_rolling_minimum(
                 n_leading=n_leading,
                 correct=correct_min,
                 take=take,
+                skyflat_path=skyflat_path,
+                correct_banding=correct_banding,
             )
             # create the error estimate by combining the official noise and the error on the minimum
             # the idea of this smoothing is to avoid underestimation of the error, but preserve small scale features
             minimum_err_smoothed = sampled_median_filter(minimum_err, size=5)
             minimum_err_filtered = np.maximum(0, minimum_err - minimum_err_smoothed)
-            minimum_sigma = np.sqrt(minimum_rms**2 + minimum_err_smoothed**2 + minimum_err_filtered**2)
+            minimum_sigma = np.sqrt(
+                minimum_rms**2 + minimum_err_smoothed**2 + minimum_err_filtered**2
+            )
             minimum_sigma = np.nan_to_num(minimum_sigma, nan=1e7)
             # the time between the minimum for each pixel and when it was last flagged for persistence prior to the target
             dt_lp_post = np.take_along_axis(
@@ -220,32 +265,67 @@ def calc_rolling_minimum(
             ).squeeze()
             if debug:
                 image_name = (
-                    f'{target["obs_id"]}_{target["dithobs"]}_{filter_index}_{filt}'
+                    f"{target['obs_id']}_{target['dithobs']}_{filter_index}_{filt}"
                 )
-                _fits_append = partial(fits_append, ext=ext, primary_header=primary_header)
-                _fits_append(os.path.join(outpath, f"mask_{image_name}.fits"), mask.astype(int))
+                _fits_append = partial(
+                    fits_append, ext=ext, primary_header=primary_header
+                )
+                _fits_append(
+                    os.path.join(outpath, f"mask_{image_name}.fits"), mask.astype(int)
+                )
                 _fits_append(os.path.join(outpath, f"min_{image_name}.fits"), minimum)
-                _fits_append(os.path.join(outpath, f"min_err_{image_name}.fits"), minimum_err)
-                _fits_append(os.path.join(outpath, f"min_err_smoothed_{image_name}.fits"), minimum_err_smoothed)
-                _fits_append(os.path.join(outpath, f"min_err_filtered_{image_name}.fits"), minimum_err_filtered)
-                _fits_append(os.path.join(outpath, f"min_rms_{image_name}.fits"), minimum_rms)
-                _fits_append(os.path.join(outpath, f"min_sigma_{image_name}.fits"), minimum_sigma)
-                _fits_append(os.path.join(outpath, f"dt_lp_post_{image_name}.fits"), dt_lp_post)
-                _fits_append(os.path.join(outpath, f"dt_lp_prior_{image_name}.fits"), dt_lp_prior)
-                _fits_append(os.path.join(outpath, f"dt_lp_post_target_{image_name}.fits"), dt_lp_post_target)
-                _fits_append(os.path.join(outpath, f"dt_lp_prior_target_{image_name}.fits"), dt_lp_prior_target)
-                _fits_append(os.path.join(outpath, f"lp_prior_flux_{image_name}.fits"), lp_prior_flux)
+                _fits_append(
+                    os.path.join(outpath, f"min_err_{image_name}.fits"), minimum_err
+                )
+                _fits_append(
+                    os.path.join(outpath, f"min_err_smoothed_{image_name}.fits"),
+                    minimum_err_smoothed,
+                )
+                _fits_append(
+                    os.path.join(outpath, f"min_err_filtered_{image_name}.fits"),
+                    minimum_err_filtered,
+                )
+                _fits_append(
+                    os.path.join(outpath, f"min_rms_{image_name}.fits"), minimum_rms
+                )
+                _fits_append(
+                    os.path.join(outpath, f"min_sigma_{image_name}.fits"), minimum_sigma
+                )
+                _fits_append(
+                    os.path.join(outpath, f"dt_lp_post_{image_name}.fits"), dt_lp_post
+                )
+                _fits_append(
+                    os.path.join(outpath, f"dt_lp_prior_{image_name}.fits"), dt_lp_prior
+                )
+                _fits_append(
+                    os.path.join(outpath, f"dt_lp_post_target_{image_name}.fits"),
+                    dt_lp_post_target,
+                )
+                _fits_append(
+                    os.path.join(outpath, f"dt_lp_prior_target_{image_name}.fits"),
+                    dt_lp_prior_target,
+                )
+                _fits_append(
+                    os.path.join(outpath, f"lp_prior_flux_{image_name}.fits"),
+                    lp_prior_flux,
+                )
                 _fits_append(os.path.join(outpath, f"dt_{image_name}.fits"), dt)
                 dqp = get_persistence_mask(target["filename"], extname=ext)
-                _fits_append(os.path.join(outpath, f"dqp_{image_name}.fits"), dqp.astype(int))
+                _fits_append(
+                    os.path.join(outpath, f"dqp_{image_name}.fits"), dqp.astype(int)
+                )
                 img = fits.getdata(target["filename"], extname=ext)
                 _fits_append(os.path.join(outpath, f"img_{image_name}.fits"), img)
-                dq = get_invalid_mask_without_persistence(target["filename"], extname=ext)
+                dq = get_invalid_mask_without_persistence(
+                    target["filename"], extname=ext
+                )
                 dq = dq | dqp
                 img_masked = np.where(dq, np.nan, img)
                 img_filtered = sampled_median_filter(img_masked, size=101)
                 img_masked = np.where(dq, img_filtered, img)
-                _fits_append(os.path.join(outpath, f"img_masked_{image_name}.fits"), img_masked)
+                _fits_append(
+                    os.path.join(outpath, f"img_masked_{image_name}.fits"), img_masked
+                )
             image_id = (target["obs_id"], target["dithobs"], filter_index, filt)
             minimum_images[image_id] = minimum
             minimum_err_images[image_id] = minimum_sigma
@@ -253,7 +333,7 @@ def calc_rolling_minimum(
             dt_images[image_id] = dt
     return minimum_images, minimum_err_images, dt_lp_images, dt_images
 
-# %% ../../nbs/euclid/persistence.ipynb 12
+# %% ../../nbs/euclid/persistence.ipynb 13
 def _average_over_filters(images):
     images = images.copy()
     new_images = {}
@@ -346,15 +426,18 @@ def calc_persistence_correction(
                 outpath, f"corr_err_{obs_id}_{dithobs}_{filter_index}_{filt}.fits"
             )
             fits_append(out_fn, corr_err, ext, primary_header)
-        persistence_images[(obs_id, dithobs, filt)] = (corr_flux, corr_err)
+            key = f"{obs_id}_{dithobs}_{filt}"
+        persistence_images[key] = (corr_flux, corr_err)
     return persistence_images
 
-# %% ../../nbs/euclid/persistence.ipynb 13
+# %% ../../nbs/euclid/persistence.ipynb 14
 def apply_persistence_correction(
     image_info,  # a DataFrame of image information for the images to correct
     persistence_images,  # a dictionary of persistence images
     ext,  # the image extension
     outpath,  # path at which to save corrected images
+    skyflat_path=None,  # the folder containing the skyflats (atemporal background)
+    correct_banding=True,  # if True, then apply banding correction to the images
     debug=False,  # save masked corrected image
 ):
     for i in range(len(image_info)):
@@ -370,23 +453,30 @@ def apply_persistence_correction(
             dq_ext = ext.replace("SCI", "DQ")
             dq_img = fits.getdata(fn, extname=dq_ext)
             dq_hdr = fits.getheader(fn, extname=dq_ext)
-            key = (target["obs_id"], target["dithobs"], target["filter"])
+            key = f"{target['obs_id']}_{target['dithobs']}_{target['filter']}"
             if key in persistence_images:
-                pers, pers_err = persistence_images[
-                    (target["obs_id"], target["dithobs"], target["filter"])
-                ]
+                print(f"Applying persistence correction for {key}")
+                pers, pers_err = persistence_images[key]
                 img -= pers
                 rms_img = np.sqrt(rms_img**2 + pers_err**2)
                 rms_img = rms_img.astype(np.float32)
             else:
                 print(f"No persistence correction for {key}")
+            if skyflat_path is not None:
+                img = read_and_apply_skyflat(img, fn, ext, skyflat_path)
+            if correct_banding:
+                print(f"Applying banding correction to {fn} for {ext}")
+                correction = banding_correction(img)
+                img = img - correction
             outfn = os.path.join(outpath, os.path.basename(fn))
             fits_append(outfn, img, ext, primary_header, hdr)
             fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
             fits_append(outfn, dq_img, dq_ext, primary_header, dq_hdr)
             if debug:
                 dqp = get_persistence_mask(fn, extname=ext)
-                dq = get_invalid_mask_without_persistence(target["filename"], extname=ext)
+                dq = get_invalid_mask_without_persistence(
+                    target["filename"], extname=ext
+                )
                 dq = dq | dqp
                 img_masked = np.where(dq, np.nan, img)
                 img_filtered = sampled_median_filter(img_masked, size=101)
@@ -394,14 +484,14 @@ def apply_persistence_correction(
                 filt = target["filter"]
                 filter_index = "JHY".index(filt)
                 image_name = (
-                    f'{target["obs_id"]}_{target["dithobs"]}_{filter_index}_{filt}'
+                    f"{target['obs_id']}_{target['dithobs']}_{filter_index}_{filt}"
                 )
                 outfn = os.path.join(outpath, f"corrimg_masked_{image_name}.fits")
                 fits_append(outfn, img_masked, ext, primary_header, hdr)
                 outfn = os.path.join(outpath, f"corrimg_rms_{image_name}.fits")
                 fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
 
-# %% ../../nbs/euclid/persistence.ipynb 14
+# %% ../../nbs/euclid/persistence.ipynb 15
 def fit_persistence_decay(dt, flux):
     slope = -10
     fit = fitting.LinearLSQFitter()
@@ -410,7 +500,7 @@ def fit_persistence_decay(dt, flux):
     fit_result, mask = or_fit(line_init, dt, flux)
     return fit_result, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 15
+# %% ../../nbs/euclid/persistence.ipynb 16
 def fit_powerlaw_persistence_decay(log_dt, log_flux):
     dt = 10**log_dt
     flux = 10**log_flux
@@ -426,7 +516,7 @@ def fit_powerlaw_persistence_decay(log_dt, log_flux):
     fit_result, mask = or_fit(model, dt, flux)
     return fit_result, mask
 
-# %% ../../nbs/euclid/persistence.ipynb 16
+# %% ../../nbs/euclid/persistence.ipynb 17
 def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
     # if necessary create a sqlite database and table, then insert data
     dbfn = os.path.join(outpath, "decay_db.sqlite")
@@ -439,7 +529,7 @@ def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
                 f"INSERT INTO {form} VALUES ({mjd}, '{ext}', {x}, {y}, {slope}, {offset})"
             )
 
-# %% ../../nbs/euclid/persistence.ipynb 17
+# %% ../../nbs/euclid/persistence.ipynb 18
 def estimate_persistence_decay(
     minimum_images,  # the minimum estimates of the persistence
     dt_lp_images,  # the times since the last persistence feature appeared
@@ -589,11 +679,12 @@ def estimate_persistence_decay(
     n_features = (~np.isnan(slope)).sum()
     return average_slope, n_features
 
-# %% ../../nbs/euclid/persistence.ipynb 18
+# %% ../../nbs/euclid/persistence.ipynb 19
 def correct_persistence(
     obs_id,  # the observation_id to process
     path,  # the folder containing the downloaded calibrated images
     outpath=None,  # the folder where all output files should be placed
+    skyflat_path=None,  # the folder containing the skyflats (atemporal background)
     detector=None,  # the detector number to process, e.g. 44; if None processes all detectors
     decay_form="powerlaw",  # the form of the persistence decay to assume
     estimate_decay=False,  # print an estimate of the persistence decay slope for each detector
@@ -601,6 +692,7 @@ def correct_persistence(
     debug=False,  # print debugging information and save intermediate files to `outpath`
     assumed_decay_slope=1.0,  # the decay slope to assume, if `use_estimated_decay=False`
     per_filter=True,  # if False, then combine the persistence estimates for each filter
+    correct_banding=True,  # if True, then apply banding correction to the images
     overwrite=False,  # if True, then delete and recreate existing files in `outpath`
 ):
     if use_estimated_decay:
@@ -615,8 +707,13 @@ def correct_persistence(
     if os.path.isdir(outpath) and not overwrite:
         print(f"Folder for {obs_id} already exists, skipping.")
         return
-    get_nisp_images_for_this_observation = partial(get_nisp_images_for_observation,
-                                                   obs_id, path=path, include_sir=True, fill_missing=True)
+    get_nisp_images_for_this_observation = partial(
+        get_nisp_images_for_observation,
+        obs_id,
+        path=path,
+        include_sir=True,
+        fill_missing=True,
+    )
     image_info = get_nisp_images_for_this_observation(n_prior=1, n_after=1)
     n_per_obs = 16
     if len(image_info) == n_per_obs * 3:
@@ -659,14 +756,18 @@ def correct_persistence(
         print(
             f"Calculating rolling minimum for obs {obs_id} with {len(image_info)} images"
         )
-        minimum_images, minimum_err_images, dt_lp_images, dt_images = calc_rolling_minimum(
-            None if debug else obs_id,
-            image_info,
-            ext=ext,
-            n_leading=n_leading,
-            debug=debug,
-            primary_header=primary_header,
-            outpath=outpath,
+        minimum_images, minimum_err_images, dt_lp_images, dt_images = (
+            calc_rolling_minimum(
+                None if debug else obs_id,
+                image_info,
+                ext=ext,
+                n_leading=n_leading,
+                debug=debug,
+                primary_header=primary_header,
+                outpath=outpath,
+                skyflat_path=skyflat_path,
+                correct_banding=correct_banding,
+            )
         )
         decay_slope = assumed_decay_slope
         if estimate_decay:
@@ -712,5 +813,7 @@ def correct_persistence(
             persistence_images,
             ext=ext,
             outpath=outpath,
+            skyflat_path=skyflat_path,
+            correct_banding=correct_banding,
             debug=debug,
         )
