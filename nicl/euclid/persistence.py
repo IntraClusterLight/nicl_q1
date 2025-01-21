@@ -9,6 +9,7 @@ __all__ = ['correct_persistence']
 import os
 import numpy as np
 import sqlite3
+import warnings
 from functools import partial
 from astropy.io import fits
 from astropy.convolution import convolve
@@ -56,7 +57,6 @@ def read_and_apply_skyflat(img, fn, extname, skyflat_path):
     filter = get_filter_from_filename(fn)
     detector = extname.split(".")[0]
     skyflat = read_skyflat(obs_id, filter, detector, skyflat_path)
-    print(f"Applying skyflat to {fn} for {extname}")
     return apply_skyflat(img, skyflat)
 
 # %% ../../nbs/euclid/persistence.ipynb 10
@@ -77,7 +77,6 @@ def minimum_map(
         if skyflat_path is not None:
             img = read_and_apply_skyflat(img, fn, extname, skyflat_path)
         if correct_banding:
-            print(f"Applying banding correction to {fn} for {extname}")
             correction = banding_correction(img)
             img = img - correction
         images.append(img)
@@ -91,7 +90,9 @@ def minimum_map(
     # if there are less than `n_ok_min` unmasked pixels
     # then the minimum will not work for rejecting on-sky sources, mask the
     # pixels completely to reflect our lack of knowledge
-    n_ok = (~masked).sum(axis=0)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", "invalid value encountered in reduce")
+        n_ok = (~masked).sum(axis=0)
     masked |= n_ok < n_ok_min
     # set masked pixels to infinity, so they are ignored when taking the minimum
     images[masked] = np.inf
@@ -465,7 +466,6 @@ def apply_persistence_correction(
             if skyflat_path is not None:
                 img = read_and_apply_skyflat(img, fn, ext, skyflat_path)
             if correct_banding:
-                print(f"Applying banding correction to {fn} for {ext}")
                 correction = banding_correction(img)
                 img = img - correction
             outfn = os.path.join(outpath, os.path.basename(fn))

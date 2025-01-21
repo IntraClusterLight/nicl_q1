@@ -151,6 +151,7 @@ def sampled_median_filter(
     footprint.flat[sample] = True
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+        warnings.filterwarnings("ignore", "invalid value encountered in reduce")
         if use_dask:
             footprint = xr.DataArray(footprint, dims=dims)
             extra_dims = tuple(set(coarse_data.dims) - set(footprint.dims))
@@ -183,6 +184,7 @@ def sampled_median_filter(
             )
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+                warnings.filterwarnings("ignore", "invalid value encountered in reduce")
                 median = median.interp(
                     original_dims,
                     assume_sorted=True,

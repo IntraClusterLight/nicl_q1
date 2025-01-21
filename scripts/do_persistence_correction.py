@@ -23,11 +23,17 @@ def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
     print(f"All {len(obs_ids)} obs_ids to process:")
     print(obs_ids)
     print("Processing:", flush=True)
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    if max_workers > 1:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            for obs_id in obs_ids:
+                outpath = processed_path / f"persistence/NIR/{obs_id}/"
+                skyflat_path = processed_path / f"skyflat/NIR/"
+                executor.submit(try_correct_persistence, obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
+    else:
         for obs_id in obs_ids:
             outpath = processed_path / f"persistence/NIR/{obs_id}/"
             skyflat_path = processed_path / f"skyflat/NIR/"
-            executor.submit(try_correct_persistence, obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
+            try_correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
 
 if __name__ == '__main__':
-    main(max_workers=2)
+    main(max_workers=1)
