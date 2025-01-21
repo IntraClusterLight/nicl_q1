@@ -467,7 +467,7 @@ def apply_persistence_correction(
                 img = read_and_apply_skyflat(img, fn, ext, skyflat_path)
             if correct_banding:
                 correction = banding_correction(img)
-                img = img - correction
+                img -= correction
             outfn = os.path.join(outpath, os.path.basename(fn))
             fits_append(outfn, img, ext, primary_header, hdr)
             fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)

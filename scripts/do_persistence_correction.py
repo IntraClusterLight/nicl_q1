@@ -36,4 +36,4 @@ def main(max_workers=1, release_name="Q1_R1", processed_version="v0.4"):
             try_correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
 
 if __name__ == '__main__':
-    main(max_workers=1)
+    main(max_workers=8)

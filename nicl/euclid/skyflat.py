@@ -159,9 +159,9 @@ def interpolate_skyflats(flat, data):
         coarse_factor = np.array(data.shape) // np.array(flat.shape)
         pix = [np.arange(s) for s in data.shape]
         coarse_pix = [
-            np.mean(p.reshape(-1, coarse_factor[i]), axis=1) for i, p in enumerate(pix)
+            np.mean(p.reshape(-1, coarse_factor[i]), axis=1, dtype=np.float32) for i, p in enumerate(pix)
         ]
-        outpix = np.meshgrid(*pix, indexing="ij")
+        outpix = np.meshgrid(*pix, indexing="ij", dtype=np.float32)
         outpix = np.moveaxis(outpix, 0, -1)
         skyflat = interpn(
             coarse_pix,
