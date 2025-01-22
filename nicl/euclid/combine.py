@@ -861,7 +861,7 @@ def combine(
             if filter in MER.filters:
                 mer_filters.append(filter)
                 continue
-    if vis_filters is None or vis_filters:
+    if (vis_filters is None or vis_filters) and (obs_ids is not None or obs_ids):
         # if requested to combine individual dithers, combine them separately for each obsid
         # otherwise naming output files would become an issue
         if individual_dithers:
@@ -905,7 +905,7 @@ def combine(
             )
             if not dry_run:
                 vis_combiner.combine()
-    if nisp_filters is None or nisp_filters:
+    if (nisp_filters is None or nisp_filters) and (obs_ids is not None or obs_ids):
         if individual_dithers:
             for obs_id in np.atleast_1d(obs_ids):
                 nisp_combiner = NISPCombiner(
@@ -947,7 +947,7 @@ def combine(
             )
             if not dry_run:
                 nisp_combiner.combine()
-    if mer_filters is None or mer_filters:
+    if (mer_filters is None or mer_filters) and (tile_ids is not None or tile_ids):
         mer_combiner = MerCombiner(
             in_dir=in_dir,
             out_dir=out_dir,
