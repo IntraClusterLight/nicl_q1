@@ -324,21 +324,21 @@ class DithersMixin:
                         )
                         # subtract the background
                         sci_data -= bg.background
-                        if self.instrument.name == "NISP":
-                            # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
-                            # VIS already has the proper FLXSCALE in the headers
-                            exptime = primary_hdr["EXPTIME"]
-                            photfnu = primary_hdr["PHOTFNU"]
-                            phrelex = primary_hdr["PHRELEX"]
-                            phreldt = sci_ext_hdr["PHRELDT"]
-                            phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
-                            sci_ext_hdr.append(
-                                (
-                                    "PHOSCALE",
-                                    phoscale,
-                                    "Combined photometric scaling factors",
-                                )
+                    if self.instrument.name == "NISP":
+                        # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
+                        # VIS already has the proper FLXSCALE in the headers
+                        exptime = primary_hdr["EXPTIME"]
+                        photfnu = primary_hdr["PHOTFNU"]
+                        phrelex = primary_hdr["PHRELEX"]
+                        phreldt = sci_ext_hdr["PHRELDT"]
+                        phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
+                        sci_ext_hdr.append(
+                            (
+                                "PHOSCALE",
+                                phoscale,
+                                "Combined photometric scaling factors",
                             )
+                        )
                     # compute weight map
                     with np.errstate(divide="ignore"):
                         np.divide(1.0, np.square(rms_data), out=rms_data)
