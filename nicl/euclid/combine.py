@@ -884,7 +884,10 @@ def combine(
                     **kwargs,
                 )
                 if not dry_run:
-                    vis_combiner.combine()
+                    try:
+                        vis_combiner.combine()
+                    except ValueError as e:
+                        print(e)
         else:
             vis_combiner = VISCombiner(
                 in_dir=in_dir,
@@ -904,7 +907,10 @@ def combine(
                 **kwargs,
             )
             if not dry_run:
-                vis_combiner.combine()
+                try:
+                    vis_combiner.combine()
+                except ValueError as e:
+                    print(e)
     if nisp_filters is None or nisp_filters:
         if individual_dithers:
             for obs_id in np.atleast_1d(obs_ids):
@@ -926,7 +932,10 @@ def combine(
                     **kwargs,
                 )
                 if not dry_run:
-                    nisp_combiner.combine()
+                    try:
+                        nisp_combiner.combine()
+                    except ValueError as e:
+                        print(e)
         else:
             nisp_combiner = NISPCombiner(
                 in_dir=in_dir,
@@ -946,7 +955,10 @@ def combine(
                 **kwargs,
             )
             if not dry_run:
-                nisp_combiner.combine()
+                try:
+                    nisp_combiner.combine()
+                except ValueError as e:
+                    print(e)
     if mer_filters is None or mer_filters:
         mer_combiner = MerCombiner(
             in_dir=in_dir,
@@ -963,4 +975,7 @@ def combine(
             **kwargs,
         )
         if not dry_run:
-            mer_combiner.combine()
+            try:
+                mer_combiner.combine()
+            except ValueError as e:
+                print(e)

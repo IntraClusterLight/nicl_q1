@@ -295,14 +295,21 @@ def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
     return ds, wcs, zp
 
 # %% ../../nbs/euclid/xarray.ipynb 15
-def xr_fast_mask(data):
+def xr_fast_mask(
+    data,
+    mask_params=None,  # mask parameters
+    estimate_background=False,  # estimate the background from the image median
+    max_repeat=10,  # maximum number of masking iterations
+    relative_rms_tolerance=0.01):
     mask = xr.apply_ufunc(
         fast_mask,
         data,
         kwargs=dict(
-            estimate_background=True,
+            mask_params=mask_params,
+            estimate_background=estimate_background,
+            max_repeat=max_repeat,
+            relative_rms_tolerance=relative_rms_tolerance,
             return_threshold=False,
-            mask_params=dict(nsigma=2.0, erosion_iterations=1),
         ),
         vectorize=True,
         dask="parallelized",

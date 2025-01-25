@@ -56,7 +56,7 @@ def fast_mask(
     params = {
         "nsigma": 2.0,
         "background": 0.0,
-        "erosion_iterations": 2,
+        "erosion_iterations": 1,
         "dilation_radius": 3.0,
         "dilation_iterations": 3,
     }

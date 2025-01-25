@@ -30,7 +30,7 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51):
     if not coarse_path.exists():
         ds, _, _ = read_all_zarr_refs(zarr_path, obs_id)
         data = ds["SCI"]
-        mask = xr_fast_mask(data)
+        mask = xr_fast_mask(data, estimate_background=True)
         # TODO: this currently doesn't work, apparently because of a bug in kerchunk,
         # interpreting the type incorrectly (unsigned int32?)
         # invalid = ds["DQ"]

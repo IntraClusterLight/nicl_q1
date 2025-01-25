@@ -15,22 +15,31 @@ from .xarray import xr_fast_mask
 from ..filter import sampled_median_filter
 
 # %% ../../nbs/euclid/debanding.ipynb 8
-def mask_data(data):
-    mask = xr_fast_mask(data)
+def filter_and_mask_data(data, scale=200):
+    """Filter the data to remove large scale variations.
+    
+    A smoothed, median filtered, version of the data is subtracted from the original data.
+    The result is is then masked using an object mask created from the original data.
+    The result should a map of the small scale variations in the background.
+    """
     # this currently doesn't work, apparently because of a bug in kerchunk, interpreting the type incorrectly (unsigned int32?)
-    # invalid = ds["DQ"]
+    # invalid = original_data["DQ"]
     # invalid = invalid > 0
     # mask = mask | invalid
-    masked_data = data.where(~mask)
-    return masked_data
-
-# %% ../../nbs/euclid/debanding.ipynb 9
-def filter_data(data, scale=200):
-    smoothed = sampled_median_filter(data, scale, dims=["x", "y"])
+    # data = data.where(~mask)
+    smoothed = sampled_median_filter(data, scale, dims=["y", "x"])
     filtered_data = data - smoothed
+    mask_params = {
+        "nsigma": 2.0,
+        "erosion_iterations": 1,
+        "dilation_radius": 2.0,
+        "dilation_iterations": 2,
+    }
+    mask = xr_fast_mask(data, mask_params=mask_params, estimate_background=True)
+    filtered_data = filtered_data.where(~mask)
     return filtered_data
 
-# %% ../../nbs/euclid/debanding.ipynb 23
+# %% ../../nbs/euclid/debanding.ipynb 21
 def banding_correction(data, rows=True, cols=True, max_size=200):
     if isinstance(data, np.ndarray):
         data = xr.DataArray(data, dims=["y", "x"])
@@ -39,23 +48,28 @@ def banding_correction(data, rows=True, cols=True, max_size=200):
         return_numpy = False
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", "invalid value encountered in reduce")
-        masked_data = mask_data(data)
-        filtered_data = filter_data(masked_data, scale=max_size)
+        filtered_data = filter_and_mask_data(data, scale=max_size)
+        
         if rows:
             med_x = filtered_data.median("x")
             try:
                 med_med_x = med_x.median("y")
             except NotImplementedError:
                 med_med_x = med_x.as_numpy().median("y")
-            med_x = med_x - med_med_x
+            med_x -= med_med_x
         if cols:
             med_y = filtered_data.median("y")
             try:
                 med_med_y = med_y.median("x")
             except NotImplementedError:
                 med_med_y = med_y.as_numpy().median("x")
-            med_y = med_y - med_med_y
+            med_y -= med_med_y
     correction = med_x + med_y
+    try:
+        med_correction = correction.median()
+    except NotImplementedError:
+        med_correction = correction.as_numpy().median()
+    correction -= med_correction
     if return_numpy:
         correction = correction.to_numpy()
     return correction

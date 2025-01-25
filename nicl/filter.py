@@ -104,6 +104,7 @@ def sampled_median_filter(
         dims = data.dims
     else:
         dims = [f"dim_{d}" if isinstance(d, int) else d for d in dims]
+        dims = [d for d in data.dims if d in dims]  # ensure correct order
     if len(dims) != 2:
         raise ValueError("Only 2D filtering is supported, specify `dims`")
     original_dims = {d: data[d] for d in dims}
