@@ -454,6 +454,12 @@ def apply_persistence_correction(
             dq_ext = ext.replace("SCI", "DQ")
             dq_img = fits.getdata(fn, extname=dq_ext)
             dq_hdr = fits.getheader(fn, extname=dq_ext)
+            if debug:
+                filt = target["filter"]
+                filter_index = "JHY".index(filt)
+                image_name = (
+                    f"{target['obs_id']}_{target['dithobs']}_{filter_index}_{filt}"
+                )
             key = f"{target['obs_id']}_{target['dithobs']}_{target['filter']}"
             if key in persistence_images:
                 print(f"Applying persistence correction for {key}")
@@ -464,10 +470,19 @@ def apply_persistence_correction(
             else:
                 print(f"No persistence correction for {key}")
             if skyflat_path is not None:
+                if debug:
+                    outfn = os.path.join(outpath, f"pre-skyflat_{image_name}.fits")
+                    fits_append(outfn, img, ext, primary_header, hdr)
                 img = read_and_apply_skyflat(img, fn, ext, skyflat_path)
             if correct_banding:
+                if debug:
+                    outfn = os.path.join(outpath, f"pre-debanding_{image_name}.fits")
+                    fits_append(outfn, img, ext, primary_header, hdr)
                 correction = banding_correction(img)
                 img -= correction
+                if debug:
+                    outfn = os.path.join(outpath, f"debanding_{image_name}.fits")
+                    fits_append(outfn, correction, ext, primary_header, hdr)
             outfn = os.path.join(outpath, os.path.basename(fn))
             fits_append(outfn, img, ext, primary_header, hdr)
             fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
@@ -481,15 +496,11 @@ def apply_persistence_correction(
                 img_masked = np.where(dq, np.nan, img)
                 img_filtered = sampled_median_filter(img_masked, size=101)
                 img_masked = np.where(dq, img_filtered, img)
-                filt = target["filter"]
-                filter_index = "JHY".index(filt)
-                image_name = (
-                    f"{target['obs_id']}_{target['dithobs']}_{filter_index}_{filt}"
-                )
                 outfn = os.path.join(outpath, f"corrimg_masked_{image_name}.fits")
                 fits_append(outfn, img_masked, ext, primary_header, hdr)
                 outfn = os.path.join(outpath, f"corrimg_rms_{image_name}.fits")
                 fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
+
 
 # %% ../../nbs/euclid/persistence.ipynb 15
 def fit_persistence_decay(dt, flux):
@@ -693,6 +704,8 @@ def correct_persistence(
     assumed_decay_slope=1.0,  # the decay slope to assume, if `use_estimated_decay=False`
     per_filter=True,  # if False, then combine the persistence estimates for each filter
     correct_banding=True,  # if True, then apply banding correction to the images
+    final_skyflat_correction=True,  # if True, then apply the skyflat correction to the final images
+    correct_persistence=True,  # if True, then apply persistence correction to the images
     overwrite=False,  # if True, then delete and recreate existing files in `outpath`
 ):
     if use_estimated_decay:
@@ -751,63 +764,68 @@ def correct_persistence(
     ].reset_index()
     mjd = obs_image_info["mjd"].mean()
     for ext in sci_exts:
-        # TODO: ALL, BEFORE, AFTER last persistence
         print(ext)
-        print(
-            f"Calculating rolling minimum for obs {obs_id} with {len(image_info)} images"
-        )
-        minimum_images, minimum_err_images, dt_lp_images, dt_images = (
-            calc_rolling_minimum(
-                None if debug else obs_id,
-                image_info,
+        if correct_persistence:
+            print(
+                f"Calculating rolling minimum for obs {obs_id} with {len(image_info)} images"
+            )
+            minimum_images, minimum_err_images, dt_lp_images, dt_images = (
+                calc_rolling_minimum(
+                    None if debug else obs_id,
+                    image_info,
+                    ext=ext,
+                    n_leading=n_leading,
+                    debug=debug,
+                    primary_header=primary_header,
+                    outpath=outpath,
+                    skyflat_path=skyflat_path,
+                    correct_banding=correct_banding,
+                )
+            )
+            decay_slope = assumed_decay_slope
+            if estimate_decay:
+                print("Estimating persistence decay")
+                try:
+                    slope, n_features = estimate_persistence_decay(
+                        minimum_images,
+                        dt_lp_images,
+                        ext=ext,
+                        mjd=mjd,
+                        primary_header=primary_header,
+                        outpath=outpath,
+                        form=decay_form,
+                        debug=debug,
+                    )
+                    print(
+                        f"Estimated persistence {decay_form} decay slope from {n_features} features ({ext}): {slope:.2e}"
+                    )
+                    if use_estimated_decay:
+                        decay_slope = slope
+                except Exception as e:
+                    print("Encountered error when estimate_persistence_decay:")
+                    print(e)
+                    if use_estimated_decay:
+                        print(f"Using default decay slope: {decay_slope:.2e}")
+            print("Calculating persistence correction")
+            persistence_images = calc_persistence_correction(
+                minimum_images,
+                minimum_err_images,
+                dt_images,
                 ext=ext,
-                n_leading=n_leading,
+                decay_slope=decay_slope,
+                form=decay_form,
+                per_filter=per_filter,
+                dt_lp_images=dt_lp_images,
                 debug=debug,
                 primary_header=primary_header,
                 outpath=outpath,
-                skyflat_path=skyflat_path,
-                correct_banding=correct_banding,
             )
-        )
-        decay_slope = assumed_decay_slope
-        if estimate_decay:
-            print("Estimating persistence decay")
-            try:
-                slope, n_features = estimate_persistence_decay(
-                    minimum_images,
-                    dt_lp_images,
-                    ext=ext,
-                    mjd=mjd,
-                    primary_header=primary_header,
-                    outpath=outpath,
-                    form=decay_form,
-                    debug=debug,
-                )
-                print(
-                    f"Estimated persistence {decay_form} decay slope from {n_features} features ({ext}): {slope:.2e}"
-                )
-                if use_estimated_decay:
-                    decay_slope = slope
-            except Exception as e:
-                print("Encountered error when estimate_persistence_decay:")
-                print(e)
-                if use_estimated_decay:
-                    print(f"Using default decay slope: {decay_slope:.2e}")
-        print("Calculating persistence correction")
-        persistence_images = calc_persistence_correction(
-            minimum_images,
-            minimum_err_images,
-            dt_images,
-            ext=ext,
-            decay_slope=decay_slope,
-            form=decay_form,
-            per_filter=per_filter,
-            dt_lp_images=dt_lp_images,
-            debug=debug,
-            primary_header=primary_header,
-            outpath=outpath,
-        )
+        else:
+            print("Skipping persistence correction")
+            persistence_images = {}
         print("Applying persistence correction")
+        if not final_skyflat_correction:
+            skyflat_path = None
         apply_persistence_correction(
             obs_image_info,
             persistence_images,
