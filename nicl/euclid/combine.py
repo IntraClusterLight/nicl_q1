@@ -25,7 +25,7 @@ from photutils.background import Background2D
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
-from nicl.mask import fast_mask
+from nicl.euclid.background import sub_bkg
 from nicl.euclid.constants import (
     VIS,
     NISP,
@@ -293,16 +293,7 @@ class DithersMixin:
                     )
                     # subtract background if requested
                     if self.bkg_sub:
-                        obj_mask, _ = fast_mask(sci_data, estimate_background=True)
-                        # combine the bad pixel mask and the object mask to form a final mask
-                        mask = bad_pix_mask | obj_mask
-                        # 1 x 1 mesh by default if not specified
-                        if self.bkg_mesh_size is None:
-                            bkg_mesh_size_pix = (
-                                sci_data.shape[0],
-                                sci_data.shape[1],
-                            )
-                        else:
+                        if self.bkg_mesh_size is not None:
                             bkg_mesh_size_pix = (
                                 round_up_box_size(
                                     sci_data.shape[0],
@@ -315,31 +306,31 @@ class DithersMixin:
                                     / self.instrument.pix_scale,
                                 ),
                             )
-                        bg = Background2D(
+                        else:
+                            bkg_mesh_size_pix = None
+                        sci_data = sub_bkg(
                             sci_data,
-                            bkg_mesh_size_pix,
-                            mask=mask,
+                            dq_mask=bad_pix_mask,
+                            obj_mask="fast_mask",
+                            mesh_size=bkg_mesh_size_pix,
                             filter_size=(self.bkg_filter_size, self.bkg_filter_size),
-                            sigma_clip=SigmaClip(sigma=3),
                             exclude_percentile=90.0,
                         )
-                        # subtract the background
-                        sci_data -= bg.background
-                        if self.instrument.name == "NISP":
-                            # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
-                            # VIS already has the proper FLXSCALE in the headers
-                            exptime = primary_hdr["EXPTIME"]
-                            photfnu = primary_hdr["PHOTFNU"]
-                            phrelex = primary_hdr["PHRELEX"]
-                            phreldt = sci_ext_hdr["PHRELDT"]
-                            phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
-                            sci_ext_hdr.append(
-                                (
-                                    "PHOSCALE",
-                                    phoscale,
-                                    "Combined photometric scaling factors",
-                                )
+                    if self.instrument.name == "NISP":
+                        # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
+                        # VIS already has the proper FLXSCALE in the headers
+                        exptime = primary_hdr["EXPTIME"]
+                        photfnu = primary_hdr["PHOTFNU"]
+                        phrelex = primary_hdr["PHRELEX"]
+                        phreldt = sci_ext_hdr["PHRELDT"]
+                        phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
+                        sci_ext_hdr.append(
+                            (
+                                "PHOSCALE",
+                                phoscale,
+                                "Combined photometric scaling factors",
                             )
+                        )
                     # compute weight map
                     with np.errstate(divide="ignore"):
                         np.divide(1.0, np.square(rms_data), out=rms_data)
