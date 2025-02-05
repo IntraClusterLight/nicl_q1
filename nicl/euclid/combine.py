@@ -302,7 +302,7 @@ class DithersMixin:
                                 ),
                                 round_up_box_size(
                                     sci_data.shape[1],
-                                    self.bkg_mesh_size[0].to(u.arcsec).value
+                                    self.bkg_mesh_size[1].to(u.arcsec).value
                                     / self.instrument.pix_scale,
                                 ),
                             )
