@@ -49,7 +49,9 @@ def smooth_image(image, sigma):
     """Smooth `image` using Gaussian with standard deviation `sigma`."""
     kernel = Gaussian2DKernel(sigma)
     kernel.normalize()
-    smoothed = convolve(image.data, kernel)
+    with catch_warnings():
+        filterwarnings("ignore", ".*NaN values detected post convolution.*")
+        smoothed = convolve(image.data, kernel)
     return smoothed
 
 # %% ../nbs/12_mask.ipynb 5
@@ -60,6 +62,7 @@ def fast_mask(
     max_repeat=10,  # maximum number of masking iterations
     relative_rms_tolerance=0.01,  # relative tolerance in the rms required to stop iterating
     return_threshold=True,  # return the threshold
+    verbose=False,  # print information about the iterations
 ):
     params = {
         "nsigma": 2.0,
@@ -69,31 +72,43 @@ def fast_mask(
         "dilation_radius": 2.0,
         "dilation_iterations": 2,
     }
+    if verbose:
+        print("Fast mask")
     if mask_params:
         params.update(mask_params)
+    if verbose:
+        print(f"    smoothing image with sigma of {params['smooth_sigma']} pixels")
     smoothed_image = smooth_image(image, params["smooth_sigma"])
     mask = None
     bkg = params["background"]
     previous_rms = np.inf
     for i in range(max_repeat + 1):
+        if verbose:
+            print(f"    iteration {i}")
         if mask is not None:
-            masked_image = np.where(mask, np.nan, image)
+            valid_pixels = image[~mask & np.isfinite(image)]
         else:
-            masked_image = image
+            valid_pixels = image[np.isfinite(image)]
         if estimate_background:
-            bkg = np.nanmedian(masked_image)
-        rms = median_abs_deviation(
-            masked_image, axis=None, scale="normal", nan_policy="omit"
-        )
+            if verbose:
+                print(f"    estimating background")
+            bkg = np.median(valid_pixels)
+        rms = np.median(abs(valid_pixels - bkg)) / 0.67449
         threshold = rms * params["nsigma"] + bkg
         mask = smoothed_image > threshold
         if params["erosion_iterations"] > 0:
+            if verbose:
+                print(f"    eroding mask with {params['erosion_iterations']} iterations")
             mask = binary_erosion(mask, iterations=params["erosion_iterations"])
         if params["dilation_radius"] > 0 and params["dilation_iterations"] > 0:
             structure = circular_footprint(params["dilation_radius"])
+            if verbose:
+                print(f"    dilating mask with radius {params['dilation_radius']} pixels for {params['dilation_iterations']} iterations")
             mask = binary_dilation(
                 mask, structure=structure, iterations=params["dilation_iterations"]
             )
+        if verbose:
+            print(f"    background RMS is {rms:.3f}")
         if abs(rms - previous_rms) / rms < relative_rms_tolerance:
             break
         previous_rms = rms
