@@ -116,19 +116,23 @@ class DataAccess:
             return table
 
     def build_instrument_condition(self, instrument, filter, raw=False):
-        release_condition = "1=1" if raw else f"(release_name='{self.release_name}')"
-        instrument_condition = (
-            f"AND instrument_name = '{instrument}'" if instrument is not None else ""
-        )
-        filter_condition = f"AND filter_name = '{filter}'" if filter is not None else ""
-        return " ".join((release_condition, instrument_condition, filter_condition))
+        conditions = []
+        if self.release_name and not raw:
+            conditions.append(f"(release_name='{self.release_name}')")
+        if instrument is not None:
+            conditions.append(f"(instrument_name = '{instrument}')")
+        if filter is not None:
+            conditions.append(f"(filter_name = '{filter}')")
+        return " AND ".join(conditions)
 
     def build_fov_condition(self, ra, dec, radius, fully_contained):
         ra, dec, radius = (maybe_to_value(x, "deg") for x in (ra, dec, radius))
-        release_condition = f"(release_name='{self.release_name}')"
+        conditions = []
+        if self.release_name:
+            conditions.append(f"(release_name='{self.release_name}')")
         criterion = "CONTAINS" if fully_contained else "INTERSECTS"
-        fov_condition = f"AND (fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)"
-        return " ".join((release_condition, fov_condition))
+        conditions.append(f"(fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)")
+        return " AND ".join(conditions)
 
     def find_all_observations(
         self,
@@ -136,9 +140,10 @@ class DataAccess:
         """Obtain a list of all survey obs_ids for observations in the current release."""
         query = f"""SELECT DISTINCT observation_id
                     FROM sedm.calibrated_frame
-                    WHERE (product_type like '%Calibrated%')
-                    AND release_name='{self.release_name}'
-                    ORDER BY observation_id ASC"""
+                    WHERE (product_type like '%Calibrated%')\n"""
+        if self.release_name:
+            query += f"AND release_name='{self.release_name}'\n"
+        query += "ORDER BY observation_id ASC"
         results = self.tap_query(query)
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
         return obs_ids
