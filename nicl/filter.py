@@ -124,6 +124,7 @@ def sampled_median_filter(
     if coarsening > 1:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+            warnings.filterwarnings("ignore", "invalid value encountered in reduce")
             coarse_data = data.coarsen(
                 {d: coarsening for d in dims}, boundary="pad"
             ).median()
