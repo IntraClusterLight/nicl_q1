@@ -64,7 +64,7 @@ def _get_ext_det(x):
     return x.split(".")[0] if "." in x else x
 
 # %% ../../nbs/euclid/xarray.ipynb 7
-def create_zarr_ref_from_fits(fns, out_path=None):
+def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
     """Create a zarr reference from a set of Euclid fits files.
 
     This uses kerchunk to build a zarr reference file for accessing data directly from fits files.
@@ -89,7 +89,7 @@ def create_zarr_ref_from_fits(fns, out_path=None):
     filters = []
     wcs_list = []
     zp_list = []
-    pbar = tqdm(fns)
+    pbar = tqdm(fns) if progress else fns
     for fn in pbar:
         product_id = get_product_id(fn)
         product_ids.append(product_id)
@@ -98,9 +98,10 @@ def create_zarr_ref_from_fits(fns, out_path=None):
             dither_ids.append(dither_id)
         filter = get_filter_from_filename(fn)
         filters.append(filter)
-        pbar.set_description(
-            f"{fn.split('/')[-1]}, {product_id}, {dither_id}, {filter}"
-        )
+        if progress:
+            pbar.set_description(
+                f"{fn.split('/')[-1]}, {product_id}, {dither_id}, {filter}"
+            )
         ref_exts = []
         coords = []
         coord_name = "extension"
