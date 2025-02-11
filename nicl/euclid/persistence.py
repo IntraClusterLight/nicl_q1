@@ -105,7 +105,8 @@ def minimum_map(
         rms_images, np.expand_dims(minimum_idx, 0), axis=0
     ).squeeze()
     # estimate rms on the minimum assuming we are taking the median of n-1 values
-    minimum_rms *= np.sqrt(np.pi / 2) / np.sqrt(n_ok - 1)
+    n_ok_ok = n_ok > 1
+    minimum_rms[n_ok_ok] *= np.sqrt(np.pi / 2) / np.sqrt(n_ok[n_ok_ok] - 1)
     # estimate error on the minimum from difference versus next smallest value
     minimum_err = (images_sorted[take + 1] - minimum) / np.sqrt(2)
     if correct:
@@ -118,13 +119,14 @@ def minimum_map(
             bias = np.mean(m)
             with_n = n_ok == n
             minimum[with_n] -= bias * rms
-    # now set invalid pixels to zero
+    # subtract the median background
+    min_med = np.median(minimum[~invalid])
+    minimum -= min_med
+    # set invalid pixels to zero
     invalid = np.isnan(minimum)
     minimum[invalid] = 0
-    # subtract the median background
-    min_med = np.median(minimum)
-    minimum -= min_med
-    minimum[invalid] = 0
+    minimum_rms[invalid] = 0
+    minimum_err[invalid] = 0
     return minimum, minimum_err, minimum_rms, minimum_idx
 
 # %% ../../nbs/euclid/persistence.ipynb 11
