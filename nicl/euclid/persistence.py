@@ -120,10 +120,10 @@ def minimum_map(
             with_n = n_ok == n
             minimum[with_n] -= bias * rms
     # subtract the median background
+    invalid = np.isnan(minimum)
     min_med = np.median(minimum[~invalid])
     minimum -= min_med
     # set invalid pixels to zero
-    invalid = np.isnan(minimum)
     minimum[invalid] = 0
     minimum_rms[invalid] = 0
     minimum_err[invalid] = 0
