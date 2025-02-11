@@ -21,7 +21,7 @@ from nicl.euclid.xarray import (
 )
 
 # %% ../../nbs/euclid/skyflat.ipynb 7
-def create_coarse_data(obs_id, zarr_path, n_pix=51):
+def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
     """Create and store the coarse data for a given observation ID.
 
     Coarse data is computed by taking the median in boxes of size `n_pix` x `n_pix`.
@@ -30,7 +30,7 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51):
     if not coarse_path.exists():
         ds, _, _ = read_all_zarr_refs(zarr_path, obs_id)
         data = ds["SCI"]
-        mask = xr_fast_mask(data, estimate_background=True)
+        mask = xr_fast_mask(data, estimate_background=True, verbose=verbose)
         # TODO: this currently doesn't work, apparently because of a bug in kerchunk,
         # interpreting the type incorrectly (unsigned int32?)
         # invalid = ds["DQ"]
@@ -178,11 +178,11 @@ def interpolate_skyflats(flat, data):
     return skyflat
 
 # %% ../../nbs/euclid/skyflat.ipynb 16
-def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51):
+def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, verbose=False):
     """Read the coarse data and compute the skyflats for a given `obs_id`."""
     group_obs_ids = group_for_obs_id[obs_id]
     for group_obs_id in group_obs_ids:
-        create_coarse_data(group_obs_id, zarr_path, n_pix=n_pix)
+        create_coarse_data(group_obs_id, zarr_path, n_pix=n_pix, verbose=verbose)
     coarse_data = xr.open_mfdataset(
         zarr_path.glob(f"*/coarse_{n_pix}.zarr"), engine="zarr"
     )

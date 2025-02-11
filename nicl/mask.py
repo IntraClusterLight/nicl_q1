@@ -91,8 +91,10 @@ def fast_mask(
             valid_pixels = image[np.isfinite(image)]
         if estimate_background:
             if verbose:
-                print(f"    estimating background")
+                print(f"    estimating background from {len(valid_pixels)} pixels")
             bkg = np.median(valid_pixels)
+            if verbose:
+                print(f"    estimated background is {bkg}")
         rms = np.median(abs(valid_pixels - bkg)) / 0.67449
         threshold = rms * params["nsigma"] + bkg
         mask = smoothed_image > threshold
