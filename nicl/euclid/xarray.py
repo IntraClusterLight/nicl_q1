@@ -13,12 +13,16 @@ from warnings import catch_warnings, filterwarnings
 
 import numpy as np
 import pandas as pd
+import fsspec
+import numcodecs
 import xarray as xr
+import zarr
 from astropy.io import fits
 from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU
 from astropy.wcs import WCS
+from fsspec.implementations.reference import LazyReferenceMapper
+from kerchunk.codecs import AsciiTableCodec, VarArrCodec
 from kerchunk.combine import MultiZarrToZarr
-from kerchunk.fits import process_file
 from tqdm import tqdm
 
 from ..mask import fast_mask
@@ -30,21 +34,6 @@ from nicl.euclid.utilities import (
 )
 
 # %% ../../nbs/euclid/xarray.ipynb 4
-def _fix_byte_order(refs):
-    """Correctly identify the byte order as bigendian.
-
-    This is a workaround. A proper fix has been submitted via this PR:
-    https://github.com/fsspec/kerchunk/pull/531
-    When that PR is merged this function will be unnecessary, but not cause any harm.
-    """
-    for k in refs.keys():
-        if "zarray" in k:
-            z = json.loads(refs[k])
-            z["dtype"] = np.dtype(z["dtype"]).newbyteorder(">").str
-            refs[k] = json.dumps(z).encode()
-    return refs
-
-# %% ../../nbs/euclid/xarray.ipynb 5
 def _rename(refs, new_name):
     """Rename the zarray in a kerchunk json reference."""
     new_refs = {}
@@ -55,13 +44,161 @@ def _rename(refs, new_name):
             new_refs[new_key] = refs[key]
     return new_refs
 
-# %% ../../nbs/euclid/xarray.ipynb 6
+# %% ../../nbs/euclid/xarray.ipynb 5
 def _get_ext_type(x):
-    return x.split(".")[1] if "." in x else None
+    return x.split(".")[-1] if "." in x else None
 
 
 def _get_ext_det(x):
-    return x.split(".")[0] if "." in x else x
+    return ".".join(x.split(".")[:-1]) if "." in x else x
+
+# %% ../../nbs/euclid/xarray.ipynb 6
+# Code vendored from kerchunk.fits and adapted for speed with very large files
+
+BITPIX2DTYPE = {
+    8: "uint8",
+    16: ">i2",
+    32: ">i4",
+    64: ">i8",
+    -32: ">f4",
+    -64: ">f8",
+}  # always bigendian
+
+
+def process_file(
+    url,
+    extension,
+    storage_options=None,
+    out=None,
+    hdu=None,
+    infile=None,
+):
+    """
+    Create JSON references for a single FITS file as a zarr group
+
+    Parameters
+    ----------
+    url: str
+        Where the file is
+    extension: str
+        The extension name
+    storage_options: dict
+        How to load that file (passed to fsspec)
+    out: dict-like or None
+        This allows you to supply an fsspec.implementations.reference.LazyReferenceMapper
+        to write out parquet as the references get filled, or some other dictionary-like class
+        to customise how references get stored
+    hdu: HDU or None
+        An open FITS HDU to process
+    infile: HDUList or None
+        An open FITS file to process
+
+
+    Returns
+    -------
+    dict of the references and the header
+    """
+    from astropy.io import fits
+
+    storage_options = storage_options or {}
+    out = out or {}
+    g = zarr.open(out)
+
+    with fsspec.open(url, mode="rb", **storage_options) as f:
+        if hdu is None and infile is None:
+            infile = fits.open(f, do_not_scale_image_data=True)
+        if hdu is None:
+            hdu = infile[extension]
+        hdr = hdu.header
+        hdr.__str__()  # causes fixing of invalid cards
+        attrs = dict(hdr)
+        kwargs = {}
+        if hdu.is_image:
+            # for images/cubes (i.e., ndarrays with simple type)
+            nax = attrs["NAXIS"]
+            shape = tuple(int(attrs[f"NAXIS{i}"]) for i in range(nax, 0, -1))
+            dtype = BITPIX2DTYPE[attrs["BITPIX"]]
+            length = np.dtype(dtype).itemsize
+            for s in shape:
+                length *= s
+
+            if "BSCALE" in attrs or "BZERO" in attrs:
+                kwargs["filters"] = [
+                    numcodecs.FixedScaleOffset(
+                        offset=float(attrs.get("BZERO", 0)),
+                        scale=float(attrs.get("BSCALE", 1)),
+                        astype=dtype,
+                        dtype=float,
+                    )
+                ]
+            else:
+                kwargs["filters"] = None
+        elif isinstance(hdu, fits.hdu.table.TableHDU):
+            # ascii table
+            spans = hdu.columns._spans
+            outdtype = [
+                [name, hdu.columns[name].format.recformat]
+                for name in hdu.columns.names
+            ]
+            indtypes = [
+                [name, f"S{i + 1}"] for name, i in zip(hdu.columns.names, spans)
+            ]
+            nrows = int(attrs["NAXIS2"])
+            shape = (nrows,)
+            kwargs["filters"] = [AsciiTableCodec(indtypes, outdtype)]
+            dtype = [tuple(d) for d in outdtype]
+            length = (sum(spans) + len(spans)) * nrows
+        elif isinstance(hdu, fits.hdu.table.BinTableHDU):
+            # binary table
+            dtype = hdu.columns.dtype.newbyteorder(">")  # always big endian
+            nrows = int(attrs["NAXIS2"])
+            shape = (nrows,)
+            # if hdu.fileinfo()["datSpan"] > length
+            if any(_.format.startswith(("P", "Q")) for _ in hdu.columns):
+                # contains var fields
+                length = hdu.fileinfo()["datSpan"]
+                dt2 = [
+                    (name, "O")
+                    if hdu.columns[name].format.startswith(("P", "Q"))
+                    else (name, str(dtype[name].base))
+                    + ((dtype[name].shape,) if dtype[name].shape else ())
+                    for name in dtype.names
+                ]
+                types = {
+                    name: hdu.columns[name].format[1]
+                    for name in dtype.names
+                    if hdu.columns[name].format.startswith(("P", "Q"))
+                }
+                kwargs["object_codec"] = VarArrCodec(
+                    str(dtype), str(dt2), nrows, types
+                )
+                dtype = dt2
+            else:
+                length = dtype.itemsize * nrows
+                kwargs["filters"] = None
+        else:
+            print(f"Unknown extension type: {hdu}")
+        # one chunk for whole thing.
+        # TODO: we could sub-chunk on biggest dimension
+        name = hdu.name or str(extension)
+        arr = g.empty(
+            name, dtype=dtype, shape=shape, chunks=shape, compression=None, **kwargs
+        )
+        arr.attrs.update(
+            {
+                k: str(v) if not isinstance(v, (int, float, str)) else v
+                for k, v in attrs.items()
+                if k != "COMMENT"
+            }
+        )
+        arr.attrs["_ARRAY_DIMENSIONS"] = ["z", "y", "x"][-len(shape) :]
+        loc = hdu.fileinfo()["datLoc"]
+        parts = ".".join(["0"] * len(shape))
+        out[f"{name}/{parts}"] = [url, loc, length]
+    if isinstance(out, LazyReferenceMapper):
+        out.flush()
+    return out, attrs
+
 
 # %% ../../nbs/euclid/xarray.ipynb 7
 def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
@@ -91,6 +228,7 @@ def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
     zp_list = []
     pbar = tqdm(fns) if progress else fns
     for fn in pbar:
+        hdul = fits.open(fn, do_not_scale_image_data=True)
         product_id = get_product_id(fn)
         product_ids.append(product_id)
         dither_id = get_dither_id_from_filename(fn)
@@ -106,16 +244,15 @@ def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
         coords = []
         coord_name = "extension"
         for ext in exts:
+            hdu = hdul[ext]
             ext_type = _get_ext_type(ext)
-            out = process_file(fn, extension=ext)
+            out, hdr = process_file(fn, hdu=hdu, extension=ext)
             if ext_type is not None:
                 out = _rename(out, ext_type)
                 coord_name = "detector"
-            out = _fix_byte_order(out)
             ref_exts.append(out)
             coord = _get_ext_det(ext)
             coords.append(coord)
-            hdr = fits.getheader(fn, ext)
             wcs = {
                 k: hdr[k]
                 for k in (
@@ -156,6 +293,7 @@ def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
         )
         ref_exts = mzz.translate()
         ref_files.append(ref_exts)
+        hdul.close()
     coo_map = {}
     concat_dims = []
     if len(np.unique(product_ids)) > 0:
