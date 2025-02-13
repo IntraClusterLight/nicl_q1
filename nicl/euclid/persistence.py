@@ -31,6 +31,7 @@ from nicl.euclid.utilities import (
     get_obs_id_from_filename,
     get_primary_header,
     get_persistence_mask,
+    get_invalid_mask,
     get_invalid_mask_without_persistence,
     get_rms,
     fits_append,
@@ -77,7 +78,9 @@ def minimum_map(
         if skyflat_path is not None:
             img = read_and_apply_skyflat(img, fn, extname, skyflat_path)
         if correct_banding:
-            correction = banding_correction(img)
+            invalid = get_invalid_mask(fn, extname)
+            masked_image = img.where(~invalid)
+            correction = banding_correction(masked_image)
             img = img - correction
         images.append(img)
     images = np.array(images)
