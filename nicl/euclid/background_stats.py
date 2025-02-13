@@ -260,7 +260,7 @@ def background_stats_plot(results, true_bkg_std=None, errorbars=False, zp_mag=No
     if zp_mag is None:
         ax.set_yscale("log")
     else:
-        ax.yaxis.set_inverted(True)
+        ax.set_ylim(30, 24.5)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
     ax.xaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
     ax.xaxis.set_ticks(results["sqrt_n_pix"])
