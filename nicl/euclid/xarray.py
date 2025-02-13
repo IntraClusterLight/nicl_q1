@@ -56,13 +56,28 @@ def _get_ext_det(x):
 # Code vendored from kerchunk.fits and adapted for speed with very large files
 
 BITPIX2DTYPE = {
-    8: "uint8",
+    8: ">u1",
     16: ">i2",
     32: ">i4",
     64: ">i8",
     -32: ">f4",
     -64: ">f8",
 }  # always bigendian
+
+
+def infer_dtype_info(attrs):
+    """Infer the dtype of a FITS file from the header."""
+    bitpix = attrs["BITPIX"]
+    bzero = attrs.get("BZERO")
+    stored_dtype = BITPIX2DTYPE[bitpix]
+    dtype = stored_dtype
+    if bitpix == 64 and bzero == 2**63:
+        dtype = ">u8"
+    if bitpix == 32 and bzero == 2**31:
+        dtype = ">u4"
+    elif bitpix == 16 and bzero == 2**15:
+        dtype = ">u2"
+    return dtype, stored_dtype
 
 
 def process_file(
@@ -117,7 +132,7 @@ def process_file(
             # for images/cubes (i.e., ndarrays with simple type)
             nax = attrs["NAXIS"]
             shape = tuple(int(attrs[f"NAXIS{i}"]) for i in range(nax, 0, -1))
-            dtype = BITPIX2DTYPE[attrs["BITPIX"]]
+            dtype, stored_dtype = infer_dtype_info(attrs)
             length = np.dtype(dtype).itemsize
             for s in shape:
                 length *= s
@@ -128,7 +143,7 @@ def process_file(
                         offset=float(attrs.get("BZERO", 0)),
                         scale=float(attrs.get("BSCALE", 1)),
                         astype=dtype,
-                        dtype=float,
+                        dtype=np.dtype(stored_dtype).type,
                     )
                 ]
             else:
@@ -351,9 +366,9 @@ def open_fits_as_dataset(fns):
     JSON reference once with `create_zarr_ref_from_fits`, save it, and then just open
     the reference as needed with `open_zarr_ref_as_dataset`.
     """
-    ref = create_zarr_ref_from_fits(fns)
+    ref, wcs, zp = create_zarr_ref_from_fits(fns)
     ds = open_zarr_ref_as_dataset(ref)
-    return ds
+    return ds, wcs, zp
 
 # %% ../../nbs/euclid/xarray.ipynb 10
 def write_da_to_fits(

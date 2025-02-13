@@ -21,12 +21,9 @@ def filter_and_mask_data(data, scale=200):
     A smoothed, median filtered, version of the data is subtracted from the original data.
     The result is is then masked using an object mask created from the original data.
     The result should a map of the small scale variations in the background.
+
+    The input data should already be masked with NaNs
     """
-    # this currently doesn't work, apparently because of a bug in kerchunk, interpreting the type incorrectly (unsigned int32?)
-    # invalid = original_data["DQ"]
-    # invalid = invalid > 0
-    # mask = mask | invalid
-    # data = data.where(~mask)
     smoothed = sampled_median_filter(data, scale, dims=["y", "x"])
     filtered_data = data - smoothed
     mask_params = {

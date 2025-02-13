@@ -31,11 +31,9 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
         ds, _, _ = read_all_zarr_refs(zarr_path, obs_id)
         data = ds["SCI"]
         mask = xr_fast_mask(data, estimate_background=True, verbose=verbose)
-        # TODO: this currently doesn't work, apparently because of a bug in kerchunk,
-        # interpreting the type incorrectly (unsigned int32?)
-        # invalid = ds["DQ"]
-        # invalid = invalid > 0
-        # mask = mask | invalid
+        invalid = ds["DQ"]
+        invalid = invalid & 1 > 0
+        mask = mask | invalid
         masked_data = data.where(~mask)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
