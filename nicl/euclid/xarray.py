@@ -419,18 +419,13 @@ def create_all_zarr_refs(path, zarr_path, obs_id_glob="[23]*"):
 # %% ../../nbs/euclid/xarray.ipynb 14
 def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
     ref_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/ref.json")]
-    out = MultiZarrToZarr(ref_files, concat_dims=["observation_id"])
-    with catch_warnings():
-        filterwarnings(
-            "ignore", "Concatenated coordinate .* contains less than expected"
-        )
-        ref = out.translate()
-    ds = open_zarr_ref_as_dataset(ref)
+    datasets = [open_zarr_ref_as_dataset(ref) for ref in ref_files]
+    ds = xr.concat(datasets, dim="observation_id")
     ds = ds.assign_coords(y=("y", ds.y.values), x=("x", ds.x.values))
     wcs_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/wcs.zarr")]
-    wcs = xr.open_mfdataset(wcs_files, engine="zarr")
+    wcs = xr.open_mfdataset(wcs_files, engine="zarr", combine="nested", concat_dim="observation_id")
     zp_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/zp.zarr")]
-    zp = xr.open_mfdataset(zp_files, engine="zarr")
+    zp = xr.open_mfdataset(zp_files, engine="zarr", combine="nested", concat_dim="observation_id")
     return ds, wcs, zp
 
 # %% ../../nbs/euclid/xarray.ipynb 15
