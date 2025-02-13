@@ -39,7 +39,7 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
         masked_data = data.where(~mask)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
-            coarse_data = masked_data.coarsen(dict(x=n_pix, y=n_pix)).median()
+            coarse_data = masked_data.coarsen(dict(x=n_pix, y=n_pix), boundary="pad").median()
             coarse_data.to_zarr(coarse_path)
 
 # %% ../../nbs/euclid/skyflat.ipynb 9
