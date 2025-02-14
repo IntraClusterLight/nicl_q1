@@ -183,7 +183,7 @@ def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, verb
     for group_obs_id in group_obs_ids:
         create_coarse_data(group_obs_id, zarr_path, n_pix=n_pix, verbose=verbose)
     coarse_data = xr.open_mfdataset(
-        zarr_path.glob(f"*/coarse_{n_pix}.zarr"), engine="zarr"
+        zarr_path.glob(f"*/coarse_{n_pix}.zarr"), engine="zarr", combine="nested", concat_dim="observation_id"
     )
     coarse_data = coarse_data["SCI"]
     if zp is not None:
