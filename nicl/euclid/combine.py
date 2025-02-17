@@ -24,7 +24,7 @@ from photutils.background import Background2D
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
-from nicl.euclid.background import sub_bkg
+from nicl.mask import fast_mask
 from nicl.euclid.constants import (
     VIS,
     NISP,
@@ -442,9 +442,10 @@ class DithersMixin:
         if self.multi_chip_bkg:
             # remove the files in the temporary input directory
             rmtree(self.in_dir)
-        with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci, fits.open(
-            tmpdir / "coadd.weight.fits", memmap=True
-        ) as hdul_weights:
+        with (
+            fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci,
+            fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights,
+        ):
             # this is necessary because they are both PrimaryHDU objects
             hdu_sci = fits.ImageHDU(hdul_sci[0].data, hdul_sci[0].header)
             hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
@@ -478,6 +479,61 @@ class DithersMixin:
         print(
             f"Postprocessing took {elapsed_secs:.1f} secs. Output saved to {self.out_dir / out_fn}"
         )
+
+
+def sub_bkg(
+    img,  # input image
+    dq_mask=None,  # data quality mask for bad pixels
+    obj_mask="fast_mask",  # object mask; can be a callable function or an array
+    mesh_size=None,  # mesh size for background modeling; default to 1x1 mesh if not specified
+    **kwargs,  # additional arguments for Background2D
+):
+    """model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
+    img = np.asarray(img)
+    # check if need to build object mask
+    if isinstance(obj_mask, str):
+        # determine if obj_mask is a callable function
+        if obj_mask in globals() and callable(globals()[obj_mask]):
+            obj_mask = globals()[obj_mask]
+        elif obj_mask in locals() and callable(locals()[obj_mask]):
+            obj_mask = locals()[obj_mask]
+        else:
+            raise ValueError(f"{obj_mask} is not a valid function name")
+        match obj_mask.__name__:
+            case "fast_mask":
+                obj_mask, _ = obj_mask(
+                    img,
+                    estimate_background=True,
+                )
+            case _:
+                obj_mask = obj_mask(img)
+    else:
+        obj_mask = np.asarray(obj_mask).astype(bool)
+    # check if the shape matches
+    if obj_mask.shape != img.shape:
+        raise ValueError(
+            "The shape of the object mask does not match that of the input image."
+        )
+    # combine the dq_mask and obj_mask
+    if dq_mask is not None:
+        dq_mask = np.asarray(dq_mask).astype(bool)
+        if dq_mask.shape != img.shape:
+            raise ValueError(
+                "The shape of the data quality mask does not match that of the input image."
+            )
+        mask = dq_mask | obj_mask
+    else:
+        mask = obj_mask
+    # default 1x1 mesh
+    if mesh_size is None:
+        mesh_size = img.shape[0], img.shape[1]
+    bg = Background2D(
+        img,
+        mesh_size,
+        mask=mask,
+        **kwargs,
+    )
+    return img - bg.background
 
 # %% ../../nbs/euclid/combine.ipynb 6
 # subclass for combing NISP images
