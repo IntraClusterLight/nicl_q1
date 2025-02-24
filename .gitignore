@@ -149,3 +149,9 @@ checklink/cookies.txt
 
 # Quarto
 .quarto
+
+# presentations
+*.pptx
+
+# script output
+scripts/*.out

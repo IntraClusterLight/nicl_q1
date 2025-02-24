@@ -43,8 +43,9 @@ def _sign_checkerboard(shape):
     return 1 - 2 * (np.indices(shape).sum(axis=0) % 2)
 
 
-def _nan_to_inf(x):
-    substitutes = np.inf * _sign_checkerboard(x.shape)
+def _nan_to_inf(x, dims):
+    shape = tuple(x.sizes[d] for d in dims)
+    substitutes = np.inf * _sign_checkerboard(shape)
     x = x.where(~x.isnull(), substitutes)
     return x
 
@@ -65,7 +66,8 @@ def sampled_median_filter(
     mask: np.ndarray | None = None,  # optional 2D mask to apply to `data`
     allow_nans=True,  # ignore NaNs in `data`
     return_mad=False,  # additionally return the MAD
-    keep_coarse=False,
+    keep_coarse=False,  # if True, return the coarsened image
+    dims=None,  # if data is a DataArray, the dimensions to which to apply the filter
     verbose=True,
 ) -> np.ndarray | xr.DataArray:  # the filtered data
     """Perform median filtering in an efficient, but reduced accuracy, method.
@@ -74,7 +76,7 @@ def sampled_median_filter(
     The resulting image is then median filtered using a circular footprint, which may optionally
     be randomly-sampled and centrally weighted by taking the sampling probablity as a Gaussian distribution.
 
-    If `data` is an `xarray.DataArray`, then the filtering is performed using dask, and the returned object is an
+    If `data` is a dask-backed `xarray.DataArray`, then the filtering is performed using dask, and the returned object is an
     `xarray.DataArray`, with lazy computation. Otherwise, numpy is used and the returned object is a `numpy.ndarray`.
 
     If `gaussian_sigma` is specified, the samples are weighted by a Gaussian profile, otherwise the filter is a
@@ -90,12 +92,21 @@ def sampled_median_filter(
     If `allow_nans` is False, then NaNs in `data` are propagated, otherwise they are ignored; for
     efficiency, this is achieved by setting them to infinity with a checkerboard sign pattern.
 
+    If `dims` is provided, the filtering is performed on the specified dimensions, otherwise the filtering is performed
+    on all dimensions.
+
     Optionally also return the median-absolute-deviation (MAD), scaled to match the standard deviation for Gaussian noise.
     """
     use_dask = isinstance(data, xr.DataArray) and isinstance(data.data, da.Array)
     if not use_dask:
         data = xr.DataArray(data)
-    dims = data.dims
+    if dims is None:
+        dims = data.dims
+    else:
+        dims = [f"dim_{d}" if isinstance(d, int) else d for d in dims]
+        dims = [d for d in data.dims if d in dims]  # ensure correct order
+    if len(dims) != 2:
+        raise ValueError("Only 2D filtering is supported, specify `dims`")
     original_dims = {d: data[d] for d in dims}
     data = data.assign_coords(original_dims)
     if mask is not None:
@@ -104,22 +115,23 @@ def sampled_median_filter(
     if allow_nans:
         # using the generic filter with nanmedian is slow and runs into problems with dask
         # this is a workaround by replacing nans with a grid of positive and negative infinity
-        data = _nan_to_inf(data)
+        data = _nan_to_inf(data, dims)
     if coarse_factor is None:
         size_scale = size if gaussian_sigma is None else min(6 * gaussian_sigma, size)
         coarsening = max(size_scale // coarse_samples, 1)
     else:
         coarsening = coarse_factor
-    coarse_data = data
     if coarsening > 1:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
-            with np.errstate(invalid="ignore"):
-                coarse_data = data.coarsen(
-                    {d: coarsening for d in dims}, boundary="pad"
-                ).median()
+            warnings.filterwarnings("ignore", "invalid value encountered in reduce")
+            coarse_data = data.coarsen(
+                {d: coarsening for d in dims}, boundary="pad"
+            ).median()
         if allow_nans:
-            coarse_data = _nan_to_inf(coarse_data)
+            coarse_data = _nan_to_inf(coarse_data, dims)
+    else:
+        coarse_data = data
     coarse_size = round(size / coarsening)
     coarse_gaussian_sigma = (
         None if gaussian_sigma is None else gaussian_sigma / coarsening
@@ -141,7 +153,11 @@ def sampled_median_filter(
     footprint.flat[sample] = True
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+        warnings.filterwarnings("ignore", "invalid value encountered in reduce")
         if use_dask:
+            footprint = xr.DataArray(footprint, dims=dims)
+            extra_dims = tuple(set(coarse_data.dims) - set(footprint.dims))
+            footprint = footprint.expand_dims(extra_dims)
             median = xr.DataArray(
                 dask_median_filter(coarse_data.data, footprint=footprint, mode=mode),
                 coords=coarse_data.coords,
@@ -152,6 +168,9 @@ def sampled_median_filter(
             median = xr.apply_ufunc(
                 median_filter,
                 coarse_data,
+                input_core_dims=[dims],
+                output_core_dims=[dims],
+                vectorize=dims != coarse_data.dims,
                 kwargs=dict(footprint=footprint, mode=mode),
                 keep_attrs=True,
             )
@@ -167,13 +186,13 @@ def sampled_median_filter(
             )
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
-                with np.errstate(invalid="ignore"):
-                    median = median.interp(
-                        original_dims,
-                        assume_sorted=True,
-                        method="linear",
-                        kwargs=dict(bounds_error=False, fill_value=None),
-                    )
+                warnings.filterwarnings("ignore", "invalid value encountered in reduce")
+                median = median.interp(
+                    original_dims,
+                    assume_sorted=True,
+                    method="linear",
+                    kwargs=dict(bounds_error=False, fill_value=None),
+                )
     if return_mad:
         absolute_deviation = np.abs(data - median)
         mad = sampled_median_filter(
@@ -191,6 +210,8 @@ def sampled_median_filter(
         mad *= 1.4826
     if not use_dask:
         median = median.to_numpy()
+        if return_mad:
+            mad = mad.to_numpy()
     if return_mad:
         return median, mad
     else:

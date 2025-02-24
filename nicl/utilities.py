@@ -46,11 +46,13 @@ def sb_to_adu(sb, pix_scale, zp=27 * u.ABmag):
     return counts
 
 # %% ../nbs/10_utilities.ipynb 4
-def get_pixel_scale(img):
+def get_pixel_scale(img, wcs=None):
     """Calculate the average pixel scale of the supplied image."""
+    if wcs is None:
+        wcs = image.wcs
     return (
         np.mean(
-            [s.to_value("arcsec") for s in img.wcs.celestial.proj_plane_pixel_scales()]
+            [s.to_value("arcsec") for s in wcs.celestial.proj_plane_pixel_scales()]
         )
         * u.arcsec
     )
@@ -60,10 +62,12 @@ def get_img_centre_pixel(img):
     return (np.array(img.shape) - 1) / 2
 
 
-def get_img_centre_world(img):
+def get_img_centre_world(img, wcs=None):
     """Calculate the world coordinates at the centre of the supplied image."""
     centre_pixel = get_img_centre_pixel(img)
-    return img.wcs.pixel_to_world(*centre_pixel)
+    if wcs is None:
+        wcs = image.wcs
+    return wcs.pixel_to_world(*centre_pixel)
 
 
 def distance_from_coord(shape, coord):
@@ -147,8 +151,7 @@ def maybe_to_value(x, unit):
 
 # %% ../nbs/10_utilities.ipynb 9
 def parse_input_for_skycoord(skycoord):
-    """
-    Parse input to return a SkyCoord object.
+    """Parse input to return a SkyCoord object.
 
     Parameters
     ----------
@@ -164,6 +167,7 @@ def parse_input_for_skycoord(skycoord):
     ------
     ValueError
         If the input is neither a string nor a SkyCoord object.
+
     """
     if isinstance(skycoord, str):
         return SkyCoord(skycoord, unit=(u.hourangle, u.deg))
@@ -174,8 +178,7 @@ def parse_input_for_skycoord(skycoord):
 
 
 def parse_input_for_angular_size(angular_size, duplicate=False):
-    """
-    Parse input to return an angular size Quantity.
+    r"""Parse input to return an angular size Quantity.
 
     Parameters
     ----------
@@ -200,6 +203,7 @@ def parse_input_for_angular_size(angular_size, duplicate=False):
     ValueError
         If the input is an empty list or tuple, or if the input type is not
         supported.
+
     """
     # note that u.Quantity is also an instance of ndarray
     if isinstance(angular_size, np.ndarray):

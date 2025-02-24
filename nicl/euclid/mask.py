@@ -16,11 +16,7 @@ from nicl.mask import (
 )
 from nicl.utilities import (
     calc_sb_threshold as _calc_sb_threshold,
-    distance_from_coord,
-    get_img_centre_pixel,
-    get_img_centre_world,
     get_pixel_scale,
-    physical_to_angular,
     sb_to_adu,
 )
 

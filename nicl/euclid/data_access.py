@@ -62,7 +62,10 @@ class DataAccess:
     def tap_query(self, query):
         self.tap_login()
         job = self.tap.launch_job(query)
-        return job.get_results()
+        results = job.get_results()
+        if len(results) == 2000:
+            print("Warning: query results may be truncated.")
+        return results
 
     def get_mer_filename_lookup(self):
         """Build a DataFrame of MER files.
@@ -113,29 +116,34 @@ class DataAccess:
             return table
 
     def build_instrument_condition(self, instrument, filter, raw=False):
-        release_condition = "1=1" if raw else f"(release_name='{self.release_name}')"
-        instrument_condition = (
-            f"AND instrument_name = '{instrument}'" if instrument is not None else ""
-        )
-        filter_condition = f"AND filter_name = '{filter}'" if filter is not None else ""
-        return " ".join((release_condition, instrument_condition, filter_condition))
+        conditions = []
+        if self.release_name and not raw:
+            conditions.append(f"(release_name='{self.release_name}')")
+        if instrument is not None:
+            conditions.append(f"(instrument_name = '{instrument}')")
+        if filter is not None:
+            conditions.append(f"(filter_name = '{filter}')")
+        return " AND ".join(conditions)
 
     def build_fov_condition(self, ra, dec, radius, fully_contained):
         ra, dec, radius = (maybe_to_value(x, "deg") for x in (ra, dec, radius))
-        release_condition = f"(release_name='{self.release_name}')"
+        conditions = []
+        if self.release_name:
+            conditions.append(f"(release_name='{self.release_name}')")
         criterion = "CONTAINS" if fully_contained else "INTERSECTS"
-        fov_condition = f"AND (fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)"
-        return " ".join((release_condition, fov_condition))
+        conditions.append(f"(fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)")
+        return " AND ".join(conditions)
 
     def find_all_observations(
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all survey obs_ids for observations in the current release."""
-        query = f"""SELECT observation_id
+        query = f"""SELECT DISTINCT observation_id
                     FROM sedm.calibrated_frame
-                    WHERE (product_type like '%Calibrated%')
-                    AND release_name='{self.release_name}'
-                    ORDER BY observation_id ASC"""
+                    WHERE (product_type like '%Calibrated%')\n"""
+        if self.release_name:
+            query += f"AND release_name='{self.release_name}'\n"
+        query += "ORDER BY observation_id ASC"
         results = self.tap_query(query)
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
         return obs_ids
@@ -144,7 +152,7 @@ class DataAccess:
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all MER tile_indexes for tiles in the current release."""
-        query = f"""SELECT tile_index
+        query = f"""SELECT DISTINCT tile_index
                     FROM sedm.mosaic_product
                     WHERE release_name='{self.release_name}'
                     ORDER BY tile_index ASC"""
@@ -162,7 +170,7 @@ class DataAccess:
     ):  # returns a list of observation_ids
         """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
         condition = self.build_fov_condition(ra, dec, radius, fully_contained)
-        query = f"""SELECT observation_id
+        query = f"""SELECT DISTINCT observation_id
                     FROM sedm.calibrated_frame
                     WHERE (product_type like '%Calibrated%')
                     AND {condition}
@@ -181,7 +189,7 @@ class DataAccess:
     ):  # returns a list of tile_indexes
         """Obtain a list of survey MER tile_indexes for tiles that entirely contain or intersect the specified target region."""
         condition = self.build_fov_condition(ra, dec, radius, fully_contained)
-        query = f"""SELECT tile_index
+        query = f"""SELECT DISTINCT tile_index
                     FROM sedm.mosaic_product
                     WHERE {condition}
                     ORDER BY tile_index ASC"""
@@ -261,6 +269,7 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid filenames to outpath."""
+        outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         if isinstance(filenames, Table):
             filenames = filenames["file_name"]
@@ -303,6 +312,7 @@ class DataAccess:
         verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid mosaics to outpath."""
+        outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         print(f"Downloading {len(file_info)} files to {outpath}")
         filenames = []
@@ -394,7 +404,13 @@ class DataAccess:
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
-        outpath = Path(outpath, "NIR", f"{obs_id:n}")
+        if instrument == "NISP":
+            instrument_folder = "NIR"
+        elif instrument == "VIS":
+            instrument_folder = "VIS_QUAD"
+        else:
+            raise ValueError("The instrument must be NISP or VIS.")
+        outpath = Path(outpath, instrument_folder, f"{obs_id:n}")
         self.download_files(file_info, outpath=outpath, verbose=verbose)
         return file_info
 
