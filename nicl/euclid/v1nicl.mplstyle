@@ -1,0 +1,105 @@
+## EUCLID STYLE SHEET
+#
+# This is a Matplotlib style configuration file for Euclid papers.
+#
+# This version has been adapted to not use TeX and include some of Steven's preferences.
+#
+# If you wish to use this style sheet, you can place this style configuration file into your
+# working directory and start your plotting script with (note the _inclusion_ of the file 
+# extension!):
+#
+#     import matplotlib.pyplot as plt
+#     plt.style.use(['euclid_stylesheet.mplstyle'])
+#
+# Alternatively, you can place the style configuration file in your python path:
+# <path to your python installation location>/site-packages/matplotlib/mpl-data/stylelib/
+# This will allow you to use the style sheet in your plotting scripts from anywhere with (note
+# the _omission_ of the file extension!):
+#
+#     import matplotlib.pyplot as plt
+#     plt.style.use(['euclid_stylesheet'])
+#
+# See 
+# https://matplotlib.org/stable/users/explain/customizing.html#customizing-with-style-sheets
+# for more details on how to use matplotlib style sheets.
+#
+# The figure size and font size in this file are set up to play well with each other and to 
+# create a figure that should fit well into one column of a double column paper, while having
+# an appropriate font size that goes well with the paper font size. 
+# Hence, my strong recommendation is: DO NOT MESS AROUND WITH `figsize` AND/OR `fontsize`!
+#
+# If you want to create a bigger figure spanning two columns, use the figwidth provided by this
+# style sheet as a baseline, e.g.:
+#
+#     fw, fh = plt.rcParams['figure.figsize']
+#     fig, ax = plt.subplots(figsize=(2*fw, 2*fh))
+#
+# This should get you close to the desired figure size fitting neatly into the paper, while still
+# preserving a consistent font size. You should NOT meddle with the font size!
+#
+#
+# Credit to Lukas Hergt for setting up this style sheet. Some minor tweaks were made by Laila Linke.
+#
+### CONFIGURATION BEGINS HERE
+
+
+############
+## Figure ##
+############
+
+figure.figsize:     4.0, 3.0  # figure size in inches
+figure.dpi:         200       # figure dots per inch (just for display)
+savefig.dpi:        300       # figure dots per inch for saving non-vector graphics
+savefig.format:     pdf       # {png, ps, pdf, svg}
+savefig.bbox:       tight     # {tight, standard}
+savefig.pad_inches: 0.02      # padding to be used, when bbox is set to 'tight'
+
+
+##########
+## Axes ##
+##########
+
+lines.linewidth:    1.0       # line width in points
+lines.markersize:   5.0       # marker size, in points
+axes.linewidth:     0.6       # edge line width
+
+xtick.major.size:   2.5       # major tick size in points
+xtick.minor.size:   1.5       # minor tick size in points
+xtick.major.width:  0.6       # major tick width in points
+xtick.minor.width:  0.4       # minor tick width in points
+xtick.major.pad:    5.0       # distance to major tick label in points
+
+ytick.major.size:   2.5       # major tick size in points
+ytick.minor.size:   1.5       # minor tick size in points
+ytick.major.width:  0.6       # major tick width in points
+ytick.minor.width:  0.4       # minor tick width in points
+ytick.major.pad:    5.0       # distance to major tick label in points
+
+axes.facecolor:     white     # Background color
+xtick.top:          True        # include ticks on top
+ytick.right:        True        # include ticks on right hand side
+xtick.direction:    in        # move ticks to inside
+ytick.direction:    in        # move ticks to inside
+
+#axes.xmargin:       0           # Margin for xaxis around data
+
+##########
+## Text ##
+##########
+# You (in most cases) should not be setting font sizes by specifying a number.
+# The `font.size` property is the default font size for text, given in pts. Rather than changing
+# font sizes manually everywhere, you should set a sensible number value for `font.size` once,
+# and otherwise work with relative font size labels: 
+# {xx-small, x-small, small, medium, large, x-large, xx-large}
+
+font.family:        serif     # use serif font
+font.serif:	    STIXGeneral  # Closest to Computer Modern for regular text
+text.usetex:        False     # do not use LaTeX for all text handling
+mathtext.fontset:   cm        # use Computer Modern font, matching LaTeX default
+
+font.size:          8.0       # font size that defines 'medium'
+axes.titlesize:     large     # font size of the axes title
+axes.labelsize:     medium    # font size of the x and y labels
+legend.fontsize:    medium    # font size of legend entries
+xtick.labelsize:    medium    # font size of the tick labels
+ytick.labelsize:    medium    # font size of the tick labels
