@@ -45,19 +45,20 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
 def group_obs_ids(
     obs_ids,  # list of observation IDs
     half_window=3,  # half-window size for grouping
+    max_gap_size=2,  # maximum gap size for judging whether a sequence is continuous
 ) -> dict[int, list[int]]:  # dict of grouped observation IDs for each observation ID
     """Group the observation IDs around each observation ID.
 
     Determines the best group of observations for characterising the skyflat for a given observation ID.
     For observations within a continuous sequence, the group comprises the `half_window` observations on
     either side of the given observation ID. The target observation itself is not included in the group.
-    The group is restricted to observations in a continuous sequence, such that it may be truncated for
-    observations close to the edge of a sequence. Where possible, the number of observations on the opposing
-    side is increased, to maintain a total group size of `2 * half_window`. However, for short sequences,
-    the group may be smaller.
+    The group is restricted to observations in a continuous sequence (with gaps no larger than `max_gap_size`),
+    such that it may be truncated for observations close to the edge of a sequence. Where possible, the number
+    of observations on the opposing side is increased, to maintain a total group size of `2 * half_window`.
+    However, for short sequences, the group may be smaller.
     """
     obs_ids = sorted(obs_ids)
-    gaps = np.where(np.diff(obs_ids) > 1)[0]
+    gaps = np.where(np.diff(obs_ids) > 1 + max_gap_size)[0]
     group_starts = [0] + list(gaps + 1)
     group_ends = list(gaps) + [len(obs_ids)]
 
@@ -71,14 +72,22 @@ def group_obs_ids(
             if obs_id in group:
                 min_obs_id_group = min(group)
                 max_obs_id_group = max(group)
-                for hw in range(half_window, 2 * half_window + 1):
+                for hw in range(half_window, 4 * half_window + 1):
                     min_obs_id = max(min_obs_id_group, obs_id - hw)
                     max_obs_id = min(max_obs_id_group, obs_id + hw)
-                    if max_obs_id - min_obs_id >= 2 * half_window:
+                    selected_obs_ids = [
+                        i for i in range(min_obs_id, max_obs_id + 1) if i in obs_ids
+                    ]
+                    if len(selected_obs_ids) == 2 * half_window + 1:
                         break
-                selected_obs_ids = [
-                    i for i in range(min_obs_id, max_obs_id + 1) if i != obs_id
-                ]
+                    elif len(selected_obs_ids) > 2 * half_window + 1:
+                        obs_id_idx = selected_obs_ids.index(obs_id) 
+                        if obs_id_idx < half_window:
+                            selected_obs_ids = selected_obs_ids[:-1]
+                        else:
+                            selected_obs_ids = selected_obs_ids[1:]
+                        break
+                selected_obs_ids.remove(obs_id)
                 group_for_obs_id[obs_id] = selected_obs_ids
     return group_for_obs_id
 
