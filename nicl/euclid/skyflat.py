@@ -43,7 +43,8 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
 
 # %% ../../nbs/euclid/skyflat.ipynb 9
 def group_obs_ids(
-    obs_ids,  # list of observation IDs
+    target_obs_ids,  # list of observation IDs for which to create groups
+    available_obs_ids,  # list of observation IDs available for grouping 
     half_window=3,  # half-window size for grouping
     max_gap_size=2,  # maximum gap size for judging whether a sequence is continuous
 ) -> dict[int, list[int]]:  # dict of grouped observation IDs for each observation ID
@@ -57,17 +58,17 @@ def group_obs_ids(
     of observations on the opposing side is increased, to maintain a total group size of `2 * half_window`.
     However, for short sequences, the group may be smaller.
     """
-    obs_ids = sorted(obs_ids)
-    gaps = np.where(np.diff(obs_ids) > 1 + max_gap_size)[0]
+    available_obs_ids = sorted(available_obs_ids)
+    gaps = np.where(np.diff(available_obs_ids) > 1 + max_gap_size)[0]
     group_starts = [0] + list(gaps + 1)
-    group_ends = list(gaps) + [len(obs_ids)]
+    group_ends = list(gaps) + [len(available_obs_ids)]
 
     sequential_groups = [
-        obs_ids[start : end + 1] for start, end in zip(group_starts, group_ends)
+        available_obs_ids[start : end + 1] for start, end in zip(group_starts, group_ends)
     ]
 
     group_for_obs_id = {}
-    for obs_id in obs_ids:
+    for obs_id in target_obs_ids:
         for group in sequential_groups:
             if obs_id in group:
                 min_obs_id_group = min(group)
@@ -76,7 +77,7 @@ def group_obs_ids(
                     min_obs_id = max(min_obs_id_group, obs_id - hw)
                     max_obs_id = min(max_obs_id_group, obs_id + hw)
                     selected_obs_ids = [
-                        i for i in range(min_obs_id, max_obs_id + 1) if i in obs_ids
+                        i for i in range(min_obs_id, max_obs_id + 1) if i in available_obs_ids
                     ]
                     if len(selected_obs_ids) == 2 * half_window + 1:
                         break
