@@ -79,7 +79,7 @@ def minimum_map(
             img = read_and_apply_skyflat(img, fn, extname, skyflat_path)
         if correct_banding:
             invalid = get_invalid_mask(fn, extname)
-            masked_image = img.where(~invalid)
+            masked_image = np.where(invalid, np.nan, img)
             correction = banding_correction(masked_image)
             img = img - correction
         images.append(img)
