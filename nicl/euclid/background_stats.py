@@ -49,7 +49,7 @@ def measure_aperture_stats(
     if sqrt_n_pix < 3:
         # does not make sense to use an annulus for small numbers of pixels
         annulus = False
-    
+
     if annulus:
         outer_size = outer_size / np.sqrt(1 - (1 - annular_thickness) ** 2)
         inner_size = (1 - annular_thickness) * outer_size
@@ -77,7 +77,12 @@ def measure_aperture_stats(
         else:
             ap = CircularAperture(positions, r=outer_size / 2)
 
-    stats = ApertureStats(data, ap, mask=mask, sum_method="center", )
+    stats = ApertureStats(
+        data,
+        ap,
+        mask=mask,
+        sum_method="center",
+    )
     stats = stats.to_table(columns=("sum_aper_area", "mean", "median"))
     return stats, outer_size
 
@@ -102,7 +107,14 @@ def aperture_stats(
     previous_stats = None
     while True:
         i += 1
-        stats, outer_size = measure_aperture_stats(data, mask, n_apertures, sqrt_n_pix_adjusted, aperture_shape, annular_thickness)
+        stats, outer_size = measure_aperture_stats(
+            data,
+            mask,
+            n_apertures,
+            sqrt_n_pix_adjusted,
+            aperture_shape,
+            annular_thickness,
+        )
         achieved_n_pix = stats["sum_aper_area"].value
         ok = abs(achieved_n_pix - n_pix) / n_pix < n_pix_tolerance
         n_ok = ok.sum()
@@ -122,16 +134,22 @@ def aperture_stats(
         else:
             sqrt_n_pix_adjusted *= sqrt_n_pix_adjustment
             if verbose:
-                print(f"trying again after adjusting sqrt_n_pix to {sqrt_n_pix_adjusted:.0f}")
+                print(
+                    f"trying again after adjusting sqrt_n_pix to {sqrt_n_pix_adjusted:.0f}"
+                )
     if verbose:
         print(f"total number of valid apertures: {n_ok}")
     std = partial(median_abs_deviation, axis=None, scale="normal")
     std_mean = float(std(stats["mean"]))
     err_std_mean = float(std_mean / np.sqrt(2 * n_ok - 2))
-    err_std_mean_bootstrap = float(bootstrap((stats["mean"],), std, n_resamples=1000).standard_error)
+    err_std_mean_bootstrap = float(
+        bootstrap((stats["mean"],), std, n_resamples=1000).standard_error
+    )
     std_median = float(std(stats["median"]))
     err_std_median = float(std_median / np.sqrt(2 * n_ok - 2))
-    err_std_median_bootstrap = float(bootstrap((stats["median"],), std, n_resamples=1000).standard_error)
+    err_std_median_bootstrap = float(
+        bootstrap((stats["median"],), std, n_resamples=1000).standard_error
+    )
     results = dict(
         sqrt_n_pix=sqrt_n_pix,
         std_mean=std_mean,
@@ -191,20 +209,34 @@ def stats_versus_size(
 def convert_to_mag(results, zp):
     results["expected_std_mean"] = zp - 2.5 * np.log10(results["expected_std_mean"])
     results["expected_std_median"] = zp - 2.5 * np.log10(results["expected_std_median"])
-    results["err_std_mean"] = (results["err_std_mean"] / results["std_mean"]) * 2.5 / np.log(10)
-    results["err_std_median"] = (results["err_std_median"] / results["std_median"]) * 2.5 / np.log(10)
-    results["err_bs_std_mean"] = (results["err_bs_std_mean"] / results["std_mean"]) * 2.5 / np.log(10)
-    results["err_bs_std_median"] = (results["err_bs_std_median"] / results["std_median"]) * 2.5 / np.log(10)
+    results["err_std_mean"] = (
+        (results["err_std_mean"] / results["std_mean"]) * 2.5 / np.log(10)
+    )
+    results["err_std_median"] = (
+        (results["err_std_median"] / results["std_median"]) * 2.5 / np.log(10)
+    )
+    results["err_bs_std_mean"] = (
+        (results["err_bs_std_mean"] / results["std_mean"]) * 2.5 / np.log(10)
+    )
+    results["err_bs_std_median"] = (
+        (results["err_bs_std_median"] / results["std_median"]) * 2.5 / np.log(10)
+    )
     results["std_mean"] = zp - 2.5 * np.log10(results["std_mean"])
     results["std_median"] = zp - 2.5 * np.log10(results["std_median"])
     if "expected_std_from_rms_mean" in results.columns:
-        results["expected_std_from_rms_mean"] = zp - 2.5 * np.log10(results["expected_std_from_rms_mean"])
+        results["expected_std_from_rms_mean"] = zp - 2.5 * np.log10(
+            results["expected_std_from_rms_mean"]
+        )
     if "expected_std_from_rms_median" in results.columns:
-        results["expected_std_from_rms_median"] = zp - 2.5 * np.log10(results["expected_std_from_rms_median"])
+        results["expected_std_from_rms_median"] = zp - 2.5 * np.log10(
+            results["expected_std_from_rms_median"]
+        )
     return results
 
 # %% ../../nbs/euclid/background_stats.ipynb 7
-def background_stats_plot(results, true_bkg_std=None, errorbars=False, zp_mag=None, filename=None):
+def background_stats_plot(
+    results, true_bkg_std=None, errorbars=False, zp_mag=None, filename=None
+):
     if zp_mag is not None:
         results = convert_to_mag(results, zp_mag)
     fig, ax = plt.subplots()
@@ -226,7 +258,11 @@ def background_stats_plot(results, true_bkg_std=None, errorbars=False, zp_mag=No
         )
     else:
         ax.plot(
-            results["sqrt_n_pix"], results["std_mean"], "-s", color="purple", label="measured std(mean)"
+            results["sqrt_n_pix"],
+            results["std_mean"],
+            "-s",
+            color="purple",
+            label="measured std(mean)",
         )
     ax.plot(
         results["sqrt_n_pix"],
@@ -253,7 +289,16 @@ def background_stats_plot(results, true_bkg_std=None, errorbars=False, zp_mag=No
             label="measured std(median)",
         )
     if "expected_std_from_rms_mean" in results.columns:
-        ax.plot(1, results["expected_std_from_rms_mean"][0], "*", color="red", mfc="none", markersize=20, label="expected rms", zorder=10)
+        ax.plot(
+            1,
+            results["expected_std_from_rms_mean"][0],
+            "*",
+            color="red",
+            mfc="none",
+            markersize=20,
+            label="expected rms",
+            zorder=10,
+        )
     if true_bkg_std is not None:
         ax.axhline(true_bkg_std, ls=":", label="true bkg std")
     ax.set_xscale("log")
@@ -267,7 +312,7 @@ def background_stats_plot(results, true_bkg_std=None, errorbars=False, zp_mag=No
     ax.xaxis.set_minor_locator(NullLocator())
     ax.set_xlabel("sqrt(n_pix)")
     ax.set_ylabel("std(average)")
-    ax.tick_params(axis='x', labelrotation=90)
+    ax.tick_params(axis="x", labelrotation=90)
     ax.legend()
     if filename is not None:
         fig.savefig(filename)
@@ -307,7 +352,7 @@ def measure(
         sci_ext = [hdu.name for hdu in hdul if "SCI" in hdu.name]
         multi_ext = len(sci_ext) > 1
         for ext in sci_ext:
-            if multi_ext:   
+            if multi_ext:
                 out_fn_stem = f"{fn.stem}_{ext}"
             else:
                 out_fn_stem = f"{fn.stem}"
@@ -318,7 +363,9 @@ def measure(
             rms[data_mask] = np.nan
             if mask is None:
                 if create_mask:
-                    mask, _ = fast_mask(data, estimate_background=estimate_background, verbose=verbose)
+                    mask, _ = fast_mask(
+                        data, estimate_background=estimate_background, verbose=verbose
+                    )
                 else:
                     mask = np.zeros(data.shape, dtype=bool)
             mask |= data_mask
@@ -344,18 +391,28 @@ def measure(
                 rms=rms,
                 verbose=verbose,
             )
-            outfile = (outpath / f"{out_fn_stem}.fits")
+            outfile = outpath / f"{out_fn_stem}.fits"
             outfile.parent.mkdir(parents=True, exist_ok=True)
             ext_results.write(outfile, overwrite=True)
             if plots:
-                outfile = (outpath / f"{out_fn_stem}.pdf")
-                background_stats_plot(ext_results, zp_mag=zp_mag, filename=outfile, errorbars=errorbars)
+                outfile = outpath / f"{out_fn_stem}.pdf"
+                background_stats_plot(
+                    ext_results, zp_mag=zp_mag, filename=outfile, errorbars=errorbars
+                )
             if debug:
-                fits.writeto(outpath / f"{out_fn_stem}_mask.fits", mask.astype(np.int8), overwrite=True)
+                fits.writeto(
+                    outpath / f"{out_fn_stem}_mask.fits",
+                    mask.astype(np.int8),
+                    overwrite=True,
+                )
                 fits.writeto(outpath / f"{out_fn_stem}_data.fits", data, overwrite=True)
                 masked_data = data.copy()
                 masked_data[mask] = np.nan
-                fits.writeto(outpath / f"{out_fn_stem}_masked_data.fits", masked_data, overwrite=True)
+                fits.writeto(
+                    outpath / f"{out_fn_stem}_masked_data.fits",
+                    masked_data,
+                    overwrite=True,
+                )
             results[ext] = ext_results
     if not separate_detectors:
         results = table.vstack(results.values())
