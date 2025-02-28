@@ -24,6 +24,7 @@ from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
 from nicl.mask import fast_mask
+from nicl.euclid.skyflat import read_skyflat, apply_skyflat
 from nicl.euclid.constants import (
     VIS,
     NISP,
@@ -36,6 +37,7 @@ from nicl.euclid.utilities import (
     default_data_path,
     round_up_box_size,
     get_dither_id_from_filename,
+    get_obs_id_from_filename,
 )
 from nicl.utilities import parse_input_for_angular_size, parse_input_for_skycoord
 
@@ -60,6 +62,8 @@ class Combiner(ABC):
         bkg_mesh_size=None,  # size of the background mesh boxes in angular units
         bkg_filter_size=None,  # median filter background over `bkg_filter_size` x `bkg_filter_size` boxes
         multi_chip_bkg=False,  # if True, combine all chips/quads first for background subtraction
+        autodark_corr=False,  # if True, apply dark current correction for VIS dithers
+        autodark_dir=None,  # directory to find autodarks for VIS dithers
         release_name=None,  # the data release to use to find obs_ids if required, e.g., 'Q1_R1', 'DR1'
         instrument=None,  # Euclid instrument,e.g., VIS or NISP in nicl.euclid.constants
         swarp_config=None,  # default SWarp configuration file content
@@ -133,6 +137,14 @@ class Combiner(ABC):
             )
             if np.any(mesh_size > rd_size):
                 self.multi_chip_bkg = True
+        # check autodark settings
+        self.autodark_corr = autodark_corr
+        if self.autodark_corr:
+            if autodark_dir is None:
+                raise ValueError(
+                    "Autodark correction requires specifying the directory to find autodarks."
+                )
+            self.autodark_dir = Path(autodark_dir).expanduser()
         # assemble command line arguments to pass to SWarp
         self._swarp_extra_args = self._parse_swarp_args(kwargs)
         print(f"Initialized {self}")
@@ -252,10 +264,17 @@ class DithersMixin:
         else:
             pixel_scale = self.instrument.pix_scale
         pixel_scale_str = f"{pixel_scale:.2f} arcsec/pix"
+        obj_str = f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}"
+        if self.individual_dithers:
+            obj_str += ", individual_dithers=True"
         if self.multi_chip_bkg:
-            return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, multi_chip_bkg={self.multi_chip_bkg}, individual_dithers={self.individual_dithers})"
+            obj_str += ", multi_chip_bkg=True"
         else:
-            return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, bkg_sub={self.bkg_sub}, individual_dithers={self.individual_dithers})"
+            obj_str += f", bkg_sub={self.bkg_sub}"
+        if self.autodark_corr:
+            obj_str += ", autodark_corr=True"
+        obj_str += ")"
+        return obj_str
 
     def __repr__(self):
         return self.__str__()
@@ -287,6 +306,11 @@ class DithersMixin:
         start_time = datetime.now()
         sci_fns = []
         for i, dither in enumerate(dithers):
+            # for now we throw away the short exposures
+            if self.autodark_corr and self.instrument.name == "VIS":
+                dither_id = get_dither_id_from_filename(dither.name)
+                if dither_id.endswith("2"):
+                    continue
             with fits.open(dither) as hdul:
                 if self.multi_chip_bkg:
                     primary_hdr = hdul[0].header
@@ -361,6 +385,14 @@ class DithersMixin:
                             ],
                             axis=0,
                         )
+                        # perform autodark correction for VIS dithers
+                        if self.autodark_corr and self.instrument.name == "VIS":
+                            obsid = get_obs_id_from_filename(dither.name)
+                            # TODO: separate applying autodark correction for short and long exposures
+                            autodark = read_skyflat(
+                                obsid, "VIS", ext, self.autodark_dir
+                            )
+                            sci_data = apply_skyflat(sci_data, autodark)
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
@@ -542,7 +574,12 @@ class NISPCombiner(DithersMixin, Combiner):
     """Combine NISP images using SWarp."""
 
     def __init__(self, **kwargs):
-        super().__init__(instrument=NISP, swarp_config=SWARP_CONFIG_NISP, **kwargs)
+        super().__init__(
+            instrument=NISP,
+            swarp_config=SWARP_CONFIG_NISP,
+            autodark_corr=False,
+            **kwargs,
+        )
 
     def combine_per_filter(self, filter):
         if self.multi_chip_bkg:
@@ -722,6 +759,7 @@ class MerCombiner(Combiner):
             bkg_sub=False,
             individual_dithers=False,
             multi_chip_bkg=False,
+            autodark_corr=False,
             **kwargs,
         )
 
@@ -893,6 +931,8 @@ def combine(
     add_bkg_mod=False,  # add back background model for MER stacks
     bkg_filter_size=3,  # median filter background over `filter_size` x `filter_size` boxes
     multi_chip_bkg=False,  # combine multiple chips before background modeling and subtraction
+    autodark_corr=False,  # apply autodark correction for VIS dithers
+    autodark_dir=None,  # directory where autodark files are located
     release_name="Q1_R1",  # the data release name, e.g., "Q1_R1", "DR1"
     overwrite=False,  # overwrite existing combined image files
     debug=False,  # retain intermediate files for checking and more verbose output
@@ -904,11 +944,11 @@ def combine(
     Combine Euclid calibrated dithers from different instruments (VIS or NISP) or
     MER stacks using SWarp. Input images are found based on input ids (obs_ids
     for VIS/NISP or tile_ids for MER) or cutout parameters (center and size).
-    Before running SWarp, the program optionally performs background subtraction
-    for VIS/NISP dithers and adds background models back to MER mosaics, then
-    writes the resulting images to a temporary directory where SWarp will run.
-    Finally, the combined image is copied to the output directory with the
-    specified name. Users can specify center, size, and pixel scale of the
+    Before running SWarp, the program optionally performs autodark correction,
+    background subtraction for VIS/NISP dithers and adds background models back to
+    MER mosaics, then writes the resulting images to a temporary directory where
+    SWarp will run. Finally, the combined image is copied to the output directory
+    with the specified name. Users can specify center, size, and pixel scale of the
     combined image.
 
     Parameters
@@ -955,6 +995,10 @@ def combine(
         subtraction (only for VIS/NISP data). If bkg_mesh_size is larger than the
         chip/quad size, multi_chip_bkg is automatically set to True regardless of
         the user input.
+    autodark_corr : bool, optional
+        If True, apply autodark correction for VIS dithers.
+    autodark_dir : str, optional
+        Directory to search for the autodark FITS files.
     release_name : str, optional
         Data release identifier to look up default directories if in_dir or
         out_dir is not specified.
@@ -1067,6 +1111,8 @@ def combine(
                     bkg_mesh_size=bkg_mesh_size,
                     bkg_filter_size=bkg_filter_size,
                     multi_chip_bkg=multi_chip_bkg,
+                    autodark_corr=autodark_corr,
+                    autodark_dir=autodark_dir,
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
@@ -1091,6 +1137,8 @@ def combine(
                 bkg_mesh_size=bkg_mesh_size,
                 bkg_filter_size=bkg_filter_size,
                 multi_chip_bkg=multi_chip_bkg,
+                autodark_corr=autodark_corr,
+                autodark_dir=autodark_dir,
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
