@@ -992,12 +992,11 @@ def combine(
         If True, each dither of the obsids is combined separately (only applies
         to VIS/NISP data).
     cutout_cen : str or SkyCoord object, optional
-        Sky coordinates of the center of the cutout region. Ignored if
-        individual_dithers is True.
+        Sky coordinates of the center of the cutout region.
     cutout_size : str, int, float, U.Quantity object, or a list/tuple/ndarray
         of them, optional
         Size of the cutout region in angular units (two values for different
-        width and height). Ignored if individual_dithers is True.
+        width and height).
     name : str, optional
         Suffix for the output file basename. Overriden by obsid if
         individual_dithers=True.
