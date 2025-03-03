@@ -20,6 +20,7 @@ import numpy as np
 from astropy.io import fits
 from astropy import units as u
 from photutils.background import Background2D
+from regions import RectangleSkyRegion
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
@@ -39,7 +40,11 @@ from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_obs_id_from_filename,
 )
-from nicl.utilities import parse_input_for_angular_size, parse_input_for_skycoord
+from nicl.utilities import (
+    parse_input_for_angular_size,
+    parse_input_for_skycoord,
+    does_image_overlap_with_skyregion,
+)
 
 # %% ../../nbs/euclid/combine.ipynb 4
 # base class for combining images
@@ -369,6 +374,19 @@ class DithersMixin:
                     weight_hdul.writeto(tmpdir / wt_fn)
                 else:
                     for ext in self.instrument.extnames:
+                        sci_ext_hdr = hdul[f"{ext}.SCI"].header
+                        # check if the cutout region overlaps with the chip/quad
+                        if self.cutout_cen is not None and self.cutout_size is not None:
+                            cutout_reg = RectangleSkyRegion(
+                                center=self.cutout_cen,
+                                width=self.cutout_size[0],
+                                height=self.cutout_size[1],
+                            )
+                            # a threshold of 0.01 (0.1 in length) is used to exclude negligible overlaps
+                            if not does_image_overlap_with_skyregion(
+                                sci_ext_hdr, cutout_reg, threshold=0.01
+                            ):
+                                continue
                         sci_data = hdul[f"{ext}.SCI"].data
                         rms_data = hdul[f"{ext}.RMS"].data
                         if self.instrument.name == "VIS":
@@ -376,7 +394,6 @@ class DithersMixin:
                         elif self.instrument.name == "NISP":
                             dq_data = hdul[f"{ext}.DQ"].data
                         primary_hdr = hdul[0].header
-                        sci_ext_hdr = hdul[f"{ext}.SCI"].header
                         rms_ext_hdr = hdul[f"{ext}.RMS"].header
                         bad_pix_mask = np.any(
                             [
@@ -595,6 +612,8 @@ class NISPCombiner(DithersMixin, Combiner):
                         out_dir=tmpdir,
                         filters=self.filters,
                         ids=id,
+                        cutout_cen=self.cutout_cen,
+                        cutout_size=self.cutout_size,
                         individual_dithers=True,
                         bkg_sub=False,
                         release_name=self.release_name,
@@ -677,6 +696,8 @@ class VISCombiner(DithersMixin, Combiner):
                         out_dir=tmpdir,
                         filters=self.filters,
                         ids=id,
+                        cutout_cen=self.cutout_cen,
+                        cutout_size=self.cutout_size,
                         individual_dithers=True,
                         bkg_sub=False,
                         release_name=self.release_name,
@@ -1052,11 +1073,6 @@ def combine(
 
     if individual_dithers and obs_ids is None:
         raise ValueError("obs_ids must be specified to combine individual dithers.")
-
-    # ignore user input of cutout parameters if combining individual dithers
-    if individual_dithers:
-        cutout_cen = None
-        cutout_size = None
 
     if cutout_cen is not None:
         cutout_cen = parse_input_for_skycoord(cutout_cen)
