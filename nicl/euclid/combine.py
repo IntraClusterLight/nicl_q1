@@ -232,11 +232,13 @@ class Combiner(ABC):
             print(
                 f"SWarp finished successfully. Elapsed time: {elapsed_mins:.1f} mins."
             )
+            return True
         except subprocess.CalledProcessError as e:
             print(
                 f"Command '{' '.join(e.cmd)}' returned non-zero exit status, please check its stderr below."
             )
             print(e.stderr)
+            return False
 
     @abstractmethod
     def _post_process(self):
@@ -475,6 +477,9 @@ class DithersMixin:
                         sci_fns.append(sci_fn)
                         sci_hdul.writeto(tmpdir / sci_fn)
                         weight_hdul.writeto(tmpdir / wt_fn)
+        if not sci_fns:
+            print("No valid images preprocessed for SWarp.")
+            return False
         # prepare image list for swarp
         with open(tmpdir / "images.list", "w") as f:
             for fn in sci_fns:
@@ -483,6 +488,7 @@ class DithersMixin:
         elapsed_secs = (end_time - start_time).total_seconds()
         elapsed_mins = elapsed_secs / 60
         print(f"Preparing science and weight images took {elapsed_mins:.1f} mins.")
+        return True
 
     def _post_process_stack_and_weight(self, tmpdir, out_fn):
         """Clean up FITS headers and copy the output to the desired directory."""
@@ -652,8 +658,10 @@ class NISPCombiner(DithersMixin, Combiner):
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
                 print("You must delete this folder manually when done.")
-            self._prepare_input_for_swarp(images, tmpdir)
-            self._run_swarp(tmpdir)
+            if not self._prepare_input_for_swarp(images, tmpdir):
+                return
+            if not self._run_swarp(tmpdir):
+                return
             self._post_process(tmpdir, out_fn)
 
     def _get_ids(self):
@@ -667,7 +675,7 @@ class NISPCombiner(DithersMixin, Combiner):
         )
 
     def _prepare_input_for_swarp(self, images, tmpdir):
-        super()._prepare_dithers_for_swarp(images, tmpdir)
+        return super()._prepare_dithers_for_swarp(images, tmpdir)
 
     def _post_process(self, tmpdir, out_fn):
         super()._post_process_stack_and_weight(tmpdir, out_fn)
@@ -748,8 +756,10 @@ class VISCombiner(DithersMixin, Combiner):
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
                 print("You must delete this folder manually when done.")
-            self._prepare_input_for_swarp(images, tmpdir)
-            self._run_swarp(tmpdir)
+            if not self._prepare_input_for_swarp(images, tmpdir):
+                return
+            if not self._run_swarp(tmpdir):
+                return
             self._post_process(tmpdir, out_fn)
 
     def _find_images(self):
@@ -760,7 +770,7 @@ class VISCombiner(DithersMixin, Combiner):
         )
 
     def _prepare_input_for_swarp(self, images, tmpdir):
-        super()._prepare_dithers_for_swarp(images, tmpdir)
+        return super()._prepare_dithers_for_swarp(images, tmpdir)
 
     def _post_process(self, tmpdir, out_fn):
         super()._post_process_stack_and_weight(tmpdir, out_fn)
