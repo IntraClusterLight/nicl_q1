@@ -14,7 +14,6 @@ import numpy as np
 
 from astropy.io import fits
 from astropy import table
-from astropy.convolution import convolve, TrapezoidDisk2DKernel
 from matplotlib.ticker import FuncFormatter, NullLocator
 from matplotlib import patheffects as pe
 from scipy.stats import bootstrap, median_abs_deviation
@@ -29,7 +28,7 @@ from photutils.aperture import (
 from photutils.background import Background2D
 from tqdm import tqdm
 
-from ..mask import fast_mask, plot_mask
+from ..mask import fast_mask
 
 # %% ../../nbs/euclid/background_stats.ipynb 4
 def measure_aperture_stats(
