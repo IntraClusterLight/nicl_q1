@@ -13,12 +13,11 @@ import subprocess
 import socket
 import getpass
 from itertools import chain
-from shutil import copy2
+from shutil import copy2, rmtree
 
 
 import numpy as np
 from astropy.io import fits
-from astropy.stats import SigmaClip
 from astropy import units as u
 from photutils.background import Background2D
 from datetime import datetime
@@ -60,6 +59,7 @@ class Combiner(ABC):
         bkg_sub=True,  # to subtract background or not
         bkg_mesh_size=None,  # size of the background mesh boxes in angular units
         bkg_filter_size=None,  # median filter background over `bkg_filter_size` x `bkg_filter_size` boxes
+        multi_chip_bkg=False,  # if True, combine all chips/quads first for background subtraction
         release_name=None,  # the data release to use to find obs_ids if required, e.g., 'Q1_R1', 'DR1'
         instrument=None,  # Euclid instrument,e.g., VIS or NISP in nicl.euclid.constants
         swarp_config=None,  # default SWarp configuration file content
@@ -121,6 +121,18 @@ class Combiner(ABC):
                     )
             else:
                 self.filters = filters
+        # determine if multiple chips need to be combined first for bkg subtraction
+        # override user input if the mesh size is larger than the chip/quad size
+        self.multi_chip_bkg = multi_chip_bkg
+        if self.bkg_sub and self.bkg_mesh_size is not None:
+            rd_size = (
+                np.array(self.instrument.readout_unit_size) * self.instrument.pix_scale
+            )
+            mesh_size = np.array(
+                [mesh.to_value("arcsec") for mesh in self.bkg_mesh_size]
+            )
+            if np.any(mesh_size > rd_size):
+                self.multi_chip_bkg = True
         # assemble command line arguments to pass to SWarp
         self._swarp_extra_args = self._parse_swarp_args(kwargs)
         print(f"Initialized {self}")
@@ -240,7 +252,10 @@ class DithersMixin:
         else:
             pixel_scale = self.instrument.pix_scale
         pixel_scale_str = f"{pixel_scale:.2f} arcsec/pix"
-        return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, bkg_sub={self.bkg_sub}, individual_dithers={self.individual_dithers})"
+        if self.multi_chip_bkg:
+            return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, multi_chip_bkg={self.multi_chip_bkg}, individual_dithers={self.individual_dithers})"
+        else:
+            return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, bkg_sub={self.bkg_sub}, individual_dithers={self.individual_dithers})"
 
     def __repr__(self):
         return self.__str__()
@@ -273,72 +288,39 @@ class DithersMixin:
         sci_fns = []
         for i, dither in enumerate(dithers):
             with fits.open(dither) as hdul:
-                for ext in self.instrument.extnames:
-                    sci_data = hdul[f"{ext}.SCI"].data
-                    rms_data = hdul[f"{ext}.RMS"].data
-                    if self.instrument.name == "VIS":
-                        dq_data = hdul[f"{ext}.FLG"].data
-                    elif self.instrument.name == "NISP":
-                        dq_data = hdul[f"{ext}.DQ"].data
+                if self.multi_chip_bkg:
                     primary_hdr = hdul[0].header
-                    sci_ext_hdr = hdul[f"{ext}.SCI"].header
-                    rms_ext_hdr = hdul[f"{ext}.RMS"].header
-                    bad_pix_mask = np.any(
-                        [
-                            (dq_data & 2**bit > 0)
-                            for bit in self.instrument.bad_pix_bits
-                        ],
-                        axis=0,
-                    )
-                    # subtract background if requested
-                    if self.bkg_sub:
-                        obj_mask, _ = fast_mask(sci_data, estimate_background=True)
-                        # combine the bad pixel mask and the object mask to form a final mask
-                        mask = bad_pix_mask | obj_mask
-                        # 1 x 1 mesh by default if not specified
-                        if self.bkg_mesh_size is None:
-                            bkg_mesh_size_pix = (
+                    sci_data = hdul[1].data
+                    rms_data = hdul[2].data
+                    sci_ext_hdr = hdul[1].header
+                    rms_ext_hdr = hdul[2].header
+                    bad_pix_mask = np.isinf(rms_data)
+                    if self.bkg_mesh_size is not None:
+                        bkg_mesh_size_pix = (
+                            round_up_box_size(
                                 sci_data.shape[0],
+                                self.bkg_mesh_size[0].to(u.arcsec).value
+                                / self.instrument.pix_scale,
+                            ),
+                            round_up_box_size(
                                 sci_data.shape[1],
-                            )
-                        else:
-                            bkg_mesh_size_pix = (
-                                round_up_box_size(
-                                    sci_data.shape[0],
-                                    self.bkg_mesh_size[0].to(u.arcsec).value
-                                    / self.instrument.pix_scale,
-                                ),
-                                round_up_box_size(
-                                    sci_data.shape[1],
-                                    self.bkg_mesh_size[0].to(u.arcsec).value
-                                    / self.instrument.pix_scale,
-                                ),
-                            )
-                        bg = Background2D(
-                            sci_data,
-                            bkg_mesh_size_pix,
-                            mask=mask,
-                            filter_size=(self.bkg_filter_size, self.bkg_filter_size),
-                            sigma_clip=SigmaClip(sigma=3),
-                            exclude_percentile=90.0,
+                                self.bkg_mesh_size[1].to(u.arcsec).value
+                                / self.instrument.pix_scale,
+                            ),
                         )
-                        # subtract the background
-                        sci_data -= bg.background
-                    if self.instrument.name == "NISP":
-                        # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
-                        # VIS already has the proper FLXSCALE in the headers
-                        exptime = primary_hdr["EXPTIME"]
-                        photfnu = primary_hdr["PHOTFNU"]
-                        phrelex = primary_hdr["PHRELEX"]
-                        phreldt = sci_ext_hdr["PHRELDT"]
-                        phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
-                        sci_ext_hdr.append(
-                            (
-                                "PHOSCALE",
-                                phoscale,
-                                "Combined photometric scaling factors",
-                            )
-                        )
+                    else:
+                        bkg_mesh_size_pix = None
+                    sci_data = sub_bkg(
+                        sci_data,
+                        dq_mask=bad_pix_mask,
+                        obj_mask="fast_mask",
+                        mesh_size=bkg_mesh_size_pix,
+                        filter_size=(
+                            self.bkg_filter_size,
+                            self.bkg_filter_size,
+                        ),
+                        exclude_percentile=90.0,
+                    )
                     # compute weight map
                     with np.errstate(divide="ignore"):
                         np.divide(1.0, np.square(rms_data), out=rms_data)
@@ -356,11 +338,94 @@ class DithersMixin:
                             fits.ImageHDU(rms_data, rms_ext_hdr),
                         ]
                     )
-                    sci_fn = f"sci_{i}_{ext}.fits"
-                    wt_fn = f"sci_{i}_{ext}.weight.fits"
+                    sci_fn = dither.name
+                    wt_fn = dither.name.replace(".fits", ".weight.fits")
                     sci_fns.append(sci_fn)
                     sci_hdul.writeto(tmpdir / sci_fn)
                     weight_hdul.writeto(tmpdir / wt_fn)
+                else:
+                    for ext in self.instrument.extnames:
+                        sci_data = hdul[f"{ext}.SCI"].data
+                        rms_data = hdul[f"{ext}.RMS"].data
+                        if self.instrument.name == "VIS":
+                            dq_data = hdul[f"{ext}.FLG"].data
+                        elif self.instrument.name == "NISP":
+                            dq_data = hdul[f"{ext}.DQ"].data
+                        primary_hdr = hdul[0].header
+                        sci_ext_hdr = hdul[f"{ext}.SCI"].header
+                        rms_ext_hdr = hdul[f"{ext}.RMS"].header
+                        bad_pix_mask = np.any(
+                            [
+                                (dq_data & 2**bit > 0)
+                                for bit in self.instrument.bad_pix_bits
+                            ],
+                            axis=0,
+                        )
+                        # subtract background if requested
+                        if self.bkg_sub:
+                            if self.bkg_mesh_size is not None:
+                                bkg_mesh_size_pix = (
+                                    round_up_box_size(
+                                        sci_data.shape[0],
+                                        self.bkg_mesh_size[0].to(u.arcsec).value
+                                        / self.instrument.pix_scale,
+                                    ),
+                                    round_up_box_size(
+                                        sci_data.shape[1],
+                                        self.bkg_mesh_size[1].to(u.arcsec).value
+                                        / self.instrument.pix_scale,
+                                    ),
+                                )
+                            else:
+                                bkg_mesh_size_pix = None
+                            sci_data = sub_bkg(
+                                sci_data,
+                                dq_mask=bad_pix_mask,
+                                obj_mask="fast_mask",
+                                mesh_size=bkg_mesh_size_pix,
+                                filter_size=(
+                                    self.bkg_filter_size,
+                                    self.bkg_filter_size,
+                                ),
+                                exclude_percentile=90.0,
+                            )
+                        if self.instrument.name == "NISP":
+                            # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
+                            # VIS already has the proper FLXSCALE in the headers
+                            exptime = primary_hdr["EXPTIME"]
+                            photfnu = primary_hdr["PHOTFNU"]
+                            phrelex = primary_hdr["PHRELEX"]
+                            phreldt = sci_ext_hdr["PHRELDT"]
+                            phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
+                            sci_ext_hdr.append(
+                                (
+                                    "PHOSCALE",
+                                    phoscale,
+                                    "Combined photometric scaling factors",
+                                )
+                            )
+                        # compute weight map
+                        with np.errstate(divide="ignore"):
+                            np.divide(1.0, np.square(rms_data), out=rms_data)
+                        # set the weight to 0 for bad pixels
+                        rms_data[bad_pix_mask] = 0
+                        sci_hdul = fits.HDUList(
+                            [
+                                fits.PrimaryHDU(header=primary_hdr),
+                                fits.ImageHDU(sci_data, sci_ext_hdr),
+                            ]
+                        )
+                        weight_hdul = fits.HDUList(
+                            [
+                                fits.PrimaryHDU(header=primary_hdr),
+                                fits.ImageHDU(rms_data, rms_ext_hdr),
+                            ]
+                        )
+                        sci_fn = f"sci_{i}_{ext}.fits"
+                        wt_fn = f"sci_{i}_{ext}.weight.fits"
+                        sci_fns.append(sci_fn)
+                        sci_hdul.writeto(tmpdir / sci_fn)
+                        weight_hdul.writeto(tmpdir / wt_fn)
         # prepare image list for swarp
         with open(tmpdir / "images.list", "w") as f:
             for fn in sci_fns:
@@ -373,9 +438,13 @@ class DithersMixin:
     def _post_process_stack_and_weight(self, tmpdir, out_fn):
         """Clean up FITS headers and copy the output to the desired directory."""
         start_time = datetime.now()
-        with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci, fits.open(
-            tmpdir / "coadd.weight.fits", memmap=True
-        ) as hdul_weights:
+        if self.multi_chip_bkg:
+            # remove the files in the temporary input directory
+            rmtree(self.in_dir)
+        with (
+            fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci,
+            fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights,
+        ):
             # this is necessary because they are both PrimaryHDU objects
             hdu_sci = fits.ImageHDU(hdul_sci[0].data, hdul_sci[0].header)
             hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
@@ -410,6 +479,61 @@ class DithersMixin:
             f"Postprocessing took {elapsed_secs:.1f} secs. Output saved to {self.out_dir / out_fn}"
         )
 
+
+def sub_bkg(
+    img,  # input image
+    dq_mask=None,  # data quality mask for bad pixels
+    obj_mask="fast_mask",  # object mask; can be a callable function or an array
+    mesh_size=None,  # mesh size for background modeling; default to 1x1 mesh if not specified
+    **kwargs,  # additional arguments for Background2D
+):
+    """model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
+    img = np.asarray(img)
+    # check if need to build object mask
+    if isinstance(obj_mask, str):
+        # determine if obj_mask is a callable function
+        if obj_mask in globals() and callable(globals()[obj_mask]):
+            obj_mask = globals()[obj_mask]
+        elif obj_mask in locals() and callable(locals()[obj_mask]):
+            obj_mask = locals()[obj_mask]
+        else:
+            raise ValueError(f"{obj_mask} is not a valid function name")
+        match obj_mask.__name__:
+            case "fast_mask":
+                obj_mask, _ = obj_mask(
+                    img,
+                    estimate_background=True,
+                )
+            case _:
+                obj_mask = obj_mask(img)
+    else:
+        obj_mask = np.asarray(obj_mask).astype(bool)
+    # check if the shape matches
+    if obj_mask.shape != img.shape:
+        raise ValueError(
+            "The shape of the object mask does not match that of the input image."
+        )
+    # combine the dq_mask and obj_mask
+    if dq_mask is not None:
+        dq_mask = np.asarray(dq_mask).astype(bool)
+        if dq_mask.shape != img.shape:
+            raise ValueError(
+                "The shape of the data quality mask does not match that of the input image."
+            )
+        mask = dq_mask | obj_mask
+    else:
+        mask = obj_mask
+    # default 1x1 mesh
+    if mesh_size is None:
+        mesh_size = img.shape[0], img.shape[1]
+    bg = Background2D(
+        img,
+        mesh_size,
+        mask=mask,
+        **kwargs,
+    )
+    return img - bg.background
+
 # %% ../../nbs/euclid/combine.ipynb 6
 # subclass for combing NISP images
 
@@ -421,18 +545,47 @@ class NISPCombiner(DithersMixin, Combiner):
         super().__init__(instrument=NISP, swarp_config=SWARP_CONFIG_NISP, **kwargs)
 
     def combine_per_filter(self, filter):
+        if self.multi_chip_bkg:
+            print(
+                "First combine all chips into a single image for background subtraction."
+            )
+            print("-" * 80)
+            try:
+                tmpdir = Path(tempfile.TemporaryDirectory(delete=False).name)
+                for id in self.ids:
+                    combiner = NISPCombiner(
+                        in_dir=self.in_dir,
+                        out_dir=tmpdir,
+                        filters=self.filters,
+                        ids=id,
+                        individual_dithers=True,
+                        bkg_sub=False,
+                        release_name=self.release_name,
+                        debug=self.debug,
+                    )
+                    combiner.combine()
+            except:
+                rmtree(tmpdir)
+                raise
+            self.in_dir = tmpdir
+            print("-" * 80)
+            print("Actually start combining the dithers now.")
         images = self._find_images(filter)
         if not images:
             return
-        out_fn = "EUC_NIR_W-STK_" + filter
-        if len(self.name) > 0:
-            out_fn += f"_{self.name}"
+        if self.individual_dithers:
+            out_fn = "EUC_NIR_W-CAL-IMAGE_"
+        else:
+            out_fn = "EUC_NIR_W-STK_"
+        out_fn += filter
+        if self.name:
+            out_fn += f"-{self.name}"
         out_fn += ".fits"
         if self.individual_dithers:
             for image in images:
                 dither = get_dither_id_from_filename(image)
                 self._combine_images(
-                    [image], out_fn.replace(".fits", f"_{dither}.fits")
+                    [image], out_fn.replace(".fits", f"-{dither}.fits")
                 )
         else:
             self._combine_images(images, out_fn)
@@ -453,7 +606,7 @@ class NISPCombiner(DithersMixin, Combiner):
     def _find_images(self, filter):
         """Return a list of paths to the NISP dithers."""
         return super()._find_dithers(
-            pattern="**/{obsid}/EUC_NIR_W-CAL-IMAGE_{filter}-{obsid}-*_*.fits",
+            pattern="**/EUC_NIR_W-CAL-IMAGE_{filter}-{obsid}-*.fits",
             filter=filter,
         )
 
@@ -474,18 +627,46 @@ class VISCombiner(DithersMixin, Combiner):
         return super()._get_obsids()
 
     def combine_per_filter(self, filter):
+        if self.multi_chip_bkg:
+            print(
+                "First combine all quads into a single image for background subtraction."
+            )
+            print("-" * 80)
+            try:
+                tmpdir = Path(tempfile.TemporaryDirectory(delete=False).name)
+                for id in self.ids:
+                    combiner = VISCombiner(
+                        in_dir=self.in_dir,
+                        out_dir=tmpdir,
+                        filters=self.filters,
+                        ids=id,
+                        individual_dithers=True,
+                        bkg_sub=False,
+                        release_name=self.release_name,
+                        debug=self.debug,
+                    )
+                    combiner.combine()
+            except:
+                rmtree(tmpdir)
+                raise
+            self.in_dir = tmpdir
+            print("-" * 80)
+            print("Actually start combining the dithers now.")
         images = self._find_images()
         if not images:
             return
-        out_fn = "EUC_VIS_SWL-STK_" + filter
-        if len(self.name) > 0:
+        if self.individual_dithers:
+            out_fn = "EUC_VIS_SWL-DET"
+        else:
+            out_fn = "EUC_VIS_SWL-STK"
+        if self.name:
             out_fn += f"-{self.name}"
         out_fn += ".fits"
         if self.individual_dithers:
             for image in images:
                 dither = get_dither_id_from_filename(image)
                 self._combine_images(
-                    [image], out_fn.replace(".fits", f"_{dither}.fits")
+                    [image], out_fn.replace(".fits", f"-{dither}.fits")
                 )
         else:
             self._combine_images(images, out_fn)
@@ -516,7 +697,7 @@ class VISCombiner(DithersMixin, Combiner):
     def _find_images(self):
         """Return a list of paths to the VIS dithers."""
         return super()._find_dithers(
-            pattern="**/{obsid}/EUC_VIS_SWL-DET-*{obsid}-*-*_*.fits",
+            pattern="**/EUC_VIS_SWL-DET-*{obsid}-*.fits",
             filter="I",
         )
 
@@ -540,6 +721,7 @@ class MerCombiner(Combiner):
             swarp_config=SWARP_CONFIG_MER,
             bkg_sub=False,
             individual_dithers=False,
+            multi_chip_bkg=False,
             **kwargs,
         )
 
@@ -710,6 +892,7 @@ def combine(
     bkg_mesh_size=None,  # size of the background mesh boxes in angular units
     add_bkg_mod=False,  # add back background model for MER stacks
     bkg_filter_size=3,  # median filter background over `filter_size` x `filter_size` boxes
+    multi_chip_bkg=False,  # combine multiple chips before background modeling and subtraction
     release_name="Q1_R1",  # the data release name, e.g., "Q1_R1", "DR1"
     overwrite=False,  # overwrite existing combined image files
     debug=False,  # retain intermediate files for checking and more verbose output
@@ -767,6 +950,11 @@ def combine(
     bkg_filter_size : int, optional
         Size of the filtering kernel for median-filtering the background model
         (only for VIS/NISP dithers).
+    multi_chip_bkg : bool, optional
+        If True, combine multiple chips/quads before background modeling and
+        subtraction (only for VIS/NISP data). If bkg_mesh_size is larger than the
+        chip/quad size, multi_chip_bkg is automatically set to True regardless of
+        the user input.
     release_name : str, optional
         Data release identifier to look up default directories if in_dir or
         out_dir is not specified.
@@ -878,6 +1066,7 @@ def combine(
                     bkg_sub=bkg_sub,
                     bkg_mesh_size=bkg_mesh_size,
                     bkg_filter_size=bkg_filter_size,
+                    multi_chip_bkg=multi_chip_bkg,
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
@@ -901,6 +1090,7 @@ def combine(
                 bkg_sub=bkg_sub,
                 bkg_mesh_size=bkg_mesh_size,
                 bkg_filter_size=bkg_filter_size,
+                multi_chip_bkg=multi_chip_bkg,
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
@@ -926,6 +1116,7 @@ def combine(
                     bkg_sub=bkg_sub,
                     bkg_mesh_size=bkg_mesh_size,
                     bkg_filter_size=bkg_filter_size,
+                    multi_chip_bkg=multi_chip_bkg,
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
@@ -949,6 +1140,7 @@ def combine(
                 bkg_sub=bkg_sub,
                 bkg_mesh_size=bkg_mesh_size,
                 bkg_filter_size=bkg_filter_size,
+                multi_chip_bkg=multi_chip_bkg,
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,

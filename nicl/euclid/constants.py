@@ -20,6 +20,7 @@ class Camera:
     filters: Tuple[str, ...]
     pix_scale: float
     chip_subdivisions: Tuple[str, ...] = None
+    readout_unit_size: Tuple[int, int] = None
     bad_pix_bits: Tuple[int, ...] = None
     n_dithers_per_obs: int = None
 
@@ -37,6 +38,7 @@ VIS = Camera(
     name="VIS",
     chips=tuple(f"{x}-{y}" for x in range(1, 7) for y in range(1, 7)),
     chip_subdivisions=("E", "F", "G", "H"),
+    readout_unit_size=(2066, 2048),
     filters=("I",),
     bad_pix_bits=(0,),  # 0 is the common flag for all invlid pixels
     pix_scale=0.1,
@@ -45,6 +47,7 @@ VIS = Camera(
 NISP = Camera(
     name="NISP",
     chips=tuple(f"DET{x}{y}" for x in range(1, 5) for y in range(1, 5)),
+    readout_unit_size=(2040, 2040),
     filters=("Y", "J", "H"),
     bad_pix_bits=(0,),  # 0 is the common flag for all invlid pixels
     pix_scale=0.3,
@@ -159,7 +162,7 @@ COMBINE_BUFSIZE        6144            # RAM dedicated to co-addition(MB)
  
 DELETE_TMPFILES        Y               # Delete temporary resampled FITS files
                                        # (Y/N)?
-COPY_KEYWORDS          RA, DEC, DATAUNIT, DET_ID, ZPAB, ZPABE, ZPVEGA, ZPVEGAE, OBJECT # List of FITS keywords to propagate
+COPY_KEYWORDS          ZPAB, ZPABE, ZPVEGA, ZPVEGAE # List of FITS keywords to propagate
                                        # from the input to the output headers
 WRITE_FILEINFO         N               # Write information about each input
                                        # file in the output image header?
@@ -270,7 +273,7 @@ COMBINE_BUFSIZE        6144            # RAM dedicated to co-addition(MB)
  
 DELETE_TMPFILES        Y               # Delete temporary resampled FITS files
                                        # (Y/N)?
-COPY_KEYWORDS          RA, DEC, DATAUNIT, DET_ID, ZPAB, ZPABE, ZPVEGA, ZPVEGAE, OBJECT # List of FITS keywords to propagate
+COPY_KEYWORDS          ZPAB, ZPABE, ZPVEGA, ZPVEGAE # List of FITS keywords to propagate
                                        # from the input to the output headers
 WRITE_FILEINFO         N               # Write information about each input
                                        # file in the output image header?

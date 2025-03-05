@@ -162,7 +162,13 @@ def interpolate_skyflats(flat, data):
         coarse_factor = np.array(data.shape) // np.array(flat.shape)
         pix = [np.arange(s) for s in data.shape]
         coarse_pix = [
-            np.mean(p.reshape(-1, coarse_factor[i]), axis=1, dtype=np.float32) for i, p in enumerate(pix)
+            np.linspace(
+                group / 2 - 0.5,
+                group * flat_pixels - group / 2 - 0.5,
+                flat_pixels,
+                dtype=np.float32,
+            )
+            for group, flat_pixels in zip(coarse_factor, flat.shape)
         ]
         outpix = np.meshgrid(*pix, indexing="ij")
         outpix = np.moveaxis(outpix, 0, -1)
