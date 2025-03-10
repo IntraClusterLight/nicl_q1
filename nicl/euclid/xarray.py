@@ -395,7 +395,11 @@ def write_da_to_fits(
         else:
             hdr = None
         hdul.append(ImageHDU(da, header=hdr))
-    hdul.writeto(fn, overwrite=overwrite)
+    try:
+        hdul.writeto(fn, overwrite=overwrite)
+    except (Exception, KeyboardInterrupt):
+        if os.path.exists(fn):
+            os.remove(fn)
     return hdul
 
 # %% ../../nbs/euclid/xarray.ipynb 11
