@@ -291,7 +291,8 @@ def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
             if dither_id is not None:
                 wcs[product_id_name] = product_id
             wcs_list.append(wcs)
-            zp = {"ZP": hdr.get("ZPAB")}
+            zp_key = "MAGZEROP" if filter == "VIS" else "ZPAB"
+            zp = {"ZP": hdr.get(zp_key)}
             zp[coord_name] = coord
             if dither_id is not None:
                 zp["filter"] = filter
