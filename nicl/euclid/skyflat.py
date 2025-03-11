@@ -8,6 +8,7 @@ __all__ = ['create_coarse_data', 'group_obs_ids', 'normalise_per_dither', 'const
            'apply_skyflat']
 
 # %% ../../nbs/euclid/skyflat.ipynb 3
+import shutil
 import warnings
 
 import numpy as np
@@ -40,7 +41,12 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
             coarse_data = masked_data.coarsen(dict(x=n_pix, y=n_pix), boundary="pad").median()
-            coarse_data.to_zarr(coarse_path)
+            try:    
+                coarse_data.to_zarr(coarse_path)
+            except (Exception, KeyboardInterrupt):
+                if coarse_path.exists():
+                    shutil.rmtree(coarse_path)
+
 
 # %% ../../nbs/euclid/skyflat.ipynb 8
 def group_obs_ids(
@@ -221,7 +227,7 @@ def interpolate_skyflats(flat, data, method="nearest"):
     return skyflat
 
 # %% ../../nbs/euclid/skyflat.ipynb 15
-def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, normalise=True, short=False):
+def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, normalise=True, filter_size=None, short=False):
     """Read the coarse data and compute the skyflats for a given `obs_id`."""
     group_obs_ids = group_for_obs_id[obs_id]
     for group_obs_id in group_obs_ids:
@@ -235,6 +241,8 @@ def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, norm
     if normalise:
         coarse_data = normalise_per_dither(coarse_data)
     flats = construct_skyflats(obs_id, coarse_data, group_for_obs_id, short)
+    if filter_size is not None: 
+        flats = flats.rolling(x=filter_size, y=filter_size, min_periods=1, center=True).median()
     return flats
 
 # %% ../../nbs/euclid/skyflat.ipynb 16
