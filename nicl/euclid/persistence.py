@@ -370,6 +370,7 @@ def calc_persistence_correction(
         flux = minimum_images[image_id]
         err = minimum_err_images[image_id]
         dt = dt_images[image_id]
+        dt_uncertainty = 22  # one quarter of the nominal exposure time
         if calc_for_sir:
             info = image_info[
                 (image_info["obs_id"] == obs_id) & (image_info["dithobs"] == dithobs)
@@ -378,8 +379,9 @@ def calc_persistence_correction(
             info_nir = info[info["filter"] != "SIR"]
             mjd_sir = info_sir["mjd"] + 0.5 * info_sir["exptime"] / 86400
             mjd = info_nir["mjd"].mean() + 0.5 * info_nir["exptime"].mean() / 86400
-            dt_sir = ((mjd - mjd_sir) * 24 * 60 * 60).values
+            dt_sir = ((mjd - mjd_sir) * 86400).values
             exptime_factor = (info_sir["exptime"] / info_nir["exptime"].mean()).values
+            dt_sir_uncertainty = dt_uncertainty * exptime_factor
             if debug:
                 print('Extra dt for SIR:', dt_sir)
                 print('Exptime factor:', exptime_factor)
@@ -443,7 +445,17 @@ def calc_persistence_correction(
                 # do not correct features formed in the current SIR image
                 corr[feature_in_current_sir] = 0
             corr_flux = flux * corr
-            corr_err = np.sqrt(err**2 + decay_slope_uncertainty**2 * np.log(t1 / t0)**2) * corr
+            flux_rel_var = (err/flux)**2
+            slope_rel_var = decay_slope_uncertainty**2 * np.log(t1 / t0)**2
+            if calc_for_sir:
+                dt_rel_var = dt_sir_uncertainty**2 * decay_slope**2 / t1**2
+            else:
+                dt_rel_var = dt_uncertainty**2 * decay_slope**2 / t1**2
+            if debug:
+                print(f"corr_err due to err: {np.sqrt(flux_rel_var):.2%}")
+                print(f"corr_err due to slope: {np.sqrt(slope_rel_var):.2%}")
+                print(f"corr_err due to dt: {np.sqrt(dt_rel_var):.2%}")
+            corr_err = np.sqrt(flux_rel_var + slope_rel_var + dt_rel_var) * corr_flux
         if background_threshold is not None:
             corr_flux[significance_mask] = 0
             corr_err[significance_mask] = 0
@@ -530,7 +542,7 @@ def apply_persistence_correction(
                         pers_mask = pers_err > mask_error_threshold_sir
                     else:
                         pers_mask = pers_err > mask_error_threshold
-                    pers_mask = binary_dilation(pers_mask, iterations=3)
+                    pers_mask = binary_dilation(pers_mask, iterations=5)
                     pers_mask = binary_erosion(pers_mask, iterations=3)
                     if debug:
                         outfn = os.path.join(outpath, f"pers_mask_{image_name}.fits")
