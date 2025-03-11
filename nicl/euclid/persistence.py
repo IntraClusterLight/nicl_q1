@@ -452,9 +452,9 @@ def calc_persistence_correction(
             else:
                 dt_rel_var = dt_uncertainty**2 * decay_slope**2 / t1**2
             if debug:
-                print(f"corr_err due to err: {np.sqrt(flux_rel_var):.2%}")
-                print(f"corr_err due to slope: {np.sqrt(slope_rel_var):.2%}")
-                print(f"corr_err due to dt: {np.sqrt(dt_rel_var):.2%}")
+                print(f"corr_err due to err: {100*np.sqrt(flux_rel_var):.2f}"+"%")
+                print(f"corr_err due to slope: {100*np.sqrt(slope_rel_var):.2f}"+"%")
+                print(f"corr_err due to dt: {100*np.sqrt(dt_rel_var):.2f}"+"%")
             corr_err = np.sqrt(flux_rel_var + slope_rel_var + dt_rel_var) * corr_flux
         if background_threshold is not None:
             corr_flux[significance_mask] = 0
@@ -908,7 +908,7 @@ def correct_persistence(
                     if use_estimated_decay:
                         decay_slope = slope
                 except Exception as e:
-                    print("Encountered error when estimate_persistence_decay:")
+                    print("Encountered error when estimating persistence decay:")
                     print(e)
                     if use_estimated_decay:
                         print(f"Using default decay slope: {decay_slope:.2e}")
