@@ -5,7 +5,8 @@
 # %% auto 0
 __all__ = ['calc_kcorr', 'calc_sb_threshold', 'sb_to_adu', 'get_pixel_scale', 'get_img_centre_pixel', 'get_img_centre_world',
            'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout', 'maybe_to_value',
-           'parse_input_for_skycoord', 'parse_input_for_angular_size', 'does_image_overlap_with_skyregion']
+           'parse_input_for_skycoord', 'parse_input_for_angular_size', 'does_image_overlap_with_skyregion',
+           'bootstrap_median_error', 'fast_median_error']
 
 # %% ../nbs/10_utilities.ipynb 2
 import numpy as np
@@ -15,6 +16,7 @@ from astropy.nddata import CCDData, Cutout2D
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy.io.fits import Header
+from astropy.stats import mad_std
 from regions import PixCoord, RectanglePixelRegion, RectangleSkyRegion
 from shapely.geometry import Polygon
 
@@ -311,3 +313,76 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     frac1 = num_pix_overlap / num_pix_img
     frac2 = num_pix_overlap / num_pix_reg
     return frac1 > threshold or frac2 > threshold
+
+# %% ../nbs/10_utilities.ipynb 11
+def bootstrap_median_error(data, errors, nboot=1000, axis=None):
+    """
+    Estimate the error of the median along a given axis using bootstrapping.
+
+    Parameters:
+        data (np.ndarray): Array of measured values.
+        errors (np.ndarray): Corresponding 1-sigma uncertainties (same shape as data).
+        nboot (int): Number of bootstrap iterations.
+        axis (int or None): Axis along which to compute the median.
+                            If None, the array is flattened.
+
+    Returns:
+        np.ndarray or float: Estimated standard error of the median along the specified axis.
+    """
+    data = np.asarray(data)
+    errors = np.asarray(errors)
+
+    # If axis is not None and the shape along that axis is 1, return the errors directly
+    if axis is not None and data.shape[axis] == 1:
+        # Need to squeeze out the singular dimension
+        return np.squeeze(errors, axis=axis)
+    # If axis is None, check if they have more than one element
+    elif axis is None and data.size <= 1:
+        return np.squeeze(errors)
+
+    # Create all synthetic bootstrap samples at once.
+    # The simulated array will have shape (nboot, ...) where ... is data.shape.
+    simulated = np.random.normal(loc=data, scale=errors, size=(nboot,) + data.shape)
+
+    if axis is None:
+        # Flatten each bootstrap sample and compute the median along the flattened axis.
+        medians = np.nanmedian(simulated.reshape(nboot, -1), axis=1)
+    else:
+        # Adjust the axis by 1 because the bootstrap dimension is at index 0.
+        medians = np.nanmedian(simulated, axis=axis + 1)
+
+    # Compute the standard deviation of the medians along the bootstrap dimension.
+    return np.nanstd(medians, axis=0)
+
+
+def fast_median_error(data, axis=None):
+    """
+    Estimate the error of the median along a given axis using an analytical approach.
+
+    Parameters:
+        data (np.ndarray): Array of measured values.
+        errors (np.ndarray): Corresponding 1-sigma uncertainties (same shape as data).
+        axis (int or None): Axis along which to compute the median.
+                            If None, the array is flattened.
+
+    Returns:
+        np.ndarray or float: Estimated standard error of the median along the specified axis.
+    """
+    data = np.asarray(data)
+
+    # If axis is not None and the shape along that axis is 1, raise an error
+    if axis is not None and data.shape[axis] == 1:
+        raise ValueError(
+            "Cannot compute median error along axis with only one element."
+        )
+    # If axis is None, check if they have more than one element
+    elif axis is None and data.size <= 1:
+        raise ValueError(
+            "Cannot compute median error for an array with only one element."
+        )
+
+    # Compute the standard error of the median using a normal approximation 1.253*sigma/sqrt(n)
+    return (
+        1.253 * mad_std(data, axis=axis, ignore_nan=True) / np.sqrt(np.isfinite(data).sum(axis=axis))
+    )
+
