@@ -361,7 +361,6 @@ def fast_median_error(data, axis=None):
 
     Parameters:
         data (np.ndarray): Array of measured values.
-        errors (np.ndarray): Corresponding 1-sigma uncertainties (same shape as data).
         axis (int or None): Axis along which to compute the median.
                             If None, the array is flattened.
 
