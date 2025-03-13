@@ -23,7 +23,12 @@ from photutils.segmentation import (
     make_2dgaussian_kernel,
     SourceCatalog,
 )
-from scipy.ndimage import binary_opening, binary_closing, binary_dilation, binary_erosion
+from scipy.ndimage import (
+    binary_opening,
+    binary_closing,
+    binary_dilation,
+    binary_erosion,
+)
 
 from nicl.euclid.utilities import (
     get_filter_from_filename,
@@ -140,7 +145,9 @@ def minimum_map(
     source_mask = fast_mask(minimum, estimate_background=True, return_threshold=False)
     minimum_background = np.where(source_mask, np.nan, minimum)
     filtered_minimum_background = sampled_median_filter(minimum_background, size=101)
-    filtered_minimum_background = np.nan_to_num(filtered_minimum_background, nan=min_med)
+    filtered_minimum_background = np.nan_to_num(
+        filtered_minimum_background, nan=min_med
+    )
     minimum -= filtered_minimum_background
     # set invalid pixels to zero
     minimum[invalid] = 0
@@ -421,10 +428,12 @@ def calc_persistence_correction(
             significance_mask = binary_closing(significance_mask, iterations=1)
             # try to avoid gaps in persistence streaks
             structure = np.ones((11, 2))
-            significance_mask = binary_opening(significance_mask, structure=structure, iterations=3)
+            significance_mask = binary_opening(
+                significance_mask, structure=structure, iterations=3
+            )
             # add a small margin around persistence features
             significance_mask = binary_erosion(significance_mask, iterations=1)
-        if form == None:
+        if form is None:
             corr_flux = flux
             corr_err = err
         elif form == "exponential":
@@ -531,9 +540,7 @@ def apply_persistence_correction(
             if debug:
                 filt = target["filter"]
                 if filt == "SIR":
-                    image_name = (
-                        f"{target['obs_id']}_{target['dithobs']}_SIR"
-                    )
+                    image_name = f"{target['obs_id']}_{target['dithobs']}_SIR"
                 else:
                     filter_index = "JHY".index(filt)
                     image_name = (
@@ -566,7 +573,9 @@ def apply_persistence_correction(
                     pers_mask = binary_erosion(pers_mask, iterations=3)
                     if debug:
                         outfn = os.path.join(outpath, f"pers_mask_{image_name}.fits")
-                        fits_append(outfn, pers_mask.astype(int), ext, primary_header, hdr)
+                        fits_append(
+                            outfn, pers_mask.astype(int), ext, primary_header, hdr
+                        )
                     dq_img = np.where(pers_mask, dq_img | 2**14, dq_img)
                     dq_img = np.where(pers_mask, dq_img | 2**0, dq_img)
                 median_rms = np.nanmedian(np.random.choice(rms_img.flat, size=10000))
@@ -585,7 +594,9 @@ def apply_persistence_correction(
                 f_masked = n_masked / rms_factor.size
                 f_corrected = n_corrected / rms_factor.size
                 print(f"Fraction of pixels masked due to persistence: {f_masked:.2%}")
-                print(f"Fraction of pixels corrected for persistence: {f_corrected:.2%}")
+                print(
+                    f"Fraction of pixels corrected for persistence: {f_corrected:.2%}"
+                )
                 print(f"Mean persistence correction: {mean_pers_corr:.2f}")
                 print(f"Mean persistence correction error: {mean_pers_err:.2f}")
                 rms_img = new_rms_img
@@ -623,7 +634,6 @@ def apply_persistence_correction(
                 outfn = os.path.join(outpath, f"corrimg_rms_{image_name}.fits")
                 fits_append(outfn, rms_img, rms_ext, primary_header, rms_hdr)
 
-
 # %% ../../nbs/euclid/persistence.ipynb 15
 def fit_persistence_decay(dt, flux):
     slope = -10
@@ -653,7 +663,7 @@ def fit_powerlaw_persistence_decay(log_dt, log_flux):
 # %% ../../nbs/euclid/persistence.ipynb 17
 def add_to_decay_database(outpath, form, mjd, ext, x, y, slope, offset=0):
     # if necessary create a sqlite database and table, then insert data
-    dbfn = os.path.join(outpath, "decay_db.sqlite")
+    dbfn = os.path.join(outpath, "../decay_db.sqlite")
     if not np.isnan(slope):
         with sqlite3.connect(dbfn) as con:
             con.execute(
@@ -871,7 +881,7 @@ def correct_persistence(
         return
     if os.path.isdir(outpath):
         remove_if_necessary(outpath, f"*_{obs_id}*.fits")
-        remove_if_necessary(outpath, f"*.pdf")
+        remove_if_necessary(outpath, "*.pdf")
         for fn in image_info["filename"]:
             if fn is not None:
                 basename = os.path.basename(fn)
