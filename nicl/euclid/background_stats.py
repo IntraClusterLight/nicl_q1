@@ -30,7 +30,7 @@ from tqdm import tqdm
 
 from ..mask import fast_mask
 
-# %% ../../nbs/euclid/background_stats.ipynb 4
+# %% ../../nbs/euclid/background_stats.ipynb 5
 def measure_aperture_stats(
     data,
     mask,
@@ -162,7 +162,7 @@ def aperture_stats(
     )
     return results
 
-# %% ../../nbs/euclid/background_stats.ipynb 5
+# %% ../../nbs/euclid/background_stats.ipynb 6
 def stats_versus_size(
     data,
     mask,
@@ -204,7 +204,7 @@ def stats_versus_size(
         )
     return results
 
-# %% ../../nbs/euclid/background_stats.ipynb 6
+# %% ../../nbs/euclid/background_stats.ipynb 7
 def convert_to_mag(results, zp):
     results["expected_std_mean"] = zp - 2.5 * np.log10(results["expected_std_mean"])
     results["expected_std_median"] = zp - 2.5 * np.log10(results["expected_std_median"])
@@ -232,7 +232,7 @@ def convert_to_mag(results, zp):
         )
     return results
 
-# %% ../../nbs/euclid/background_stats.ipynb 7
+# %% ../../nbs/euclid/background_stats.ipynb 8
 def background_stats_plot(
     results, true_bkg_std=None, errorbars=False, zp_mag=None, filename=None
 ):
@@ -316,7 +316,7 @@ def background_stats_plot(
     if filename is not None:
         fig.savefig(filename)
 
-# %% ../../nbs/euclid/background_stats.ipynb 8
+# %% ../../nbs/euclid/background_stats.ipynb 9
 def measure(
     filename,  # the filename to test
     path,  # the folder containing the images
