@@ -210,8 +210,6 @@ def sampled_median_filter(
         mad *= 1.4826
     if not use_dask:
         median = median.to_numpy()
-        if return_mad:
-            mad = mad.to_numpy()
     if return_mad:
         return median, mad
     else:
