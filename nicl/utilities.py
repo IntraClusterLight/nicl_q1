@@ -163,11 +163,6 @@ def parse_input_for_skycoord(skycoord):
     SkyCoord
         A SkyCoord object representing the input sky coordinate.
 
-    Raises
-    ------
-    ValueError
-        If the input is neither a string nor a SkyCoord object.
-
     """
     if isinstance(skycoord, str):
         return SkyCoord(skycoord, unit=(u.hourangle, u.deg))
@@ -178,7 +173,7 @@ def parse_input_for_skycoord(skycoord):
 
 
 def parse_input_for_angular_size(angular_size, duplicate=False):
-    r"""Parse input to return an angular size Quantity.
+    """Parse input to return an angular size Quantity.
 
     Parameters
     ----------
@@ -197,12 +192,6 @@ def parse_input_for_angular_size(angular_size, duplicate=False):
     Quantity or list of Quantity
         The parsed angular size as a Quantity object. If `duplicate` is True,
         returns a list of duplicated Quantity objects.
-
-    Raises
-    ------
-    ValueError
-        If the input is an empty list or tuple, or if the input type is not
-        supported.
 
     """
     # note that u.Quantity is also an instance of ndarray
