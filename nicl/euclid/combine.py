@@ -411,7 +411,7 @@ class DithersMixin:
                             autodark = read_skyflat(
                                 obsid, "VIS", ext, self.autodark_dir
                             )
-                            sci_data = apply_skyflat(sci_data, autodark)
+                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear")
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
