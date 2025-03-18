@@ -251,12 +251,6 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     bool
         True if the image overlaps with the sky region by more than the threshold,
         False otherwise.
-
-    Raises
-    ------
-    ValueError
-        If hdr is not a valid FITS header, if it doesn't refer to a 2D image,
-        or if sky_reg is not a RectangleSkyRegion object.
     """
     # Check if header is a dict-like object
     if not isinstance(hdr, (dict, Header)) or not hasattr(hdr, "keys"):
