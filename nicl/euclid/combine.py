@@ -1044,12 +1044,6 @@ def combine(
         Additional keyword arguments to pass to the underlying SWarp calls.
         Note that they will override the default SWarp configuration.
 
-    Raises
-    ------
-    ValueError
-        If required parameters are missing or invalid directories/files are
-        specified.
-
     """
     # check IO designations
     if in_dir is None:

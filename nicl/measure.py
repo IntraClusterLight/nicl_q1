@@ -4,8 +4,8 @@
 
 # %% auto 0
 __all__ = ['eigh_w', 'eigenvec', 'get_eigen_ellipse', 'ellipse_patch', 'estimate_icl_shape', 'add_surface_brightness',
-           'calculate_icl_profile', 'icl_total_flux', 'background_correct_profile', 'calculate_icl_isophotes',
-           'plot_icl_profile', 'plot_icl_image', 'plot_icl', 'profile_from_isolists']
+           'calculate_icl_profile', 'measure_profile', 'icl_total_flux', 'background_correct_profile',
+           'calculate_icl_isophotes', 'plot_icl_profile', 'plot_icl_image', 'plot_icl', 'profile_from_isolists']
 
 # %% ../nbs/13_measure.ipynb 2
 import warnings
@@ -180,15 +180,33 @@ def calculate_icl_profile(
         bcg_pos = get_img_centre_pixel(image).astype(int)
     centre = bcg_pos + centre
 
+    profile = measure_profile(outer_semimajor, ax_ratio, pa, centre, image.data, mask,
+                              sigma_clip=sigma_clip, n_sigma=n_sigma,
+                              pixel_size=pixel_size, zp=zp, r500_pix=r500_pix)
+
+    return profile, icl_shape
+
+
+def measure_profile(outer_semimajor, ax_ratio, pa, centre, data,
+                    mask=None, sigma_clip=True, n_sigma=3.0,
+                    pixel_size=None, zp=None, r500_pix=None):
     apertures = [
+        EllipticalAperture(
+            positions=centre,
+            a=outer_semimajor[0],
+            b=outer_semimajor[0] * ax_ratio,
+            theta=pa,
+        )
+    ]
+    apertures += [
         EllipticalAnnulus(
             positions=centre,
-            a_in=a_out - annulus_width_pix,
+            a_in=a_in,
             a_out=a_out,
             b_out=a_out * ax_ratio,
             theta=pa,
         )
-        for a_out in outer_semimajor
+        for a_in, a_out in zip(outer_semimajor[:-1], outer_semimajor[1:])
     ]
 
     profile = QTable()
@@ -198,29 +216,33 @@ def calculate_icl_profile(
     else:
         sig_clip = None
     aperture_stats = [
-        ApertureStats(image.data, ap, mask=mask, sigma_clip=sig_clip)
+        ApertureStats(data, ap, mask=mask, sigma_clip=sig_clip)
         for ap in apertures
     ]
     profile["mean"] = [ap.mean for ap in aperture_stats]
     profile["mean_std"] = [ap.std for ap in aperture_stats]
     profile["mean_area"] = [ap.sum_aper_area / u.pix**2 for ap in aperture_stats]
     profile["mean_err"] = profile["mean_std"] / np.sqrt(profile["mean_area"])
-    profile = add_surface_brightness(profile, "mean", pixel_size, zp)
+    if pixel_size is not None and zp is not None:
+        profile = add_surface_brightness(profile, "mean", pixel_size, zp)
     # Median profile, without sigma clipping
-    aperture_stats = [ApertureStats(image.data, ap, mask=mask) for ap in apertures]
+    aperture_stats = [ApertureStats(data, ap, mask=mask) for ap in apertures]
     profile["median"] = [ap.median for ap in aperture_stats]
     profile["median_std"] = [ap.mad_std for ap in aperture_stats]
     profile["median_area"] = [ap.sum_aper_area / u.pix**2 for ap in aperture_stats]
     profile["median_err"] = profile["median_std"] / np.sqrt(profile["median_area"])
-    profile = add_surface_brightness(profile, "median", pixel_size, zp)
+    if pixel_size is not None and zp is not None:
+        profile = add_surface_brightness(profile, "median", pixel_size, zp)
     # Aperture properties
     profile["aperture"] = apertures
     profile["total_area"] = [ap.area for ap in apertures]
-    profile["semimajoraxis"] = outer_semimajor - annulus_width_pix / 2
-    profile["semimajoraxis_r500"] = profile["semimajoraxis"] / r500_pix
+    inner_semimajor = np.concatenate([[0], outer_semimajor[:-1]])
+    profile["semimajoraxis"] = (inner_semimajor + outer_semimajor) / 2
     profile["radius"] = profile["semimajoraxis"] * np.sqrt(ax_ratio)
-    profile["radius_r500"] = profile["radius"] / r500_pix
-    return profile, icl_shape
+    if r500_pix is not None:
+        profile["semimajoraxis_r500"] = profile["semimajoraxis"] / r500_pix
+        profile["radius_r500"] = profile["radius"] / r500_pix
+    return profile
 
 
 def icl_total_flux(flux, error, area):
@@ -229,12 +251,14 @@ def icl_total_flux(flux, error, area):
     return sum, err
 
 
-def background_correct_profile(background_profile, profile, image, zp):
+def background_correct_profile(background_profile, profile, image, zp=None, pixel_size=None):
     profile = profile.copy()
-    pixel_size = get_pixel_scale(image) / u.pix
-    sb_zp = zp.to_value(u.ABmag) + (
-        2.5 * np.log10(pixel_size.to_value(u.arcsec / u.pix) ** 2)
-    )
+    if zp is not None:
+        if pixel_size is None:
+            pixel_size = get_pixel_scale(image) / u.pix
+        sb_zp = zp.to_value(u.ABmag) + (
+            2.5 * np.log10(pixel_size.to_value(u.arcsec / u.pix) ** 2)
+        )
     bkg = {}
     for avg in ("mean", "median"):
         bkg[avg] = background_profile[avg].mean()
@@ -244,8 +268,9 @@ def background_correct_profile(background_profile, profile, image, zp):
         profile[f"{avg}_err"] = np.sqrt(
             profile[f"{avg}_err"] ** 2 + bkg[f"{avg}_err"] ** 2
         )
-        profile = add_surface_brightness(profile, avg, pixel_size, zp)
-        bkg[f"{avg}_sb_err"] = -2.5 * np.log10(bkg[f"{avg}_err"]) + sb_zp
+        if zp is not None:
+            profile = add_surface_brightness(profile, avg, pixel_size, zp)
+            bkg[f"{avg}_sb_err"] = -2.5 * np.log10(bkg[f"{avg}_err"]) + sb_zp
     return bkg, profile
 
 # %% ../nbs/13_measure.ipynb 19
@@ -254,7 +279,6 @@ def calculate_icl_isophotes(
     full_mask,
     bcg_mask,
     r500_angular,
-    zp=27 * u.ABmag,
     bcg_pos=None,
     allow_icl_offset=False,
     sigma_clip=True,
@@ -325,14 +349,19 @@ def plot_icl_profile(
     bkg=None,
     max_sb_err=1.0,
     ax=None,
+    band=None,
 ):
+    band = "_{" + band + "}" if band else ""
     colors = dict(mean="indigo", median="orange")
     if ax is None:
         fig, ax = plt.subplots()
     averages = [averages] if not isinstance(averages, list) else averages
-    ax.set_xlabel(r"$r\,/\,R_{500}$")
+    if "r500" in radius:
+        ax.set_xlabel(r"$r\,/\,R_{500}$")
+    else:
+        ax.set_xlabel(r"$r~{\rm [pixels]}$")
     if surface_brightness:
-        ax.set_ylabel(r"$\mu_{i}~{\rm[mag\; arcsec^{-2}]}$")
+        ax.set_ylabel(r"$\mu" + band + r"~{\rm[mag\; arcsec^{-2}]}$")
         if bkg is not None:
             for i in [1, 2, 3]:
                 bkg_line = ax.axhline(
@@ -347,7 +376,7 @@ def plot_icl_profile(
                 )
         ax.set_ylim(32, 23)
     else:
-        ax.set_ylabel(r"$I_{i}~{\rm[counts\; pixel^{-1}]}$")
+        ax.set_ylabel(r"$I" + band + r"~{\rm[counts\; pixel^{-1}]}$")
         if bkg is not None:
             ax.axhline(3 * bkg["mean_err"], ls=":", color="gray")
             bkg_line = ax.axhline(-3 * bkg["mean_err"], ls=":", color="gray")
@@ -374,7 +403,10 @@ def plot_icl_profile(
             edgecolor="none",
             alpha=0.6,
         )
-    ax.set_xlim(0, 1.1)
+    if "r500" in radius:
+        ax.set_xlim(0, 1.05)
+    else:
+        ax.set_xlim(0, 1.05 * p[radius][-1])
 
 # %% ../nbs/13_measure.ipynb 26
 def plot_icl_image(img, icl_shape, z, norm=None, ax=None):
