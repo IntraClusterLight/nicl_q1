@@ -25,7 +25,11 @@ class Camera:
     readout_unit_size: Tuple[int, int] = None
     bad_pix_bits: Tuple[int, ...] = None
     n_dithers_per_obs: int = None
-    chip_layout: Tuple[Tuple[str, ...], ...] = None
+    chip_layout: np.ndarray = None  # 2D array of strings
+    # chip_rotations is True if a half-turn rotation is required to align the orientations
+    chip_rotations: np.ndarray = None  # 2D array of booleans, 
+    nominal_zeropoint: float = None
+
 
     @property
     def extnames(self):
@@ -59,7 +63,9 @@ VIS = Camera(
          ("5-1.H", "5-1.G", "5-2.H", "5-2.G", "5-3.H", "5-3.G", "5-4.F", "5-4.E", "5-5.F", "5-5.E", "5-6.F", "5-6.E"),
          ("6-1.E", "6-1.F", "6-2.E", "6-2.F", "6-3.E", "6-3.F", "6-4.G", "6-4.H", "6-5.G", "6-5.H", "6-6.G", "6-6.H"),
          ("6-1.H", "6-1.G", "6-2.H", "6-2.G", "6-3.H", "6-3.G", "6-4.F", "6-4.E", "6-5.F", "6-5.E", "6-6.F", "6-6.E"))
-    )
+    ),
+    chip_rotations=np.zeros(dtype=bool, shape=(12, 12)),
+    nominal_zeropoint=24.56605,
 )
 NISP = Camera(
     name="NISP",
@@ -70,6 +76,8 @@ NISP = Camera(
     pix_scale=0.3,
     n_dithers_per_obs=4,
     chip_layout=np.array([[f"DET{y}{x}" for x in range(1, 5)] for y in range(1, 5)]),
+    chip_rotations=np.array([[y > 2 for x in range(1, 5)] for y in range(1, 5)]),
+    nominal_zeropoint=dict(H=29.94, J=30.03, Y=29.76),
 )
 
 MER = Camera(

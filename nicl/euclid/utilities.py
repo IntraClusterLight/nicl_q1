@@ -12,6 +12,7 @@ __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'dq_to_mask'
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
 import re
+from functools import partial
 from pathlib import Path
 
 import numpy as np
