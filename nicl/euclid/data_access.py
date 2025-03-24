@@ -138,12 +138,12 @@ class DataAccess:
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all survey obs_ids for observations in the current release."""
-        query = f"""SELECT DISTINCT observation_id
+        query = f"""SELECT DISTINCT TOP 1000000 observation_id
                     FROM sedm.calibrated_frame
                     WHERE (product_type like '%Calibrated%')\n"""
         if self.release_name:
             query += f"AND release_name='{self.release_name}'\n"
-        query += "ORDER BY observation_id ASC"
+        query += "ORDER BY observation_id ASC\n"
         results = self.tap_query(query)
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
         return obs_ids
@@ -152,7 +152,7 @@ class DataAccess:
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all MER tile_indexes for tiles in the current release."""
-        query = f"""SELECT DISTINCT tile_index
+        query = f"""SELECT DISTINCT TOP 1000000 tile_index
                     FROM sedm.mosaic_product
                     WHERE release_name='{self.release_name}'
                     ORDER BY tile_index ASC"""
@@ -292,10 +292,10 @@ class DataAccess:
         params_dict.update(FILE_NAME=filename)
         outpath = Path(outpath).expanduser()
         outfn = outpath / filename
-        self.data_login()
         if not self.dry_run:
             if not outfn.exists() or self.overwrite:
                 try:
+                    self.data_login()
                     self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
                 except (Exception, KeyboardInterrupt):
                     if outfn.exists():
@@ -385,9 +385,9 @@ class DataAccess:
             )
             print(f"Saving as {outfn}")
             print(params_dict)
-        self.data_login()
         if not self.dry_run:
             if not outfn.exists() or self.overwrite:
+                self.data_login()
                 self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
             else:
                 print(f"File already exists, skipping: {outfn}")

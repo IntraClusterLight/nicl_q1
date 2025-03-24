@@ -411,7 +411,7 @@ class DithersMixin:
                             autodark = read_skyflat(
                                 obsid, "VIS", ext, self.autodark_dir
                             )
-                            sci_data = apply_skyflat(sci_data, autodark)
+                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear")
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
@@ -1043,12 +1043,6 @@ def combine(
     **kwargs
         Additional keyword arguments to pass to the underlying SWarp calls.
         Note that they will override the default SWarp configuration.
-
-    Raises
-    ------
-    ValueError
-        If required parameters are missing or invalid directories/files are
-        specified.
 
     """
     # check IO designations
