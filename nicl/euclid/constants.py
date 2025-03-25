@@ -65,7 +65,7 @@ VIS = Camera(
          ("6-1.H", "6-1.G", "6-2.H", "6-2.G", "6-3.H", "6-3.G", "6-4.F", "6-4.E", "6-5.F", "6-5.E", "6-6.F", "6-6.E"))
     ),
     chip_rotations=np.zeros(dtype=bool, shape=(12, 12)),
-    nominal_zeropoint=24.56605,
+    nominal_zeropoint=dict(VIS=24.56605),
 )
 NISP = Camera(
     name="NISP",
