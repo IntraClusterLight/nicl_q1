@@ -22,7 +22,7 @@ from nicl.euclid.xarray import (
     xr_fast_mask,
 )
 
-# %% ../../nbs/euclid/skyflat.ipynb 6
+# %% ../../nbs/euclid/skyflat.ipynb 7
 def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
     """Create and store the coarse data for a given observation ID.
 
@@ -48,7 +48,7 @@ def create_coarse_data(obs_id, zarr_path, n_pix=51, verbose=False):
                     shutil.rmtree(coarse_path)
 
 
-# %% ../../nbs/euclid/skyflat.ipynb 8
+# %% ../../nbs/euclid/skyflat.ipynb 9
 def group_obs_ids(
     target_obs_ids,  # list of observation IDs for which to create groups
     available_obs_ids,  # list of observation IDs available for grouping 
@@ -99,7 +99,7 @@ def group_obs_ids(
                 group_for_obs_id[obs_id] = selected_obs_ids
     return group_for_obs_id
 
-# %% ../../nbs/euclid/skyflat.ipynb 10
+# %% ../../nbs/euclid/skyflat.ipynb 11
 def normalise_per_dither(data):
     """Additively normalise the data to zero median per dither."""
     agg_dims = ["x", "y", "detector"]
@@ -137,7 +137,7 @@ def construct_skyflats_err(obs_id, data, group_for_obs_id, median, short=False):
     err = mad * 1.4826 / np.sqrt(n_ok)
     return err
 
-# %% ../../nbs/euclid/skyflat.ipynb 11
+# %% ../../nbs/euclid/skyflat.ipynb 12
 def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None, short=False):
     """Write the skyflats for a given `obs_id` to disk as FITS files."""
     if wcs is not None:
@@ -169,14 +169,14 @@ def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None, short=False
                 overwrite=True,
             )
 
-# %% ../../nbs/euclid/skyflat.ipynb 12
+# %% ../../nbs/euclid/skyflat.ipynb 13
 def read_skyflat(obs_id, filter, detector, skyflat_path, short=False):
     label = "-short" if short else ""
     skyflat_fn = skyflat_path / f"flat-{obs_id}-{filter}{label}.fits"
     skyflat = fits.getdata(skyflat_fn, extname=detector)
     return skyflat
 
-# %% ../../nbs/euclid/skyflat.ipynb 13
+# %% ../../nbs/euclid/skyflat.ipynb 14
 def correct_for_zp(data, zp):
     """Correct the data for the zero-point variations between detectors."""
     print(zp.compute())
@@ -186,7 +186,7 @@ def correct_for_zp(data, zp):
     print(zp_shift.compute())
     return data * zp_shift
 
-# %% ../../nbs/euclid/skyflat.ipynb 14
+# %% ../../nbs/euclid/skyflat.ipynb 15
 def interpolate_skyflats(flat, data, method="nearest"):
     """Interpolate the `flat` to the x, y coordinates of the `data`."""
     if isinstance(flat, xr.DataArray) or isinstance(flat, xr.Dataset):
@@ -226,7 +226,7 @@ def interpolate_skyflats(flat, data, method="nearest"):
         )
     return skyflat
 
-# %% ../../nbs/euclid/skyflat.ipynb 15
+# %% ../../nbs/euclid/skyflat.ipynb 16
 def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, normalise=True, filter_size=None, short=False):
     """Read the coarse data and compute the skyflats for a given `obs_id`."""
     group_obs_ids = group_for_obs_id[obs_id]
@@ -245,7 +245,7 @@ def create_skyflats(obs_id, group_for_obs_id, zarr_path, zp=None, n_pix=51, norm
         flats = flats.rolling(x=filter_size, y=filter_size, min_periods=1, center=True).median()
     return flats
 
-# %% ../../nbs/euclid/skyflat.ipynb 16
+# %% ../../nbs/euclid/skyflat.ipynb 17
 def apply_skyflat(data, skyflat, interpolation_method="nearest"):
     """Apply a coarse `skyflat` to some `data`."""
     skyflat_interp = interpolate_skyflats(skyflat, data, interpolation_method)
