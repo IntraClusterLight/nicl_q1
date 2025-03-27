@@ -440,7 +440,7 @@ def create_all_zarr_refs(path, zarr_path, obs_id_glob="[23]*"):
 def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
     ref_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/ref.json")]
     datasets = [open_zarr_ref_as_dataset(ref) for ref in ref_files]
-    ds = xr.concat(datasets, dim="observation_id")
+    ds = xr.concat(datasets, dim="observation_id", fill_value={"SCI": np.nan, "RMS": np.nan, "DQ": 0, "FLG": 0})
     ds = ds.assign_coords(y=("y", ds.y.values), x=("x", ds.x.values))
     wcs_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/wcs.zarr")]
     wcs = xr.open_mfdataset(wcs_files, engine="zarr", combine="nested", concat_dim="observation_id")
@@ -474,4 +474,6 @@ def xr_fast_mask(
         output_core_dims=[["x", "y"]],
         output_dtypes=[bool],
     )
+    # ensure the mask is aligned with the data
+    mask = mask.transpose(*data.dims)
     return mask
