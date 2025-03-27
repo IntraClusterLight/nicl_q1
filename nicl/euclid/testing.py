@@ -95,8 +95,7 @@ def create_basic_test_images(z=0.1):
         print(f"{band} icl_flux: {icl_flux}")
         print(f"{band} bcg_flux + icl_flux: {bcg_flux + icl_flux}")
         cluster = bcg * bcg_flux + icl * icl_flux
-        cluster = cluster.withGSParams(maximum_fft_size=8192 * 2)
-        cluster.drawImage(image)
+        cluster.drawImage(image, method="no_pixel")
         hdul["SCI"].data[:] = image.array
         hdul.writeto(
             basic_test_outpath / f"cluster_{band}_no_noise.fits", overwrite=True
