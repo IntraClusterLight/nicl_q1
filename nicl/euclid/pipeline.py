@@ -316,7 +316,7 @@ class Pipeline:
     def _try_measure(self, obs_id_and_filter, path, overwrite=False):
         """Helper function for background statistics."""
         obs_id, filter = obs_id_and_filter
-        filename = f"EUC_NIR_W-STK_{filter}_{obs_id}.fits"
+        filename = f"EUC_NIR_W-STK_{filter}-{obs_id}.fits"
         obs_path = path / f"{obs_id}"
         if (obs_path / "background_stats" / filename).exists() and not overwrite:
             print(f"Skipping {obs_id} {filter} because it already exists", flush=True)
