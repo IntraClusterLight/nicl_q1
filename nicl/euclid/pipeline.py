@@ -273,7 +273,7 @@ class Pipeline:
                 flats = create_skyflats(
                     obs_id, group_for_obs_id, zarr_path, instrument=instrument, n_pix=n_pix, filter_size=filter_size
                 )
-                write_skyflats(obs_id, flats, outpath, wcs)
+                write_skyflats(obs_id, flats, outpath, coarse_factor=n_pix, wcs=wcs)
 
     def create_nir_skyflats(self):
         """Create NIR skyflats."""

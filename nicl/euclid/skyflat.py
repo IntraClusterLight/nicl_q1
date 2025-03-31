@@ -167,7 +167,7 @@ def construct_skyflats_err(group_data, median):
     return err
 
 # %% ../../nbs/euclid/skyflat.ipynb 12
-def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None, short=False):
+def write_skyflats(obs_id, flats, outpath, coarse_factor=None, wcs=None, flats_err=None, short=False):
     """Write the skyflats for a given `obs_id` to disk as FITS files."""
     if wcs is not None:
         wcs_out = wcs.isel(dither=0, observation_id=0)
@@ -176,6 +176,7 @@ def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None, short=False
         wcs_out["CRVAL2"] = 0
     else:
         wcs_out = None
+    header = {"COARSEN": coarse_factor}
     outpath.mkdir(parents=True, exist_ok=True)
     label = "-short" if short else ""
     for filt in flats.filter.values:
@@ -186,6 +187,7 @@ def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None, short=False
             outpath / f"flat-{obs_id}-{filt}{label}.fits",
             da_wcs=wcs_out,
             overwrite=True,
+            header=header,
         )
     if flats_err is not None:
         for filt in flats_err.filter.values:
@@ -196,6 +198,7 @@ def write_skyflats(obs_id, flats, outpath, wcs=None, flats_err=None, short=False
                 outpath / f"flat-err-{obs_id}-{filt}{label}.fits",
                 da_wcs=wcs_out,
                 overwrite=True,
+                header=header,
             )
 
 # %% ../../nbs/euclid/skyflat.ipynb 13
@@ -203,7 +206,11 @@ def read_skyflat(obs_id, filter, detector, skyflat_path, short=False):
     label = "-short" if short else ""
     skyflat_fn = skyflat_path / f"flat-{obs_id}-{filter}{label}.fits"
     skyflat = fits.getdata(skyflat_fn, extname=detector)
-    return skyflat
+    header = fits.getval(skyflat_fn, "COARSEN")
+    coarse_factor = header.get("COARSEN", None)
+    if coarse_factor is None:
+        raise ValueError("Coarsening factor not found in the skyflat header")
+    return skyflat, coarse_factor
 
 # %% ../../nbs/euclid/skyflat.ipynb 14
 def correct_for_zp(data, zp):

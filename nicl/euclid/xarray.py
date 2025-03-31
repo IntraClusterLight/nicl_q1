@@ -8,6 +8,7 @@ __all__ = ['create_zarr_ref_from_fits', 'open_zarr_ref_as_dataset', 'open_fits_a
 
 # %% ../../nbs/euclid/xarray.ipynb 2
 import json
+import os
 from pathlib import Path
 from warnings import catch_warnings, filterwarnings
 
@@ -16,9 +17,8 @@ import pandas as pd
 import fsspec
 import numcodecs
 import xarray as xr
-import zarr
 from astropy.io import fits
-from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU
+from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU, Header
 from astropy.wcs import WCS
 from fsspec.implementations.reference import LazyReferenceMapper
 from kerchunk.codecs import AsciiTableCodec, VarArrCodec
@@ -379,10 +379,12 @@ def write_da_to_fits(
     fn,  # the filename to which to write the data
     da_wcs=None,  # an optional DataArray of WCS info for each `detector`
     overwrite=False,  # should any existing file be overwritten
+    header=None,  # an optional header to use for the FITS file
 ):
     """Write a DataArray to a FITS file."""
-    hdul = HDUList(PrimaryHDU())
-    if "detector" in da.coords:
+    header = Header(header) if header is not None else None
+    hdul = HDUList(PrimaryHDU(header=header))
+    if "detector" in da.coords: 
         for det in da["detector"].to_numpy():
             if da_wcs is not None:
                 wcs = WCS(da_wcs.sel(detector=det).as_numpy().to_pandas())
