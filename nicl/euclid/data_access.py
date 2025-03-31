@@ -6,21 +6,27 @@
 __all__ = ['DataAccess']
 
 # %% ../../nbs/euclid/data_access.ipynb 2
-import re
-from getpass import getpass
+import logging
 import os
+import re
+import tempfile
+from getpass import getpass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from astropy import table
+from astropy.io import fits
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from .utilities import default_data_path, euclid_credentials
+from .utilities import default_data_path, euclid_credentials, get_dither_id_from_filename
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
+logging.getLogger("astroquery").setLevel(logging.WARNING)
+
+# %% ../../nbs/euclid/data_access.ipynb 5
 class DataAccess:
     """Provides access to Euclid data."""
 
@@ -284,6 +290,7 @@ class DataAccess:
         self,
         filename,  # the filename to download
         outpath,  # the folder in which to save the downloaded files
+        ignore_dry_run=False,  # ignore object's dry_run setting
     ):
         """Download Euclid filename to outpath."""
         params_dict = dict(
@@ -292,7 +299,7 @@ class DataAccess:
         params_dict.update(FILE_NAME=filename)
         outpath = Path(outpath).expanduser()
         outfn = outpath / filename
-        if not self.dry_run:
+        if ignore_dry_run or not self.dry_run:
             if not outfn.exists() or self.overwrite:
                 try:
                     self.data_login()
@@ -521,3 +528,51 @@ class DataAccess:
                 file_info.append(tile_file_info)
         if len(file_info) > 0:
             return table.vstack(file_info)
+
+    def get_catalogues_for_observation(
+        self,
+        obs_id,
+        instrument=None,  # None, NISP or VIS
+        filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
+        dither=None,  # 0, 1, 2, 3 for NISP, 0-1, 1-1, 2-1, 3-1, 0-2, 1-2 for VIS
+    ):  #  returns a squashed dictionary containing one catalogue per filter and dither
+        """Download all catalogues for a Euclid observation, optionally restricted by instrument or filter."""
+        if instrument == "VIS":
+            filter = "VIS"
+        condition = self.build_instrument_condition(instrument, filter)
+        query = f"""SELECT observation_id, file_name, instrument_name, filter_name
+            FROM sedm.frame_catalog
+            WHERE (product_type like '%Calibrated%')
+            AND {condition}
+            AND (observation_id = '{obs_id}')"""
+        file_info = self.tap_query(query)
+        catalogues = dict()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for row in file_info:
+                fn = row["file_name"]
+                this_filter = str(row["filter_name"])
+                this_dither = get_dither_id_from_filename(fn)
+                if dither is None or this_dither == dither:
+                    self.download_file(fn, outpath=temp_dir, ignore_dry_run=True)
+                    cat_file = os.path.join(temp_dir, fn)
+                    with fits.open(cat_file) as hdul:
+                        cats = []
+                        for hdu in hdul:
+                            if hdu.name == "LDAC_OBJECTS":
+                                tab = Table.read(hdu)
+                                if this_filter == "VIS":
+                                    tab["DETECTOR"] = f"{tab.meta['CCDID']}.{tab.meta['QUADID']}"
+                                else:
+                                    tab["DETECTOR"] = tab.meta["DET_ID"]
+                                tab.meta = None
+                                cats.append(tab)
+                        if this_filter not in catalogues:
+                            catalogues[this_filter] = dict()
+                        catalogues[this_filter][this_dither] = table.vstack(cats)
+        if dither:
+            for filt in catalogues:
+                catalogues[filt] = catalogues[filt][dither]
+        if filter:
+            catalogues = catalogues[filter]
+        return catalogues
+

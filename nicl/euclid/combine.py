@@ -408,10 +408,10 @@ class DithersMixin:
                         if self.autodark_corr and self.instrument.name == "VIS":
                             obsid = get_obs_id_from_filename(dither.name)
                             # TODO: separate applying autodark correction for short and long exposures
-                            autodark = read_skyflat(
+                            autodark, coarse_factor = read_skyflat(
                                 obsid, "VIS", ext, self.autodark_dir
                             )
-                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear")
+                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear", coarse_factor=coarse_factor)
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
