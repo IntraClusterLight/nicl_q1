@@ -20,10 +20,12 @@ import numpy as np
 from astropy.io import fits
 from astropy import units as u
 from photutils.background import Background2D
+from regions import RectangleSkyRegion
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
 from nicl.mask import fast_mask
+from nicl.euclid.skyflat import read_skyflat, apply_skyflat
 from nicl.euclid.constants import (
     VIS,
     NISP,
@@ -36,8 +38,13 @@ from nicl.euclid.utilities import (
     default_data_path,
     round_up_box_size,
     get_dither_id_from_filename,
+    get_obs_id_from_filename,
 )
-from nicl.utilities import parse_input_for_angular_size, parse_input_for_skycoord
+from nicl.utilities import (
+    parse_input_for_angular_size,
+    parse_input_for_skycoord,
+    does_image_overlap_with_skyregion,
+)
 
 # %% ../../nbs/euclid/combine.ipynb 4
 # base class for combining images
@@ -60,6 +67,8 @@ class Combiner(ABC):
         bkg_mesh_size=None,  # size of the background mesh boxes in angular units
         bkg_filter_size=None,  # median filter background over `bkg_filter_size` x `bkg_filter_size` boxes
         multi_chip_bkg=False,  # if True, combine all chips/quads first for background subtraction
+        autodark_corr=False,  # if True, apply dark current correction for VIS dithers
+        autodark_dir=None,  # directory to find autodarks for VIS dithers
         release_name=None,  # the data release to use to find obs_ids if required, e.g., 'Q1_R1', 'DR1'
         instrument=None,  # Euclid instrument,e.g., VIS or NISP in nicl.euclid.constants
         swarp_config=None,  # default SWarp configuration file content
@@ -133,6 +142,14 @@ class Combiner(ABC):
             )
             if np.any(mesh_size > rd_size):
                 self.multi_chip_bkg = True
+        # check autodark settings
+        self.autodark_corr = autodark_corr
+        if self.autodark_corr:
+            if autodark_dir is None:
+                raise ValueError(
+                    "Autodark correction requires specifying the directory to find autodarks."
+                )
+            self.autodark_dir = Path(autodark_dir).expanduser()
         # assemble command line arguments to pass to SWarp
         self._swarp_extra_args = self._parse_swarp_args(kwargs)
         print(f"Initialized {self}")
@@ -215,11 +232,13 @@ class Combiner(ABC):
             print(
                 f"SWarp finished successfully. Elapsed time: {elapsed_mins:.1f} mins."
             )
+            return True
         except subprocess.CalledProcessError as e:
             print(
                 f"Command '{' '.join(e.cmd)}' returned non-zero exit status, please check its stderr below."
             )
             print(e.stderr)
+            return False
 
     @abstractmethod
     def _post_process(self):
@@ -252,10 +271,17 @@ class DithersMixin:
         else:
             pixel_scale = self.instrument.pix_scale
         pixel_scale_str = f"{pixel_scale:.2f} arcsec/pix"
+        obj_str = f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}"
+        if self.individual_dithers:
+            obj_str += ", individual_dithers=True"
         if self.multi_chip_bkg:
-            return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, multi_chip_bkg={self.multi_chip_bkg}, individual_dithers={self.individual_dithers})"
+            obj_str += ", multi_chip_bkg=True"
         else:
-            return f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, bkg_sub={self.bkg_sub}, individual_dithers={self.individual_dithers})"
+            obj_str += f", bkg_sub={self.bkg_sub}"
+        if self.autodark_corr:
+            obj_str += ", autodark_corr=True"
+        obj_str += ")"
+        return obj_str
 
     def __repr__(self):
         return self.__str__()
@@ -287,6 +313,11 @@ class DithersMixin:
         start_time = datetime.now()
         sci_fns = []
         for i, dither in enumerate(dithers):
+            # for now we throw away the short exposures
+            if self.autodark_corr and self.instrument.name == "VIS":
+                dither_id = get_dither_id_from_filename(dither.name)
+                if dither_id.endswith("2"):
+                    continue
             with fits.open(dither) as hdul:
                 if self.multi_chip_bkg:
                     primary_hdr = hdul[0].header
@@ -345,6 +376,19 @@ class DithersMixin:
                     weight_hdul.writeto(tmpdir / wt_fn)
                 else:
                     for ext in self.instrument.extnames:
+                        sci_ext_hdr = hdul[f"{ext}.SCI"].header
+                        # check if the cutout region overlaps with the chip/quad
+                        if self.cutout_cen is not None and self.cutout_size is not None:
+                            cutout_reg = RectangleSkyRegion(
+                                center=self.cutout_cen,
+                                width=self.cutout_size[0],
+                                height=self.cutout_size[1],
+                            )
+                            # a threshold of 0.01 (0.1 in length) is used to exclude negligible overlaps
+                            if not does_image_overlap_with_skyregion(
+                                sci_ext_hdr, cutout_reg, threshold=0.01
+                            ):
+                                continue
                         sci_data = hdul[f"{ext}.SCI"].data
                         rms_data = hdul[f"{ext}.RMS"].data
                         if self.instrument.name == "VIS":
@@ -352,7 +396,6 @@ class DithersMixin:
                         elif self.instrument.name == "NISP":
                             dq_data = hdul[f"{ext}.DQ"].data
                         primary_hdr = hdul[0].header
-                        sci_ext_hdr = hdul[f"{ext}.SCI"].header
                         rms_ext_hdr = hdul[f"{ext}.RMS"].header
                         bad_pix_mask = np.any(
                             [
@@ -361,6 +404,14 @@ class DithersMixin:
                             ],
                             axis=0,
                         )
+                        # perform autodark correction for VIS dithers
+                        if self.autodark_corr and self.instrument.name == "VIS":
+                            obsid = get_obs_id_from_filename(dither.name)
+                            # TODO: separate applying autodark correction for short and long exposures
+                            autodark, coarse_factor = read_skyflat(
+                                obsid, "VIS", ext, self.autodark_dir
+                            )
+                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear", coarse_factor=coarse_factor)
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
@@ -426,6 +477,9 @@ class DithersMixin:
                         sci_fns.append(sci_fn)
                         sci_hdul.writeto(tmpdir / sci_fn)
                         weight_hdul.writeto(tmpdir / wt_fn)
+        if not sci_fns:
+            print("No valid images preprocessed for SWarp.")
+            return False
         # prepare image list for swarp
         with open(tmpdir / "images.list", "w") as f:
             for fn in sci_fns:
@@ -434,6 +488,7 @@ class DithersMixin:
         elapsed_secs = (end_time - start_time).total_seconds()
         elapsed_mins = elapsed_secs / 60
         print(f"Preparing science and weight images took {elapsed_mins:.1f} mins.")
+        return True
 
     def _post_process_stack_and_weight(self, tmpdir, out_fn):
         """Clean up FITS headers and copy the output to the desired directory."""
@@ -542,7 +597,12 @@ class NISPCombiner(DithersMixin, Combiner):
     """Combine NISP images using SWarp."""
 
     def __init__(self, **kwargs):
-        super().__init__(instrument=NISP, swarp_config=SWARP_CONFIG_NISP, **kwargs)
+        super().__init__(
+            instrument=NISP,
+            swarp_config=SWARP_CONFIG_NISP,
+            autodark_corr=False,
+            **kwargs,
+        )
 
     def combine_per_filter(self, filter):
         if self.multi_chip_bkg:
@@ -558,6 +618,8 @@ class NISPCombiner(DithersMixin, Combiner):
                         out_dir=tmpdir,
                         filters=self.filters,
                         ids=id,
+                        cutout_cen=self.cutout_cen,
+                        cutout_size=self.cutout_size,
                         individual_dithers=True,
                         bkg_sub=False,
                         release_name=self.release_name,
@@ -596,8 +658,10 @@ class NISPCombiner(DithersMixin, Combiner):
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
                 print("You must delete this folder manually when done.")
-            self._prepare_input_for_swarp(images, tmpdir)
-            self._run_swarp(tmpdir)
+            if not self._prepare_input_for_swarp(images, tmpdir):
+                return
+            if not self._run_swarp(tmpdir):
+                return
             self._post_process(tmpdir, out_fn)
 
     def _get_ids(self):
@@ -611,7 +675,7 @@ class NISPCombiner(DithersMixin, Combiner):
         )
 
     def _prepare_input_for_swarp(self, images, tmpdir):
-        super()._prepare_dithers_for_swarp(images, tmpdir)
+        return super()._prepare_dithers_for_swarp(images, tmpdir)
 
     def _post_process(self, tmpdir, out_fn):
         super()._post_process_stack_and_weight(tmpdir, out_fn)
@@ -640,6 +704,8 @@ class VISCombiner(DithersMixin, Combiner):
                         out_dir=tmpdir,
                         filters=self.filters,
                         ids=id,
+                        cutout_cen=self.cutout_cen,
+                        cutout_size=self.cutout_size,
                         individual_dithers=True,
                         bkg_sub=False,
                         release_name=self.release_name,
@@ -690,8 +756,10 @@ class VISCombiner(DithersMixin, Combiner):
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
                 print("You must delete this folder manually when done.")
-            self._prepare_input_for_swarp(images, tmpdir)
-            self._run_swarp(tmpdir)
+            if not self._prepare_input_for_swarp(images, tmpdir):
+                return
+            if not self._run_swarp(tmpdir):
+                return
             self._post_process(tmpdir, out_fn)
 
     def _find_images(self):
@@ -702,7 +770,7 @@ class VISCombiner(DithersMixin, Combiner):
         )
 
     def _prepare_input_for_swarp(self, images, tmpdir):
-        super()._prepare_dithers_for_swarp(images, tmpdir)
+        return super()._prepare_dithers_for_swarp(images, tmpdir)
 
     def _post_process(self, tmpdir, out_fn):
         super()._post_process_stack_and_weight(tmpdir, out_fn)
@@ -722,6 +790,7 @@ class MerCombiner(Combiner):
             bkg_sub=False,
             individual_dithers=False,
             multi_chip_bkg=False,
+            autodark_corr=False,
             **kwargs,
         )
 
@@ -893,6 +962,8 @@ def combine(
     add_bkg_mod=False,  # add back background model for MER stacks
     bkg_filter_size=3,  # median filter background over `filter_size` x `filter_size` boxes
     multi_chip_bkg=False,  # combine multiple chips before background modeling and subtraction
+    autodark_corr=False,  # apply autodark correction for VIS dithers
+    autodark_dir=None,  # directory where autodark files are located
     release_name="Q1_R1",  # the data release name, e.g., "Q1_R1", "DR1"
     overwrite=False,  # overwrite existing combined image files
     debug=False,  # retain intermediate files for checking and more verbose output
@@ -904,11 +975,11 @@ def combine(
     Combine Euclid calibrated dithers from different instruments (VIS or NISP) or
     MER stacks using SWarp. Input images are found based on input ids (obs_ids
     for VIS/NISP or tile_ids for MER) or cutout parameters (center and size).
-    Before running SWarp, the program optionally performs background subtraction
-    for VIS/NISP dithers and adds background models back to MER mosaics, then
-    writes the resulting images to a temporary directory where SWarp will run.
-    Finally, the combined image is copied to the output directory with the
-    specified name. Users can specify center, size, and pixel scale of the
+    Before running SWarp, the program optionally performs autodark correction,
+    background subtraction for VIS/NISP dithers and adds background models back to
+    MER mosaics, then writes the resulting images to a temporary directory where
+    SWarp will run. Finally, the combined image is copied to the output directory
+    with the specified name. Users can specify center, size, and pixel scale of the
     combined image.
 
     Parameters
@@ -931,12 +1002,11 @@ def combine(
         If True, each dither of the obsids is combined separately (only applies
         to VIS/NISP data).
     cutout_cen : str or SkyCoord object, optional
-        Sky coordinates of the center of the cutout region. Ignored if
-        individual_dithers is True.
+        Sky coordinates of the center of the cutout region.
     cutout_size : str, int, float, U.Quantity object, or a list/tuple/ndarray
         of them, optional
         Size of the cutout region in angular units (two values for different
-        width and height). Ignored if individual_dithers is True.
+        width and height).
     name : str, optional
         Suffix for the output file basename. Overriden by obsid if
         individual_dithers=True.
@@ -955,6 +1025,10 @@ def combine(
         subtraction (only for VIS/NISP data). If bkg_mesh_size is larger than the
         chip/quad size, multi_chip_bkg is automatically set to True regardless of
         the user input.
+    autodark_corr : bool, optional
+        If True, apply autodark correction for VIS dithers.
+    autodark_dir : str, optional
+        Directory to search for the autodark FITS files.
     release_name : str, optional
         Data release identifier to look up default directories if in_dir or
         out_dir is not specified.
@@ -1002,11 +1076,6 @@ def combine(
 
     if individual_dithers and obs_ids is None:
         raise ValueError("obs_ids must be specified to combine individual dithers.")
-
-    # ignore user input of cutout parameters if combining individual dithers
-    if individual_dithers:
-        cutout_cen = None
-        cutout_size = None
 
     if cutout_cen is not None:
         cutout_cen = parse_input_for_skycoord(cutout_cen)
@@ -1061,6 +1130,8 @@ def combine(
                     bkg_mesh_size=bkg_mesh_size,
                     bkg_filter_size=bkg_filter_size,
                     multi_chip_bkg=multi_chip_bkg,
+                    autodark_corr=autodark_corr,
+                    autodark_dir=autodark_dir,
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
@@ -1085,6 +1156,8 @@ def combine(
                 bkg_mesh_size=bkg_mesh_size,
                 bkg_filter_size=bkg_filter_size,
                 multi_chip_bkg=multi_chip_bkg,
+                autodark_corr=autodark_corr,
+                autodark_dir=autodark_dir,
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
