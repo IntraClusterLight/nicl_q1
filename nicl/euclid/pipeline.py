@@ -14,7 +14,7 @@ from itertools import product
 
 from nicl.euclid.data_access import DataAccess
 from nicl.euclid.utilities import default_data_path
-from nicl.euclid.skyflat import create_skyflats, group_obs_ids, write_skyflats
+from nicl.euclid.skyflat import create_coarse_data, create_skyflats, group_obs_ids, write_skyflats
 from nicl.euclid.xarray import create_all_zarr_refs, read_all_zarr_refs
 from nicl.euclid.persistence import correct_persistence
 from nicl.euclid.combine import combine
@@ -29,8 +29,8 @@ PROCESSING_VERSION = "v0.7"
 
 SKYFLAT_N_PIX_NIR = 51
 SKYFLAT_FILTER_SIZE_NIR = None
-SKYFLAT_N_PIX_VIS = 32
-SKYFLAT_FILTER_SIZE_VIS = 3
+SKYFLAT_N_PIX_VIS = 149
+SKYFLAT_FILTER_SIZE_VIS = None
 SKYFLAT_HALF_WINDOW_NIR = 3
 SKYFLAT_HALF_WINDOW_VIS = 5
 
@@ -176,18 +176,58 @@ class Pipeline:
                 obs_id, instrument="VIS", outpath=outpath
             )
 
+    def _get_zarr_path(self, instrument):
+        return default_data_path("zarr", self.release_name, instrument)
+
     def _try_create_zarr_refs(self, obs_id, path, zarr_path):
         """Helper function for creating zarr references."""
         create_all_zarr_refs(path, zarr_path, obs_id_glob=f"{obs_id}")
 
-    def _create_skyflats(
-            self,
-            instrument,  # "NIR" or "VIS"
-        ):
-        """Create skyflats."""
-        print(f"\n=== Creating {instrument} Skyflats ===")
+    def create_zarr_refs(self, obs_ids, instrument):
+        """Create zarr references for all the specified observations."""
+        if instrument not in ["NIR", "VIS"]:
+            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+        print(f"Creating {instrument} zarr refs", flush=True)
+        if instrument == "VIS":
+            data_instrument = "VIS_QUAD"
+        else:
+            data_instrument = instrument
+        path = default_data_path(self.release_name, data_instrument)
+        possibly_concurrent(
+            self._try_create_zarr_refs,
+            obs_ids,
+            path=path,
+            zarr_path=self._get_zarr_path(instrument),
+            executor=self.executor,
+        )
 
-        path = default_data_path(self.release_name, instrument)
+    def _try_create_coarse_data(self, obs_id, instrument, zarr_path, n_pix):
+        """Helper function for creating coarse data."""
+        create_coarse_data(obs_id, zarr_path, instrument=instrument, n_pix=n_pix)
+
+    def create_coarse_data(self, obs_ids, instrument):
+        """Create coarse data for all the specified observations."""
+        if instrument not in ["NIR", "VIS"]:
+            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+        print(f"Creating {instrument} coarse data", flush=True)
+        if instrument == "VIS":
+            n_pix = self.skyflat_n_pix_vis
+        else:
+            n_pix = self.skyflat_n_pix_nir
+        possibly_concurrent(
+            self._try_create_coarse_data,
+            obs_ids,
+            instrument=instrument,
+            zarr_path=self._get_zarr_path(instrument),
+            n_pix=n_pix,
+            executor=self.executor,
+        )
+
+    def _create_skyflats(self, instrument):
+        """Create skyflats."""
+        if instrument not in ["NIR", "VIS"]:
+            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+        print(f"\n=== Creating {instrument} Skyflats ===")
         zarr_path = default_data_path("zarr", self.release_name, instrument)
         outpath = default_data_path(
             f"{self.release_name}_processed_{self.processing_version}", "skyflat", instrument
@@ -207,18 +247,12 @@ class Pipeline:
             filter_size = self.skyflat_filter_size_nir
             n_persistence = 1
 
-        # Create zarr references for all required observations
+        # Create zarr references and coarse data for all required observations
         obs_ids = get_required_obs_ids(
             self.target_obs_ids, available_obs_ids, hw
         )
-        print(f"Creating zarr refs", flush=True)
-        possibly_concurrent(
-            self._try_create_zarr_refs,
-            obs_ids,
-            path=path,
-            zarr_path=zarr_path,
-            executor=self.executor,
-        )
+        self.create_zarr_refs(obs_ids, instrument)
+        self.create_coarse_data(obs_ids, instrument)
 
         ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob=f"*")
         available_obs_ids = sorted(ds.observation_id.values)
@@ -237,7 +271,7 @@ class Pipeline:
                 print("Creating skyflats for obs_id:", obs_id, flush=True)
                 print("Using obs_ids:", group_for_obs_id[obs_id], flush=True)
                 flats = create_skyflats(
-                    obs_id, group_for_obs_id, zarr_path, n_pix=n_pix, filter_size=filter_size
+                    obs_id, group_for_obs_id, zarr_path, instrument=instrument, n_pix=n_pix, filter_size=filter_size
                 )
                 write_skyflats(obs_id, flats, outpath, wcs)
 
@@ -274,7 +308,7 @@ class Pipeline:
             executor=self.executor,
         )
 
-    def _try_combine(self, obs_id, in_dir, out_dir_parent, bkg_sub=True):
+    def _try_combine(self, obs_id, in_dir, out_dir_parent, filters, bkg_sub=True):
         """Helper function for creating stacks."""
         out_dir = out_dir_parent / f"{obs_id}"
         if out_dir.exists():
@@ -286,29 +320,40 @@ class Pipeline:
                     in_dir=in_dir,
                     out_dir=out_dir,
                     obs_ids=obs_id,
-                    filters=self.filters,
+                    filters=filters,
                     bkg_sub=bkg_sub,
                 )
             except Exception as e:
                 print(f"Error combining {obs_id}: {e}", flush=True)
                 raise
 
-    def create_stacks(self, bkg_sub=True):
+    def create_stacks(self, instrument, bkg_sub=True, ):
         """Step 4: Create image stacks."""
-        print("\n=== Creating Stacks ===")
-        data_path = default_data_path(
+        if instrument not in ["NIR", "VIS"]:
+            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+        print(f"\n=== Creating {instrument} Stacks ===")
+        processed_path = default_data_path( 
             f"{self.release_name}_processed_{self.processing_version}"
         )
-        in_dir = data_path / "persistence" / "NIR"
-        if bkg_sub:
-            out_dir = data_path / "stacked" / "NIR"
+        if instrument == "NIR":
+            in_dir = processed_path / "persistence" / "NIR"
         else:
-            out_dir = data_path / "stacked_nobkg" / "NIR"
+            data_path = default_data_path(
+                f"{self.release_name}"
+            )
+            in_dir = data_path / "VIS_QUAD"
+        if bkg_sub:
+            out_dir = processed_path / "stacked" / instrument
+        else:
+            out_dir = processed_path / "stacked_nobkg" / instrument
+        filters = NIR_FILTERS if instrument == "NIR" else ["VIS"]
+        filters = list(set(self.filters) & set(filters))
         possibly_concurrent(
             self._try_combine,
             self.target_obs_ids,
             in_dir=in_dir,
             out_dir_parent=out_dir,
+            filters=filters,
             bkg_sub=bkg_sub,
             executor=self.executor,
         )
@@ -328,17 +373,21 @@ class Pipeline:
                 print(f"Error measuring {filename}: {e}", flush=True)
                 raise
 
-    def calculate_background_stats(self, bkg_sub=True, overwrite=False):
+    def calculate_background_stats(self, instrument, bkg_sub=True, overwrite=False):
         """Step 5: Calculate background statistics."""
-        print("\n=== Calculating Background Statistics ===")
+        if instrument not in ["NIR", "VIS"]:
+            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+        print(f"\n=== Calculating {instrument} Background Statistics ===")
         path = default_data_path(
             f"{self.release_name}_processed_{self.processing_version}"
         )
         if bkg_sub:
-            path = path / "stacked" / "NIR"
+            path = path / "stacked" / instrument
         else:
-            path = path / "stacked_nobkg" / "NIR"
-        obs_ids_and_filters = list(product(self.target_obs_ids, self.filters))
+            path = path / "stacked_nobkg" / instrument
+        filters = NIR_FILTERS if instrument == "NIR" else ["VIS"]
+        filters = list(set(self.filters) & set(filters))
+        obs_ids_and_filters = list(product(self.target_obs_ids, filters))
         possibly_concurrent(
             self._try_measure,
             obs_ids_and_filters,

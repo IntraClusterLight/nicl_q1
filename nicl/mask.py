@@ -60,7 +60,7 @@ def fast_mask(
     mask_params=None,  # mask parameters
     estimate_background=False,  # estimate the background from the image median
     max_repeat=10,  # maximum number of masking iterations
-    relative_rms_tolerance=0.01,  # relative tolerance in the rms required to stop iterating
+    relative_rms_tolerance=0.001,  # relative tolerance in the rms required to stop iterating
     return_threshold=True,  # return the threshold
     verbose=False,  # print information about the iterations
 ):
@@ -76,12 +76,15 @@ def fast_mask(
         print("Fast mask")
     if mask_params:
         params.update(mask_params)
-    if verbose:
-        print(f"    smoothing image with sigma of {params['smooth_sigma']} pixels")
-    smoothed_image = smooth_image(image, params["smooth_sigma"])
-    mask = None
+    if params["smooth_sigma"] > 0:
+        if verbose:
+            print(f"    smoothing image with sigma of {params['smooth_sigma']} pixels")
+        smoothed_image = smooth_image(image, params["smooth_sigma"])
+    else:
+        smoothed_image = image
     bkg = params["background"]
     previous_rms = np.inf
+    mask = None
     for i in range(max_repeat + 1):
         if verbose:
             print(f"    iteration {i}")
@@ -96,6 +99,12 @@ def fast_mask(
             if verbose:
                 print(f"    estimated background is {bkg}")
         rms = np.median(abs(valid_pixels - bkg)) / 0.67449
+        if verbose:
+            print(f"    background RMS is {rms:.3f}")
+        if abs(rms - previous_rms) / rms < relative_rms_tolerance:
+            break
+        previous_rms = rms
+        # update the mask
         threshold = rms * params["nsigma"] + bkg
         mask = smoothed_image > threshold
         if params["erosion_iterations"] > 0:
@@ -109,11 +118,6 @@ def fast_mask(
             mask = binary_dilation(
                 mask, structure=structure, iterations=params["dilation_iterations"]
             )
-        if verbose:
-            print(f"    background RMS is {rms:.3f}")
-        if abs(rms - previous_rms) / rms < relative_rms_tolerance:
-            break
-        previous_rms = rms
     if return_threshold:
         return mask, threshold
     else:
@@ -303,12 +307,19 @@ def plot_mask(
     mask,  # mask to plot
     detail=False,  # if True, add a row of detail images
     detail_size=1000,  # size, in pixels, of the detail region
+    background_focus=False,
+    show_mask=True,
 ):
     """Create a plot displaying the original image, masked image and mask."""
     nrows = 2 if detail else 1
-    fig, ax = plt.subplots(nrows, 3, figsize=(12, 4 * nrows), squeeze=False)
+    ncols = 3 if show_mask else 2
+    fig, ax = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows), squeeze=False)
     rms = median_abs_deviation(img, axis=None, scale="normal", nan_policy="omit")
-    norm = ImageNormalize(vmin=-2.5 * rms, vmax=10 * rms, stretch=AsinhStretch(0.1))
+    median = np.median(img)
+    if background_focus:
+        norm = ImageNormalize(vmin=median - 2.5 * rms, vmax=median + 2.5 * rms)
+    else:
+        norm = ImageNormalize(vmin=median - 2.5 * rms, vmax=median + 10 * rms, stretch=AsinhStretch(0.1))
     cmap = mpl.colormaps.get_cmap("viridis")
     cmap.set_bad("black")
     ax[0, 0].imshow(img, norm=norm, origin="lower", interpolation="none", cmap=cmap)
@@ -319,10 +330,11 @@ def plot_mask(
         interpolation="none",
         cmap=cmap,
     )
-    ax[0, 2].imshow(mask, origin="lower", interpolation="none", cmap="gray_r")
     ax[0, 0].set_title("Original Image")
     ax[0, 1].set_title("Masked Image")
-    ax[0, 2].set_title("Object Mask")
+    if show_mask:
+        ax[0, 2].imshow(mask, origin="lower", interpolation="none", cmap="gray_r")
+        ax[0, 2].set_title("Object Mask")
     if detail:
         ci, cj = get_img_centre_pixel(img).astype(int)
         ax[0, 0].plot(
@@ -342,7 +354,8 @@ def plot_mask(
             interpolation="none",
             cmap=cmap,
         )
-        ax[1, 2].imshow(mask, origin="lower", interpolation="none", cmap="gray_r")
+        if show_mask:
+            ax[1, 2].imshow(mask, origin="lower", interpolation="none", cmap="gray_r")
     for a in ax.flat:
         a.xaxis.set_ticks([])
         a.yaxis.set_ticks([])

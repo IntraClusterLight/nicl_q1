@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['create_zarr_ref_from_fits', 'open_zarr_ref_as_dataset', 'open_fits_as_dataset', 'write_da_to_fits', 'load_zarr_ref',
-           'load_wcs_from_zarr', 'create_all_zarr_refs', 'read_all_zarr_refs', 'xr_fast_mask']
+           'load_wcs_from_zarr', 'create_all_zarr_refs', 'read_all_zarr_refs', 'xr_fast_mask', 'xr_star_mask']
 
 # %% ../../nbs/euclid/xarray.ipynb 2
 import json
@@ -26,6 +26,7 @@ from kerchunk.combine import MultiZarrToZarr
 from tqdm import tqdm
 
 from ..mask import fast_mask
+from .mask import star_mask
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_filter_from_filename,
@@ -142,10 +143,11 @@ def process_file(
                     numcodecs.FixedScaleOffset(
                         offset=float(attrs.get("BZERO", 0)),
                         scale=float(attrs.get("BSCALE", 1)),
-                        astype=dtype,
-                        dtype=np.dtype(stored_dtype).type,
+                        astype=stored_dtype,
+                        dtype=stored_dtype,
                     )
                 ]
+                #kwargs["filters"] = None
             else:
                 kwargs["filters"] = None
         elif isinstance(hdu, fits.hdu.table.TableHDU):
@@ -476,4 +478,25 @@ def xr_fast_mask(
     )
     # ensure the mask is aligned with the data
     mask = mask.transpose(*data.dims)
+    return mask
+
+# %% ../../nbs/euclid/xarray.ipynb 16
+def xr_star_mask(
+    bitmask,
+    instrument,
+):
+    mask = xr.apply_ufunc(
+        star_mask,
+        bitmask,
+        kwargs=dict(
+            instrument=instrument,
+        ),
+        vectorize=True,
+        dask="parallelized",
+        input_core_dims=[["x", "y"]],
+        output_core_dims=[["x", "y"]],
+        output_dtypes=[bool],
+    )
+    # ensure the mask is aligned with the data
+    mask = mask.transpose(*bitmask.dims)
     return mask
