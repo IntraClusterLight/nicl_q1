@@ -206,7 +206,7 @@ def read_skyflat(obs_id, filter, detector, skyflat_path, short=False):
     label = "-short" if short else ""
     skyflat_fn = skyflat_path / f"flat-{obs_id}-{filter}{label}.fits"
     skyflat = fits.getdata(skyflat_fn, extname=detector)
-    header = fits.getval(skyflat_fn, "COARSEN")
+    header = fits.getheader(skyflat_fn)
     coarse_factor = header.get("COARSEN", None)
     if coarse_factor is None:
         raise ValueError("Coarsening factor not found in the skyflat header")
