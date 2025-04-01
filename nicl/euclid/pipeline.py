@@ -16,7 +16,12 @@ from typing import Callable, Optional, Any
 
 from nicl.euclid.data_access import DataAccess
 from nicl.euclid.utilities import default_data_path
-from nicl.euclid.skyflat import create_coarse_data, create_skyflats, group_obs_ids, write_skyflats
+from nicl.euclid.skyflat import (
+    create_coarse_data,
+    create_skyflats,
+    group_obs_ids,
+    write_skyflats,
+)
 from nicl.euclid.xarray import create_all_zarr_refs, read_all_zarr_refs
 from nicl.euclid.persistence import correct_persistence
 from nicl.euclid.combine import combine
@@ -54,10 +59,10 @@ def possibly_concurrent(
         with executor() as e:
             # Submit all tasks
             futures = {
-                e.submit(fn, target, *args, **kwargs): i 
+                e.submit(fn, target, *args, **kwargs): i
                 for i, target in enumerate(targets)
             }
-            
+
             # Process completed futures
             try:
                 for future in concurrent.futures.as_completed(futures):
@@ -138,8 +143,8 @@ class Pipeline:
         self.filters = filters
         self.executor = None
         if max_workers > 1:
-            self.executor = partial(concurrent.futures.ProcessPoolExecutor,
-                max_workers=max_workers
+            self.executor = partial(
+                concurrent.futures.ProcessPoolExecutor, max_workers=max_workers
             )
         self.logger = logging.getLogger(__name__)
 
@@ -204,7 +209,9 @@ class Pipeline:
     def create_zarr_refs(self, obs_ids, instrument):
         """Create zarr references for all the specified observations."""
         if instrument not in ["NIR", "VIS"]:
-            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+            raise ValueError(
+                f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'."
+            )
         self.logger.info(f"Creating {instrument} zarr refs")
         if instrument == "VIS":
             data_instrument = "VIS_QUAD"
@@ -225,7 +232,9 @@ class Pipeline:
     def create_coarse_data(self, obs_ids, instrument):
         """Create coarse data for all the specified observations."""
         if instrument not in ["NIR", "VIS"]:
-            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+            raise ValueError(
+                f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'."
+            )
         self.logger.info(f"Creating {instrument} coarse data")
         if instrument == "VIS":
             n_pix = self.skyflat_n_pix_vis
@@ -243,11 +252,15 @@ class Pipeline:
     def _create_skyflats(self, instrument):
         """Create skyflats."""
         if instrument not in ["NIR", "VIS"]:
-            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+            raise ValueError(
+                f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'."
+            )
         self.logger.info(f"=== Creating {instrument} Skyflats ===")
         zarr_path = default_data_path("zarr", self.release_name, instrument)
         outpath = default_data_path(
-            f"{self.release_name}_processed_{self.processing_version}", "skyflat", instrument
+            f"{self.release_name}_processed_{self.processing_version}",
+            "skyflat",
+            instrument,
         )
 
         da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
@@ -265,9 +278,7 @@ class Pipeline:
             n_persistence = 1
 
         # Create zarr references and coarse data for all required observations
-        obs_ids = get_required_obs_ids(
-            self.target_obs_ids, available_obs_ids, hw
-        )
+        obs_ids = get_required_obs_ids(self.target_obs_ids, available_obs_ids, hw)
         self.create_zarr_refs(obs_ids, instrument)
         self.create_coarse_data(obs_ids, instrument)
 
@@ -276,7 +287,9 @@ class Pipeline:
         group_for_obs_id = group_obs_ids(obs_ids, available_obs_ids, half_window=hw)
 
         for target_obs_id in self.target_obs_ids:
-            for obs_id in range(target_obs_id - n_persistence, target_obs_id + n_persistence + 1):
+            for obs_id in range(
+                target_obs_id - n_persistence, target_obs_id + n_persistence + 1
+            ):
                 if len(list(outpath.glob(f"flat-{obs_id}-*.fits"))) > 0:
                     self.logger.info(f"Skipping {obs_id} because it already exists")
                     continue
@@ -288,7 +301,12 @@ class Pipeline:
                 self.logger.info(f"Creating skyflats for obs_id: {obs_id}")
                 self.logger.info(f"Using obs_ids: {group_for_obs_id[obs_id]}")
                 flats = create_skyflats(
-                    obs_id, group_for_obs_id, zarr_path, instrument=instrument, n_pix=n_pix, filter_size=filter_size
+                    obs_id,
+                    group_for_obs_id,
+                    zarr_path,
+                    instrument=instrument,
+                    n_pix=n_pix,
+                    filter_size=filter_size,
                 )
                 write_skyflats(obs_id, flats, outpath, coarse_factor=n_pix, wcs=wcs)
 
@@ -341,20 +359,24 @@ class Pipeline:
                 self.logger.error(f"Error combining {obs_id}: {e}")
                 raise
 
-    def create_stacks(self, instrument, bkg_sub=True, ):
+    def create_stacks(
+        self,
+        instrument,
+        bkg_sub=True,
+    ):
         """Create image stacks."""
         if instrument not in ["NIR", "VIS"]:
-            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+            raise ValueError(
+                f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'."
+            )
         self.logger.info(f"=== Creating {instrument} Stacks ===")
-        processed_path = default_data_path( 
+        processed_path = default_data_path(
             f"{self.release_name}_processed_{self.processing_version}"
         )
         if instrument == "NIR":
             in_dir = processed_path / "persistence" / "NIR"
         else:
-            data_path = default_data_path(
-                f"{self.release_name}"
-            )
+            data_path = default_data_path(f"{self.release_name}")
             in_dir = data_path / "VIS_QUAD"
         if bkg_sub:
             out_dir = processed_path / "stacked" / instrument
@@ -390,7 +412,9 @@ class Pipeline:
     def calculate_background_stats(self, instrument, bkg_sub=True, overwrite=False):
         """Calculate background statistics."""
         if instrument not in ["NIR", "VIS"]:
-            raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
+            raise ValueError(
+                f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'."
+            )
         self.logger.info(f"=== Calculating {instrument} Background Statistics ===")
         path = default_data_path(
             f"{self.release_name}_processed_{self.processing_version}"
