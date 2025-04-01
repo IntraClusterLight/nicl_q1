@@ -12,7 +12,7 @@ import concurrent.futures
 import logging
 from functools import partial
 from itertools import product
-from typing import Callable, List, Optional, Any
+from typing import Callable, Optional, Any
 
 from nicl.euclid.data_access import DataAccess
 from nicl.euclid.utilities import default_data_path
@@ -43,11 +43,11 @@ FILTERS = NIR_FILTERS + ["VIS"]
 # %% ../../nbs/euclid/pipeline.ipynb 5
 def possibly_concurrent(
     fn: Callable,  # Function to execute
-    targets: List[Any],  # List of targets (e.g. obs_ids) to process
+    targets: list[Any],  # List of targets (e.g. obs_ids) to process
     *args,  # Positional arguments for fn
     executor: Optional[Callable] = None,  # Executor factory function
     **kwargs,  # Keyword arguments for fn
-) -> List[Any]:
+) -> list[Any]:
     """Run a function for each target, in parallel if executor is provided."""
     results = [None] * len(targets)
     if executor is not None:
@@ -84,7 +84,7 @@ def possibly_concurrent(
 
 
 def get_required_obs_ids(target_obs_ids, available_obs_ids, half_window):
-    """Get the list of obs_ids including neighboring observations required for skyflats"""
+    """Get the list of obs_ids including neighboring observations required for skyflats."""
     target_obs_ids = list(target_obs_ids)
     group_for_obs_id = group_obs_ids(
         target_obs_ids, available_obs_ids, half_window=half_window
@@ -153,7 +153,7 @@ class Pipeline:
         pass
 
     def get_nir_data(self):
-        """Step 1a: Download NIR data files."""
+        """Download NIR data files."""
         self.logger.info("=== Downloading NIR Data ===")
 
         outpath = default_data_path(self.release_name)
@@ -175,7 +175,7 @@ class Pipeline:
             da.download_sir_files_for_observation(obs_id, outpath=outpath)
 
     def get_vis_data(self):
-        """Step 1b: Download VIS data files."""
+        """Download VIS data files."""
         self.logger.info("=== Downloading VIS Data ===")
 
         outpath = default_data_path(self.release_name)
@@ -199,7 +199,6 @@ class Pipeline:
         return default_data_path("zarr", self.release_name, instrument)
 
     def _try_create_zarr_refs(self, obs_id, path, zarr_path):
-        """Helper function for creating zarr references."""
         create_all_zarr_refs(path, zarr_path, obs_id_glob=f"{obs_id}")
 
     def create_zarr_refs(self, obs_ids, instrument):
@@ -221,7 +220,6 @@ class Pipeline:
         )
 
     def _try_create_coarse_data(self, obs_id, instrument, zarr_path, n_pix):
-        """Helper function for creating coarse data."""
         create_coarse_data(obs_id, zarr_path, instrument=instrument, n_pix=n_pix)
 
     def create_coarse_data(self, obs_ids, instrument):
@@ -273,7 +271,7 @@ class Pipeline:
         self.create_zarr_refs(obs_ids, instrument)
         self.create_coarse_data(obs_ids, instrument)
 
-        ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob=f"*")
+        ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob="*")
         available_obs_ids = sorted(ds.observation_id.values)
         group_for_obs_id = group_obs_ids(obs_ids, available_obs_ids, half_window=hw)
 
@@ -295,23 +293,20 @@ class Pipeline:
                 write_skyflats(obs_id, flats, outpath, coarse_factor=n_pix, wcs=wcs)
 
     def create_nir_skyflats(self):
-        """Create NIR skyflats."""
         self._create_skyflats(instrument="NIR")
 
     def create_vis_skyflats(self):
-        """Create VIS skyflats."""
         self._create_skyflats(instrument="VIS")
 
     def _try_correct_persistence(self, obs_id, path, processed_path):
-        """Helper function for persistence correction."""
         self.logger.info(f"Processing {obs_id}...")
         outpath = processed_path / f"persistence/NIR/{obs_id}/"
-        skyflat_path = processed_path / f"skyflat/NIR/"
+        skyflat_path = processed_path / "skyflat/NIR/"
         correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
         self.logger.info(f"Completed {obs_id}...")
 
     def do_persistence_correction(self):
-        """Step 3: Perform persistence correction."""
+        """Perform persistence correction."""
         self.logger.info("=== Performing Persistence Correction ===")
         path = default_data_path(self.release_name)
         processed_path = default_data_path(
@@ -328,7 +323,7 @@ class Pipeline:
         )
 
     def _try_combine(self, obs_id, in_dir, out_dir_parent, filters, bkg_sub=True):
-        """Helper function for creating stacks."""
+        """Create stacks for obs_id if the output foler does not already exist."""
         out_dir = out_dir_parent / f"{obs_id}"
         if out_dir.exists():
             self.logger.info(f"Skipping {obs_id} because it already exists")
@@ -347,7 +342,7 @@ class Pipeline:
                 raise
 
     def create_stacks(self, instrument, bkg_sub=True, ):
-        """Step 4: Create image stacks."""
+        """Create image stacks."""
         if instrument not in ["NIR", "VIS"]:
             raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
         self.logger.info(f"=== Creating {instrument} Stacks ===")
@@ -378,7 +373,7 @@ class Pipeline:
         )
 
     def _try_measure(self, obs_id_and_filter, path, overwrite=False):
-        """Helper function for background statistics."""
+        """Measure background statistics and handle errors."""
         obs_id, filter = obs_id_and_filter
         filename = f"EUC_NIR_W-STK_{filter}-{obs_id}.fits"
         obs_path = path / f"{obs_id}"
@@ -393,7 +388,7 @@ class Pipeline:
                 raise
 
     def calculate_background_stats(self, instrument, bkg_sub=True, overwrite=False):
-        """Step 5: Calculate background statistics."""
+        """Calculate background statistics."""
         if instrument not in ["NIR", "VIS"]:
             raise ValueError(f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'.")
         self.logger.info(f"=== Calculating {instrument} Background Statistics ===")
@@ -469,5 +464,3 @@ class Pipeline:
 
         # Step 5: Calculate background statistics
         self.calculate_background_stats(bkg_sub=False)
-
-        self.logger.info("Cirrus NIR processing pipeline complete!")
