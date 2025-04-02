@@ -67,9 +67,7 @@ def create_masks(
             zp = image.header[zeropoint] * u.ABmag
         else:
             zp = zeropoint * u.ABmag
-        sb_adu_threshold = sb_to_adu(
-            sb_threshold, get_pixel_scale(image), zp
-        )
+        sb_adu_threshold = sb_to_adu(sb_threshold, get_pixel_scale(image), zp)
         bcg_mask = create_bcg_mask(
             image.data,
             sb_threshold=sb_adu_threshold,
@@ -95,7 +93,7 @@ def create_masks(
         icl_mask = None
     # === Regular objects ===
     if make_faint_mask:
-        # In this case, we exclude objects under the ICL mask, 
+        # In this case, we exclude objects under the ICL mask,
         # as these will be included in the faint mask
         object_mask, bkg, threshold, centre_mask = create_object_mask(
             image.data,
@@ -152,32 +150,49 @@ def stack_nir_bands(H_filename, J_filename, Y_filename, output_dir=None, label=N
     logger.info(f"Stacking images: {H_filename}, {J_filename}, {Y_filename}")
     filenames = {"H": H_filename, "J": J_filename, "Y": Y_filename}
     images = {band: fits.getdata(filenames[band]) for band in ["H", "J", "Y"]}
-    logger.debug(f"Shapes: H={images['H'].shape}, J={images['J'].shape}, Y={images['Y'].shape}")
-    logger.debug(f"NaN Count: H={np.isnan(images['H']).sum()}, J={np.isnan(images['J']).sum()}, Y={np.isnan(images['Y']).sum()}")
+    logger.debug(
+        f"Shapes: H={images['H'].shape}, J={images['J'].shape}, Y={images['Y'].shape}"
+    )
+    logger.debug(
+        f"NaN Count: H={np.isnan(images['H']).sum()}, J={np.isnan(images['J']).sum()}, Y={np.isnan(images['Y']).sum()}"
+    )
 
     # create global mask
     masks = {band: ~np.isfinite(images[band]) for band in ["H", "J", "Y"]}
-    global_mask = masks["H"] | masks["J"] | masks ["Y"]
+    global_mask = masks["H"] | masks["J"] | masks["Y"]
     for band in ["H", "J", "Y"]:
         images[band][global_mask] = np.nan
-    
+
     # combined image
     bandwidth = {"H": 499.9, "J": 399.4, "Y": 262.7}
-    total_bandwidth = bandwidth['H'] + bandwidth['J'] + bandwidth['Y']
-    combined_image = ((images['H'] * bandwidth['H']) + (images['J'] * bandwidth['J']) + (images['Y'] * bandwidth['Y'])) / total_bandwidth
-    logger.debug(f"Combined Image: Min={np.nanmin(combined_image)}, Max={np.nanmax(combined_image)}, NaN Count={np.isnan(combined_image).sum()}")
+    total_bandwidth = bandwidth["H"] + bandwidth["J"] + bandwidth["Y"]
+    combined_image = (
+        (images["H"] * bandwidth["H"])
+        + (images["J"] * bandwidth["J"])
+        + (images["Y"] * bandwidth["Y"])
+    ) / total_bandwidth
+    logger.debug(
+        f"Combined Image: Min={np.nanmin(combined_image)}, Max={np.nanmax(combined_image)}, NaN Count={np.isnan(combined_image).sum()}"
+    )
 
     if output_dir:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         prefix = f"{label}_" if label else ""
         header = WCS(fits.getheader(H_filename)).to_header()
-        fits.writeto(output_dir / f"{prefix}HJY_combined.fits", combined_image, header=header, overwrite=True)
+        fits.writeto(
+            output_dir / f"{prefix}HJY_combined.fits",
+            combined_image,
+            header=header,
+            overwrite=True,
+        )
 
     return combined_image
 
 
-def create_combined_nir_mask(H_filename, J_filename, Y_filename, output_dir=None, label=None):
+def create_combined_nir_mask(
+    H_filename, J_filename, Y_filename, output_dir=None, label=None
+):
     """Create a combined NIR mask for use when measuring ICL."""
     filenames = {"H": H_filename, "J": J_filename, "Y": Y_filename}
     images = dict()
@@ -185,7 +200,12 @@ def create_combined_nir_mask(H_filename, J_filename, Y_filename, output_dir=None
         image = fits.getdata(filenames[band])
         m = create_masks(image, create_faint_mask=False)
         mask_for_background = m["badpixel"] | m["icl"] | m["object"]
-        bkg = get_background(image, mask=mask_for_background, box_size=NIR_STACK_BKG_BOX_SIZE, filter_size=NIR_STACK_BKG_FILTER_SIZE)
+        bkg = get_background(
+            image,
+            mask=mask_for_background,
+            box_size=NIR_STACK_BKG_BOX_SIZE,
+            filter_size=NIR_STACK_BKG_FILTER_SIZE,
+        )
         images[band] = image - bkg
     combined_image = stack_nir_bands(images["H"], images["J"], images["Y"])
     masks = create_masks(combined_image)
@@ -197,8 +217,18 @@ def create_combined_nir_mask(H_filename, J_filename, Y_filename, output_dir=None
         output_dir.mkdir(parents=True, exist_ok=True)
         prefix = f"{label}_" if label else ""
         header = WCS(fits.getheader(H_filename)).to_header()
-        fits.writeto(output_dir / f"{prefix}NIR_background_mask.fits", mask_for_background, header=header, overwrite=True)
-        fits.writeto(output_dir / f"{prefix}NIR_measurement_mask.fits", mask_for_measurement, header=header, overwrite=True)
+        fits.writeto(
+            output_dir / f"{prefix}NIR_background_mask.fits",
+            mask_for_background,
+            header=header,
+            overwrite=True,
+        )
+        fits.writeto(
+            output_dir / f"{prefix}NIR_measurement_mask.fits",
+            mask_for_measurement,
+            header=header,
+            overwrite=True,
+        )
 
     return mask_for_measurement
 
@@ -215,7 +245,17 @@ def create_vis_mask(VIS_filename, output_dir=None, label=None):
         output_dir.mkdir(parents=True, exist_ok=True)
         prefix = f"{label}_" if label else ""
         header = WCS(fits.getheader(VIS_filename)).to_header()
-        fits.writeto(output_dir / f"{prefix}VIS_background_mask.fits", mask_for_background, header=header, overwrite=True)
-        fits.writeto(output_dir / f"{prefix}VIS_measurement_mask.fits", mask_for_measurement, header=header, overwrite=True)
+        fits.writeto(
+            output_dir / f"{prefix}VIS_background_mask.fits",
+            mask_for_background,
+            header=header,
+            overwrite=True,
+        )
+        fits.writeto(
+            output_dir / f"{prefix}VIS_measurement_mask.fits",
+            mask_for_measurement,
+            header=header,
+            overwrite=True,
+        )
 
     return mask_for_measurement

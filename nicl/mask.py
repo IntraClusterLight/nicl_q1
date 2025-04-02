@@ -93,7 +93,7 @@ def remove_segment_at_position(
 # %% ../nbs/13_mask.ipynb 5
 def smooth_image(image, sigma):
     """Smooth `image` using Gaussian with standard deviation `sigma`."""
-    kernel = Gaussian2DKernel(x_stddev=sigma, x_size=6*sigma+1)
+    kernel = Gaussian2DKernel(x_stddev=sigma, x_size=6 * sigma + 1)
     kernel.normalize()
     with catch_warnings():
         filterwarnings("ignore", ".*NaN values detected post convolution.*")
@@ -155,7 +155,9 @@ def create_icl_mask(
     logger.info("Creating ICL mask")
     with catch_warnings():
         filterwarnings("ignore", ".*Input data contains invalid values*")
-        logger.debug(f"Estimating background with box size {bkg_box_size} and filter size {bkg_filter_size}")
+        logger.debug(
+            f"Estimating background with box size {bkg_box_size} and filter size {bkg_filter_size}"
+        )
         bkg = get_background(
             image,
             box_size=bkg_box_size,
@@ -167,7 +169,9 @@ def create_icl_mask(
     logger.debug(f"Smoothing image with sigma={smooth_sigma}")
     if median_filter:
         logger.debug("Smoothing with a sampled median filter")
-        smoothed_image = sampled_median_filter(image, size=smooth_sigma * 5, gaussian_sigma=smooth_sigma)
+        smoothed_image = sampled_median_filter(
+            image, size=smooth_sigma * 5, gaussian_sigma=smooth_sigma
+        )
     else:
         logger.debug("Smoothing with a Gaussian kernel")
         smoothed_image = smooth_image(image, sigma=smooth_sigma)
@@ -216,9 +220,7 @@ def fast_mask(
     if mask_params:
         params.update(mask_params)
     if params["smooth_sigma"] > 0:
-        logger.info(
-            f"smoothing image with sigma of {params['smooth_sigma']} pixels"
-        )
+        logger.info(f"smoothing image with sigma of {params['smooth_sigma']} pixels")
         smoothed_image = smooth_image(image, params["smooth_sigma"])
     else:
         smoothed_image = image
@@ -245,9 +247,7 @@ def fast_mask(
         logger.info(f"{params['nsigma']} sigma threshold is {threshold:.5f}")
         mask = smoothed_image > threshold
         if params["erosion_iterations"] > 0:
-            logger.debug(
-                f"eroding mask with {params['erosion_iterations']} iterations"
-            )
+            logger.debug(f"eroding mask with {params['erosion_iterations']} iterations")
             mask = binary_erosion(mask, iterations=params["erosion_iterations"])
         if params["dilation_radius"] > 0 and params["dilation_iterations"] > 0:
             structure = circular_footprint(params["dilation_radius"])
@@ -301,9 +301,7 @@ def dilated_object_mask(
             logger.debug(
                 f"seeking to grow objects with radius {radius_min} pixels by {growth_pixels} pixels"
             )
-            logger.debug(
-                f"applying dilation with radius {radius} pixels"
-            )
+            logger.debug(f"applying dilation with radius {radius} pixels")
             # radius = min(9, max(1, int(np.sqrt(growth_pixels))))
             # iterations = max(1, int(growth_pixels / radius))
             # logger.debug(
@@ -317,7 +315,7 @@ def dilated_object_mask(
             #     structure=circular_footprint(radius),
             #     iterations=iterations,
             # )
-            
+
             big_mask = segm.make_source_mask(footprint=circular_footprint(radius))
             logger.debug(f"new mask contains {big_mask.sum()} pixels")
             obj_mask = obj_mask | big_mask
@@ -332,7 +330,7 @@ def dilated_object_mask(
 def create_object_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
-    exclude_mask= None,  # if provided, objects that overlap with this mask are removed
+    exclude_mask=None,  # if provided, objects that overlap with this mask are removed
     exclude_position=False,  # segment at this position is removed; False: do not remove the segment, None: assume the image centre
     wcs=None,  # WCS for converting a `centre_pos` supplied as a SkyCoord to pixels
     growth=0.5,  # the relative padding around each source
@@ -397,7 +395,9 @@ def create_object_mask(
         logger.info(f"Supplied exclude mask contains {exclude_mask.sum()} pixels")
         segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=True)
     elif exclude_position is not False:
-        segm_deblend = remove_segment_at_position(segm_deblend, image, exclude_position, wcs)
+        segm_deblend = remove_segment_at_position(
+            segm_deblend, image, exclude_position, wcs
+        )
     nlabels_centre = segm_full.nlabels - segm_deblend.nlabels
     if nlabels_centre > 0:
         logger.info(f"Removed {nlabels_centre} sources at the centre")
@@ -451,10 +451,16 @@ def create_faint_mask(
     detection_image = smooth_image(image, sigma=params["smooth_sigma"])
     if include_mask is not None:
         dilation_radius = 10
-        dilation_iterations = int(round(np.sqrt(include_mask.sum() / np.pi) / dilation_radius))
-        logger.info(f"Creating detection mask by dilating include mask by {dilation_radius * dilation_iterations} pixels")
+        dilation_iterations = int(
+            round(np.sqrt(include_mask.sum() / np.pi) / dilation_radius)
+        )
+        logger.info(
+            f"Creating detection mask by dilating include mask by {dilation_radius * dilation_iterations} pixels"
+        )
         structure = circular_footprint(dilation_radius)
-        detection_mask = binary_dilation(include_mask, structure=structure, iterations=dilation_iterations)
+        detection_mask = binary_dilation(
+            include_mask, structure=structure, iterations=dilation_iterations
+        )
         detection_image[~detection_mask] = np.nan
     logger.info("Detecting sources")
     segm = detect_sources(
@@ -480,7 +486,9 @@ def create_faint_mask(
         logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
     if exclude_position is not False:
         logger.info("Removing segment at exclude_position")
-        segm_deblend = remove_segment_at_position(segm_deblend, image, exclude_position, wcs)
+        segm_deblend = remove_segment_at_position(
+            segm_deblend, image, exclude_position, wcs
+        )
         logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
     if exclude_mask is not None:
         logger.info("Removing objects entirely covered by exclude_mask")
@@ -506,7 +514,9 @@ def plot_mask(
     fw, fh = plt.rcParams["figure.figsize"]
     fw = 2 * fw
     fh = fw * nrows / ncols
-    fig, ax = plt.subplots(nrows, ncols, figsize=(fw, fh), squeeze=False, layout="constrained")
+    fig, ax = plt.subplots(
+        nrows, ncols, figsize=(fw, fh), squeeze=False, layout="constrained"
+    )
     rms = median_abs_deviation(img, axis=None, scale="normal", nan_policy="omit")
     median = np.nanmedian(img)
     if background_focus:

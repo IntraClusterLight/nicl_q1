@@ -67,9 +67,15 @@ def _mag_to_flux(mag, zp):
     return 10 ** (-(mag - zp) / 2.5)
 
 # %% ../../nbs/euclid/testing.ipynb 7
-def create_test_images(outpath, cluster_redshift=None, shape=None,
-                       background_rms_level=None, background_scale=None,
-                       background_filenames=None, background_seed=0):
+def create_test_images(
+    outpath,
+    cluster_redshift=None,
+    shape=None,
+    background_rms_level=None,
+    background_scale=None,
+    background_filenames=None,
+    background_seed=0,
+):
     path = default_data_path("Q1_R1_clusters_test", "MCXCJ1754.6+6803")
     hdul = fits.open(path / "EUC_NIR_W-STK_H-MCXCJ1754.6+6803.fits")
     if shape is None:
@@ -84,14 +90,18 @@ def create_test_images(outpath, cluster_redshift=None, shape=None,
 
     if cluster_redshift:
         bcg_appmags, icl_appmags = get_bcg_icl_mags(cluster_redshift)
-        bcg_re = (physical_to_angular(22.6 * u.kpc, cluster_redshift) / pixscale).to_value(u.pix)
+        bcg_re = (
+            physical_to_angular(22.6 * u.kpc, cluster_redshift) / pixscale
+        ).to_value(u.pix)
         bcg_n = 4.6
         bcg_q = 0.6
         bcg_theta = 30
         bcg = galsim.Sersic(n=bcg_n, half_light_radius=bcg_re, flux=1)
         bcg_shape = galsim.Shear(q=bcg_q, beta=bcg_theta * galsim.degrees)
         bcg = bcg.shear(bcg_shape)
-        icl_re = (physical_to_angular(189.5 * u.kpc, cluster_redshift) / pixscale).to_value(u.pix)
+        icl_re = (
+            physical_to_angular(189.5 * u.kpc, cluster_redshift) / pixscale
+        ).to_value(u.pix)
         icl_n = 0.76
         icl_q = 0.6
         icl_theta = 60
@@ -106,7 +116,7 @@ def create_test_images(outpath, cluster_redshift=None, shape=None,
     outpath.mkdir(parents=True, exist_ok=True)
     image = galsim.ImageF(*shape)
     label = "cluster" if cluster_redshift else "sky"
-    
+
     for band in ["H", "J", "Y", "VIS"]:
         hdul["RMS"].data[:] = rms[band]
         if cluster_redshift:
@@ -118,9 +128,7 @@ def create_test_images(outpath, cluster_redshift=None, shape=None,
             cluster = bcg * bcg_flux + icl * icl_flux
             cluster.drawImage(image, method="no_pixel")
             hdul["SCI"].data[:] = image.array
-            hdul.writeto(
-                outpath / f"{label}_{band}_no_noise.fits", overwrite=True
-            )
+            hdul.writeto(outpath / f"{label}_{band}_no_noise.fits", overwrite=True)
             source_noise = np.random.normal(
                 scale=np.maximum(0, source_noise_level * image.array), size=shape
             )
@@ -129,14 +137,16 @@ def create_test_images(outpath, cluster_redshift=None, shape=None,
             bkg_hdul = fits.open(background_filenames[band])
             bkg = bkg_hdul["SCI"].data
             bkg_shape = bkg.shape
-            rng = np.random.default_rng(background_seed)        
+            rng = np.random.default_rng(background_seed)
             max_y = bkg_shape[0] - shape[0]
             max_x = bkg_shape[1] - shape[1]
             if max_y < 0 or max_x < 0:
-                raise ValueError(f"Background image size {bkg_shape} is too small for the required shape {shape}")
+                raise ValueError(
+                    f"Background image size {bkg_shape} is too small for the required shape {shape}"
+                )
             start_y = rng.integers(0, max_y + 1)
             start_x = rng.integers(0, max_x + 1)
-            bkg = bkg[start_y:start_y + shape[0], start_x:start_x + shape[1]]
+            bkg = bkg[start_y : start_y + shape[0], start_x : start_x + shape[1]]
             hdul["SCI"].data[:] = bkg
         else:
             if background_rms_level is None:
@@ -157,6 +167,7 @@ def create_basic_cluster_test_images():
     outpath = TEST_IMAGES_OUTPATH / "basic_test"
     create_test_images(outpath, cluster_redshift=CLUSTER_REDSHIFT)
 
+
 def create_basic_sky_test_images():
     outpath = TEST_IMAGES_OUTPATH / "basic_test"
     create_test_images(outpath, cluster_redshift=None, shape=SKY_PATCH_SHAPE)
@@ -164,11 +175,23 @@ def create_basic_sky_test_images():
 # %% ../../nbs/euclid/testing.ipynb 12
 def create_varying_background_cluster_test_images():
     outpath = TEST_IMAGES_OUTPATH / "varying_background"
-    create_test_images(outpath, cluster_redshift=CLUSTER_REDSHIFT, background_rms_level=BACKGROUND_RMS_LEVEL, background_scale=BACKGROUND_SCALE)
+    create_test_images(
+        outpath,
+        cluster_redshift=CLUSTER_REDSHIFT,
+        background_rms_level=BACKGROUND_RMS_LEVEL,
+        background_scale=BACKGROUND_SCALE,
+    )
+
 
 def create_varying_background_sky_test_images():
     outpath = TEST_IMAGES_OUTPATH / "varying_background"
-    create_test_images(outpath, cluster_redshift=None, shape=SKY_PATCH_SHAPE, background_rms_level=BACKGROUND_RMS_LEVEL, background_scale=BACKGROUND_SCALE)
+    create_test_images(
+        outpath,
+        cluster_redshift=None,
+        shape=SKY_PATCH_SHAPE,
+        background_rms_level=BACKGROUND_RMS_LEVEL,
+        background_scale=BACKGROUND_SCALE,
+    )
 
 # %% ../../nbs/euclid/testing.ipynb 16
 def create_sky_patch(outpath, ra, dec, size):
@@ -199,9 +222,11 @@ def create_sky_patch(outpath, ra, dec, size):
         bkg_sub=False,
     )
 
-
 # %% ../../nbs/euclid/testing.ipynb 18
 def create_real_background_cluster_test_images(background_filenames):
     outpath = TEST_IMAGES_OUTPATH / "real_background"
-    create_test_images(outpath, cluster_redshift=CLUSTER_REDSHIFT, background_filenames=background_filenames)
-
+    create_test_images(
+        outpath,
+        cluster_redshift=CLUSTER_REDSHIFT,
+        background_filenames=background_filenames,
+    )

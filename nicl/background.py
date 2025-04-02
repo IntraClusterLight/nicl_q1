@@ -23,9 +23,17 @@ configure_logging(__name__)
 
 # %% ../nbs/12_background.ipynb 4
 def get_background(image, *, box_size, filter_size, mask=None):
-    bkg_estimator = MedianBackground() 
+    bkg_estimator = MedianBackground()
     sigma_clip = SigmaClip(sigma=3.0, maxiters=10)
-    bkg = Background2D(image, box_size, mask=mask, filter_size=filter_size, exclude_percentile=90, bkg_estimator=bkg_estimator, sigma_clip=sigma_clip)
+    bkg = Background2D(
+        image,
+        box_size,
+        mask=mask,
+        filter_size=filter_size,
+        exclude_percentile=90,
+        bkg_estimator=bkg_estimator,
+        sigma_clip=sigma_clip,
+    )
     return bkg
 
 # %% ../nbs/12_background.ipynb 5
@@ -52,7 +60,9 @@ def plot_background(
     cmap.set_bad("black")
     ax[0].imshow(img, norm=norm, origin="lower", cmap=cmap)
     if isinstance(bkg, Background2D):
-        ax[1].imshow(bkg.background, norm=norm, origin="lower", interpolation="none", cmap=cmap)
+        ax[1].imshow(
+            bkg.background, norm=norm, origin="lower", interpolation="none", cmap=cmap
+        )
         bkg.plot_meshes(ax=ax[0], outlines=True, marker="+", color="white", alpha=0.75)
     else:
         ax[1].imshow(bkg, norm=norm, origin="lower", interpolation="none", cmap=cmap)

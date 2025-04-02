@@ -11,4 +11,3 @@ from astropy.io import fits
 
 from ..main import configure_logging
 from .autoprof import run_autoprof
-

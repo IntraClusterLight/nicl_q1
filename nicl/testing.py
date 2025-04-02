@@ -34,8 +34,15 @@ def create_test_background(
     `background_rms`. The two are summed to produce `random_with_background`.
     """
     random = norm(0, rms).rvs(size=shape)
-    if background_rms is not None and background_rms > 0 and background_scale is not None and background_scale > 0:
-        background = generate_field(_distrib, norm(0, 0.1 / background_scale).pdf, shape)
+    if (
+        background_rms is not None
+        and background_rms > 0
+        and background_scale is not None
+        and background_scale > 0
+    ):
+        background = generate_field(
+            _distrib, norm(0, 0.1 / background_scale).pdf, shape
+        )
         background *= background_rms / background.std()
     else:
         background = np.zeros(shape)
@@ -53,11 +60,12 @@ def create_test_mask(
     mask = mask > threshold * mask.std()
     return mask
 
+
 def correlate_pixels(img, slope=0.8, verbose=True):
     kernel = TrapezoidDisk2DKernel(0, slope)
     n = kernel.shape[0]
-    f_centre = kernel.array[(n - 1)//2, (n - 1)//2]
+    f_centre = kernel.array[(n - 1) // 2, (n - 1) // 2]
     if verbose:
-        print(f"Fraction of flux in central pixel is {100*f_centre:.0f}%")
+        print(f"Fraction of flux in central pixel is {100 * f_centre:.0f}%")
     convolved_img = convolve(img, kernel)
     return convolved_img

@@ -180,16 +180,36 @@ def calculate_icl_profile(
         bcg_pos = get_img_centre_pixel(image).astype(int)
     centre = bcg_pos + centre
 
-    profile = measure_profile(outer_semimajor, ax_ratio, pa, centre, image.data, mask,
-                              sigma_clip=sigma_clip, n_sigma=n_sigma,
-                              pixel_size=pixel_size, zp=zp, r500_pix=r500_pix)
+    profile = measure_profile(
+        outer_semimajor,
+        ax_ratio,
+        pa,
+        centre,
+        image.data,
+        mask,
+        sigma_clip=sigma_clip,
+        n_sigma=n_sigma,
+        pixel_size=pixel_size,
+        zp=zp,
+        r500_pix=r500_pix,
+    )
 
     return profile, icl_shape
 
 
-def measure_profile(outer_semimajor, ax_ratio, pa, centre, data,
-                    mask=None, sigma_clip=True, n_sigma=3.0,
-                    pixel_size=None, zp=None, r500_pix=None):
+def measure_profile(
+    outer_semimajor,
+    ax_ratio,
+    pa,
+    centre,
+    data,
+    mask=None,
+    sigma_clip=True,
+    n_sigma=3.0,
+    pixel_size=None,
+    zp=None,
+    r500_pix=None,
+):
     apertures = [
         EllipticalAperture(
             positions=centre,
@@ -216,8 +236,7 @@ def measure_profile(outer_semimajor, ax_ratio, pa, centre, data,
     else:
         sig_clip = None
     aperture_stats = [
-        ApertureStats(data, ap, mask=mask, sigma_clip=sig_clip)
-        for ap in apertures
+        ApertureStats(data, ap, mask=mask, sigma_clip=sig_clip) for ap in apertures
     ]
     profile["mean"] = [ap.mean for ap in aperture_stats]
     profile["mean_std"] = [ap.std for ap in aperture_stats]
@@ -251,7 +270,9 @@ def icl_total_flux(flux, error, area):
     return sum, err
 
 
-def background_correct_profile(background_profile, profile, image, zp=None, pixel_size=None):
+def background_correct_profile(
+    background_profile, profile, image, zp=None, pixel_size=None
+):
     profile = profile.copy()
     if zp is not None:
         if pixel_size is None:
