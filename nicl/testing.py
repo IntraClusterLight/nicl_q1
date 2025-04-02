@@ -30,12 +30,15 @@ def create_test_background(
     specified `rms`. A spatially varying `background` is created as a Gaussian random field,
     with a Gaussian power spectrum, centred at zero wavelength with a standard deviation of
     0.1 / `background_scale`. This produces smooth spatial features on scales on the order of
-    `background_scale`. This spatially varying background is scaled to have an rms of`
+    `background_scale`. This spatially varying background is scaled to have an rms of
     `background_rms`. The two are summed to produce `random_with_background`.
     """
     random = norm(0, rms).rvs(size=shape)
-    background = generate_field(_distrib, norm(0, 0.1 / background_scale).pdf, shape)
-    background *= background_rms / background.std()
+    if background_rms is not None and background_rms > 0 and background_scale is not None and background_scale > 0:
+        background = generate_field(_distrib, norm(0, 0.1 / background_scale).pdf, shape)
+        background *= background_rms / background.std()
+    else:
+        background = np.zeros(shape)
     random_with_background = random + background
     return random, background, random_with_background
 
