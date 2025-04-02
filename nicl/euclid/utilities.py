@@ -4,10 +4,11 @@
 
 # %% auto 0
 __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'dq_to_mask', 'get_dq_mask', 'get_persistence_mask',
-           'get_invalid_mask', 'get_invalid_mask_without_persistence', 'get_rms', 'fits_append', 'remove_if_necessary',
-           'default_data_path', 'euclid_credentials', 'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile',
-           'get_nisp_dither', 'get_nisp_stack', 'get_tile_index_from_filename', 'get_obs_id_from_filename',
-           'get_dither_id_from_filename', 'get_filter_from_filename', 'round_up_box_size']
+           'get_invalid_mask', 'get_invalid_mask_without_persistence', 'get_nir_saturation_only_mask',
+           'get_vis_star_mask', 'get_rms', 'fits_append', 'remove_if_necessary', 'default_data_path',
+           'euclid_credentials', 'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile', 'get_nisp_dither',
+           'get_nisp_stack', 'get_vis_tile', 'get_vis_dither', 'get_vis_stack', 'get_tile_index_from_filename',
+           'get_obs_id_from_filename', 'get_dither_id_from_filename', 'get_filter_from_filename', 'round_up_box_size']
 
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
@@ -115,8 +116,9 @@ def dq_to_mask(dq, maskbits=[0]):
     return mask
 
 
-def get_dq_mask(fn, extname="SCI", maskbits=[0]):
-    extname = extname.replace("SCI", "DQ")
+def get_dq_mask(fn, extname="SCI", maskbits=[0], instrument="NIR"):
+    dq_suffix = "FLG" if instrument == "VIS" else "DQ"
+    extname = extname.replace("SCI", dq_suffix)
     dq = fits.getdata(fn, extname=extname)
     return dq_to_mask(dq, maskbits)
 
@@ -135,9 +137,22 @@ def get_invalid_mask_without_persistence(fn, extname):
         return get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 10, 16, 23])
 
 
-def get_rms(fn, extname):
-    extname = extname.replace("SCI", "RMS")
+def get_nir_saturation_only_mask(fn, extname):
+    sat = get_dq_mask(fn, extname, [10]) 
+    otherwise_invalid = get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 13, 16, 23])
+    return sat & ~otherwise_invalid
+
+
+def get_vis_star_mask(fn, extname):
+    return get_dq_mask(fn, extname, [18], instrument="VIS")
+
+
+def get_rms(fn, extname, instrument="NIR"):
+    rms_suffix = "RMS" if instrument == "NIR" else "VAR"
+    extname = extname.replace("SCI", rms_suffix)
     rms = fits.getdata(fn, extname=extname)
+    if instrument == "VIS":
+        rms = np.sqrt(rms)
     return rms
 
 
@@ -211,7 +226,28 @@ def get_nisp_dither(obs_id, dither, filter, path):
 
 def get_nisp_stack(obs_id, filter, path):
     filter = filter.replace("NIR_", "")
-    fn = f"EUC_NIR_W-STK-IMAGE_{filter}-{obs_id}.fits"
+    fn = f"EUC_NIR_W-STK_{filter}-{obs_id}.fits"
+    return find_single_file(fn, path)
+
+
+def get_vis_tile(tile_index, path):
+    fn = f"EUC_MER_BGSUB-MOSAIC-VIS_TILE{tile_index}*.fits"
+    return find_single_file(fn, path)
+
+
+def get_vis_dither(obs_id, dither, path):
+    obs_id = f"{obs_id:06d}"
+    if len(dither) == 3:
+        dither = f"0{dither}"
+    fn = f"EUC_VIS_SWL-DET-{obs_id}-{dither}*.fits"
+    return find_single_file(fn, path)
+
+
+def get_vis_stack(obs_id, path):
+    obs_id = f"{obs_id:06d}"
+    if len(dither) == 3:
+        dither = f"0{dither}"
+    fn = f"EUC_VIS-STK-{obs_id}-{dither}.fits"
     return find_single_file(fn, path)
 
 # %% ../../nbs/euclid/utilities.ipynb 11
@@ -256,15 +292,15 @@ def round_up_box_size(x, y):
         return x
     if y <= 1:
         return 1
-    if x % y == 0:
-        return y
+    if x % round(y) == 0:
+        return round(y)
     frac_upper = np.round(x / np.floor(x / y)).astype(int)
     frac_lower = np.round(x / np.ceil(x / y)).astype(int)
     if np.abs(frac_upper - y) < np.abs(frac_lower - y):
         z = frac_upper
     else:
         z = frac_lower
-    # check if z actually reduces the padding/cropping compared to y
-    if np.min([x % z, z - (x % z)]) > np.min([x % y, y - (x % y)]):
+    # check if z actually reduces the padding/cropping compared to round(y)
+    if np.min([x % z, z - (x % z)]) > np.min([x % round(y), round(y) - (x % round(y))]):
         raise ValueError("This should not happen")
     return z

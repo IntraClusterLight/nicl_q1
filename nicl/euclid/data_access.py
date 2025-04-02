@@ -561,7 +561,7 @@ class DataAccess:
                             if hdu.name == "LDAC_OBJECTS":
                                 tab = Table.read(hdu)
                                 if this_filter == "VIS":
-                                    tab["DETECTOR"] = f"{tab.meta["CCDID"]}.{tab.meta["QUADID"]}"
+                                    tab["DETECTOR"] = f"{tab.meta['CCDID']}.{tab.meta['QUADID']}"
                                 else:
                                     tab["DETECTOR"] = tab.meta["DET_ID"]
                                 tab.meta = None

@@ -63,8 +63,8 @@ def read_and_apply_skyflat(img, fn, extname, skyflat_path):
     obs_id = get_obs_id_from_filename(fn)
     filter = get_filter_from_filename(fn)
     detector = extname.split(".")[0]
-    skyflat = read_skyflat(obs_id, filter, detector, skyflat_path)
-    return apply_skyflat(img, skyflat)
+    skyflat, coarse_factor = read_skyflat(obs_id, filter, detector, skyflat_path)
+    return apply_skyflat(img, skyflat, interpolation_method="nearest", coarse_factor=coarse_factor)
 
 # %% ../../nbs/euclid/persistence.ipynb 10
 def get_minimum(images, rms_images, take, masked):

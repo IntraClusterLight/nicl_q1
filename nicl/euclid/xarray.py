@@ -4,10 +4,11 @@
 
 # %% auto 0
 __all__ = ['create_zarr_ref_from_fits', 'open_zarr_ref_as_dataset', 'open_fits_as_dataset', 'write_da_to_fits', 'load_zarr_ref',
-           'load_wcs_from_zarr', 'create_all_zarr_refs', 'read_all_zarr_refs', 'xr_fast_mask']
+           'load_wcs_from_zarr', 'create_all_zarr_refs', 'read_all_zarr_refs', 'xr_fast_mask', 'xr_star_mask']
 
 # %% ../../nbs/euclid/xarray.ipynb 2
 import json
+import os
 from pathlib import Path
 from warnings import catch_warnings, filterwarnings
 
@@ -16,9 +17,8 @@ import pandas as pd
 import fsspec
 import numcodecs
 import xarray as xr
-import zarr
 from astropy.io import fits
-from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU
+from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU, Header
 from astropy.wcs import WCS
 from fsspec.implementations.reference import LazyReferenceMapper
 from kerchunk.codecs import AsciiTableCodec, VarArrCodec
@@ -26,6 +26,7 @@ from kerchunk.combine import MultiZarrToZarr
 from tqdm import tqdm
 
 from ..mask import fast_mask
+from .mask import star_mask
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_filter_from_filename,
@@ -142,10 +143,11 @@ def process_file(
                     numcodecs.FixedScaleOffset(
                         offset=float(attrs.get("BZERO", 0)),
                         scale=float(attrs.get("BSCALE", 1)),
-                        astype=dtype,
-                        dtype=np.dtype(stored_dtype).type,
+                        astype=stored_dtype,
+                        dtype=stored_dtype,
                     )
                 ]
+                #kwargs["filters"] = None
             else:
                 kwargs["filters"] = None
         elif isinstance(hdu, fits.hdu.table.TableHDU):
@@ -377,10 +379,12 @@ def write_da_to_fits(
     fn,  # the filename to which to write the data
     da_wcs=None,  # an optional DataArray of WCS info for each `detector`
     overwrite=False,  # should any existing file be overwritten
+    header=None,  # an optional header to use for the FITS file
 ):
     """Write a DataArray to a FITS file."""
-    hdul = HDUList(PrimaryHDU())
-    if "detector" in da.coords:
+    header = Header(header) if header is not None else None
+    hdul = HDUList(PrimaryHDU(header=header))
+    if "detector" in da.coords: 
         for det in da["detector"].to_numpy():
             if da_wcs is not None:
                 wcs = WCS(da_wcs.sel(detector=det).as_numpy().to_pandas())
@@ -440,7 +444,7 @@ def create_all_zarr_refs(path, zarr_path, obs_id_glob="[23]*"):
 def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
     ref_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/ref.json")]
     datasets = [open_zarr_ref_as_dataset(ref) for ref in ref_files]
-    ds = xr.concat(datasets, dim="observation_id")
+    ds = xr.concat(datasets, dim="observation_id", fill_value={"SCI": np.nan, "RMS": np.nan, "DQ": 0, "FLG": 0})
     ds = ds.assign_coords(y=("y", ds.y.values), x=("x", ds.x.values))
     wcs_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/wcs.zarr")]
     wcs = xr.open_mfdataset(wcs_files, engine="zarr", combine="nested", concat_dim="observation_id")
@@ -474,4 +478,27 @@ def xr_fast_mask(
         output_core_dims=[["x", "y"]],
         output_dtypes=[bool],
     )
+    # ensure the mask is aligned with the data
+    mask = mask.transpose(*data.dims)
+    return mask
+
+# %% ../../nbs/euclid/xarray.ipynb 16
+def xr_star_mask(
+    bitmask,
+    instrument,
+):
+    mask = xr.apply_ufunc(
+        star_mask,
+        bitmask,
+        kwargs=dict(
+            instrument=instrument,
+        ),
+        vectorize=True,
+        dask="parallelized",
+        input_core_dims=[["x", "y"]],
+        output_core_dims=[["x", "y"]],
+        output_dtypes=[bool],
+    )
+    # ensure the mask is aligned with the data
+    mask = mask.transpose(*bitmask.dims)
     return mask
