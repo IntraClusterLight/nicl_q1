@@ -26,7 +26,7 @@ from kerchunk.combine import MultiZarrToZarr
 from tqdm import tqdm
 
 from ..mask import fast_mask
-from .mask import star_mask
+from .stars import star_mask
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_filter_from_filename,

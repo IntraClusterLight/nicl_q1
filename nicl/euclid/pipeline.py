@@ -358,7 +358,7 @@ class Pipeline:
             executor=self.executor,
         )
 
-    def _try_measure(self, obs_id_and_filter, path, overwrite=False):
+    def _try_background_stats(self, obs_id_and_filter, path, overwrite=False):
         """Helper function for background statistics."""
         obs_id, filter = obs_id_and_filter
         filename = f"EUC_NIR_W-STK_{filter}-{obs_id}.fits"
@@ -389,7 +389,7 @@ class Pipeline:
         filters = list(set(self.filters) & set(filters))
         obs_ids_and_filters = list(product(self.target_obs_ids, filters))
         possibly_concurrent(
-            self._try_measure,
+            self._try_background_stats,
             obs_ids_and_filters,
             path=path,
             overwrite=overwrite,

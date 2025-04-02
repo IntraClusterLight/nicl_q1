@@ -60,7 +60,7 @@ def adu_to_sb(adu, pix_scale, zp=27 * u.ABmag):
 def get_pixel_scale(img, wcs=None):
     """Calculate the average pixel scale of the supplied image."""
     if wcs is None:
-        wcs = image.wcs
+        wcs = img.wcs
     return (
         np.mean(
             [s.to_value("arcsec") for s in wcs.celestial.proj_plane_pixel_scales()]

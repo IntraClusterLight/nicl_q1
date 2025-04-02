@@ -118,7 +118,7 @@ def sampled_median_filter(
         data = _nan_to_inf(data, dims)
     if coarse_factor is None:
         size_scale = size if gaussian_sigma is None else min(6 * gaussian_sigma, size)
-        coarsening = max(size_scale // coarse_samples, 1)
+        coarsening = max(int(size_scale // coarse_samples), 1)
     else:
         coarsening = coarse_factor
     if coarsening > 1:
