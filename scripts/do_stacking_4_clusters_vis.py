@@ -26,7 +26,7 @@ def main():
         cutout_cen = SkyCoord(cluster.RA * u.deg, cluster.DEC * u.deg, frame="icrs")
         cutout_size = 2 * cluster.R_deg * u.deg
         try_combine(name=cluster.ID, cutout_cen=cutout_cen, cutout_size=cutout_size,
-                    in_dir=in_path, out_dir=out_path, bkg_sub=False)
+                    in_dir=in_path, out_dir=out_path, pixel_scale=0.3, bkg_sub=False)
 
 if __name__ == '__main__':
     main()
