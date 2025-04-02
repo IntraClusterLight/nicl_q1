@@ -43,7 +43,7 @@ SKYFLAT_HALF_WINDOW_VIS = 5
 
 MAX_WORKERS = 8
 NIR_FILTERS = ["H", "J", "Y"]
-FILTERS = NIR_FILTERS + ["VIS"]
+FILTERS = NIR_FILTERS + ["I"]
 
 # %% ../../nbs/euclid/pipeline.ipynb 5
 def possibly_concurrent(
@@ -382,7 +382,7 @@ class Pipeline:
             out_dir = processed_path / "stacked" / instrument
         else:
             out_dir = processed_path / "stacked_nobkg" / instrument
-        filters = NIR_FILTERS if instrument == "NIR" else ["VIS"]
+        filters = NIR_FILTERS if instrument == "NIR" else ["I"]
         filters = list(set(self.filters) & set(filters))
         possibly_concurrent(
             self._try_combine,
@@ -397,7 +397,10 @@ class Pipeline:
     def _try_measure(self, obs_id_and_filter, path, overwrite=False):
         """Measure background statistics and handle errors."""
         obs_id, filter = obs_id_and_filter
-        filename = f"EUC_NIR_W-STK_{filter}-{obs_id}.fits"
+        if filter == "I":
+            filename = f"EUC_VIS_SWL-STK-{obs_id}.fits"
+        else:
+            filename = f"EUC_NIR-STK_{filter}-{obs_id}.fits"
         obs_path = path / f"{obs_id}"
         if (obs_path / "background_stats" / filename).exists() and not overwrite:
             self.logger.info(f"Skipping {obs_id} {filter} because it already exists")
@@ -423,7 +426,7 @@ class Pipeline:
             path = path / "stacked" / instrument
         else:
             path = path / "stacked_nobkg" / instrument
-        filters = NIR_FILTERS if instrument == "NIR" else ["VIS"]
+        filters = NIR_FILTERS if instrument == "NIR" else ["I"]
         filters = list(set(self.filters) & set(filters))
         obs_ids_and_filters = list(product(self.target_obs_ids, filters))
         possibly_concurrent(
