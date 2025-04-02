@@ -400,7 +400,7 @@ class Pipeline:
         if filter == "I":
             filename = f"EUC_VIS_SWL-STK-{obs_id}.fits"
         else:
-            filename = f"EUC_NIR-STK_{filter}-{obs_id}.fits"
+            filename = f"EUC_NIR_W-STK_{filter}-{obs_id}.fits"
         obs_path = path / f"{obs_id}"
         if (obs_path / "background_stats" / filename).exists() and not overwrite:
             self.logger.info(f"Skipping {obs_id} {filter} because it already exists")

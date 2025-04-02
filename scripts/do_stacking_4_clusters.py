@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-from astropy.table import Table
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 
