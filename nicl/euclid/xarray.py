@@ -17,6 +17,7 @@ import pandas as pd
 import fsspec
 import numcodecs
 import xarray as xr
+import zarr
 from astropy.io import fits
 from astropy.io.fits import HDUList, ImageHDU, PrimaryHDU, Header
 from astropy.wcs import WCS
@@ -114,8 +115,6 @@ def process_file(
     -------
     dict of the references and the header
     """
-    from astropy.io import fits
-
     storage_options = storage_options or {}
     out = out or {}
     g = zarr.open(out)
