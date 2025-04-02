@@ -27,20 +27,10 @@ obs_ids = da.find_all_observations()
 obs_ids = obs_ids[obs_ids < 4000]
 subset_obs_ids = obs_ids[obs_ids % 10 == 0]
 
-with pipeline(target_obs_ids=obs_ids) as p:
-    #p.get_nir_data()
-    #p.create_nir_skyflats()
-    p.do_persistence_correction()
-
-with pipeline(target_obs_ids=subset_obs_ids) as p:
-    for bkg_sub in [False, True]:
-        p.create_stacks(instrument="NIR", bkg_sub=bkg_sub)
-        p.calculate_background_stats(instrument="NIR", bkg_sub=bkg_sub)
-
 #with pipeline(target_obs_ids=obs_ids) as p:
 #    p.get_vis_data()
 #    p.create_vis_skyflats()
 
-#with pipeline(target_obs_ids=subset_obs_ids) as p:
-#    p.create_stacks(instrument="VIS", bkg_sub=False)
-#    p.calculate_background_stats(instrument="VIS", bkg_sub=False)
+with pipeline(target_obs_ids=subset_obs_ids) as p:
+    #p.create_stacks(instrument="VIS", bkg_sub=False)
+    p.calculate_background_stats(instrument="VIS", bkg_sub=False)
