@@ -144,7 +144,7 @@ def prepare_group_data(data, group_for_obs_id, obs_id, short=False):
     group_data = data.sel(observation_id=data.observation_id.isin(group_obs_ids))
     short_dithers = np.array([str(x.values).endswith("-2") for x in group_data.dither])
     if short and not np.any(short_dithers):
-        raise ValueError(f"No short dithers found.")
+        raise ValueError("No short dithers found.")
     select_dithers = short_dithers if short else ~short_dithers
     group_data = group_data.sel(dither=select_dithers)
     return group_data

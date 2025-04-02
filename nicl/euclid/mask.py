@@ -19,7 +19,6 @@ from nicl.mask import (
     create_icl_mask,
     create_faint_mask,
     create_object_mask,
-    write_mask,
 )
 from nicl.utilities import (
     calc_sb_threshold as _calc_sb_threshold,

@@ -9,7 +9,6 @@ __all__ = ['get_label_at_position', 'keep_segment_at_position', 'remove_segment_
 
 # %% ../nbs/13_mask.ipynb 2
 import logging
-from typing import Optional
 from warnings import catch_warnings, filterwarnings
 
 import matplotlib as mpl
@@ -167,10 +166,10 @@ def create_icl_mask(
 
     logger.debug(f"Smoothing image with sigma={smooth_sigma}")
     if median_filter:
-        logger.debug(f"Smoothing with a sampled median filter")
+        logger.debug("Smoothing with a sampled median filter")
         smoothed_image = sampled_median_filter(image, size=smooth_sigma * 5, gaussian_sigma=smooth_sigma)
     else:
-        logger.debug(f"Smoothing with a Gaussian kernel")
+        logger.debug("Smoothing with a Gaussian kernel")
         smoothed_image = smooth_image(image, sigma=smooth_sigma)
 
     logger.debug("Detecting sources")

@@ -6,9 +6,6 @@
 __all__ = []
 
 # %% ../../nbs/euclid/measure.ipynb 2
-import logging
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 from astropy.io import fits
 

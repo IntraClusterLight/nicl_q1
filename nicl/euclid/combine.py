@@ -24,7 +24,6 @@ from regions import RectangleSkyRegion
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
-from nicl.mask import fast_mask
 from nicl.euclid.skyflat import read_skyflat, apply_skyflat
 from nicl.euclid.constants import (
     VIS,
@@ -542,7 +541,7 @@ def sub_bkg(
     mesh_size=None,  # mesh size for background modeling; default to 1x1 mesh if not specified
     **kwargs,  # additional arguments for Background2D
 ):
-    """model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
+    """Model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
     img = np.asarray(img)
     # check if need to build object mask
     if isinstance(obj_mask, str):

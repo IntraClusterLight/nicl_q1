@@ -90,8 +90,7 @@ def process_file(
     hdu=None,
     infile=None,
 ):
-    """
-    Create JSON references for a single FITS file as a zarr group
+    """Create JSON references for a single FITS file as a zarr group.
 
     Parameters
     ----------
@@ -114,6 +113,7 @@ def process_file(
     Returns
     -------
     dict of the references and the header
+
     """
     storage_options = storage_options or {}
     out = out or {}
