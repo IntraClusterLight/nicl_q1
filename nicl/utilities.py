@@ -5,7 +5,8 @@
 # %% auto 0
 __all__ = ['calc_kcorr', 'calc_sb_threshold', 'sb_to_adu', 'adu_to_sb', 'get_pixel_scale', 'get_img_centre_pixel',
            'get_img_centre_world', 'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout',
-           'maybe_to_value', 'parse_input_for_skycoord', 'parse_input_for_angular_size']
+           'maybe_to_value', 'parse_input_for_skycoord', 'parse_input_for_angular_size',
+           'does_image_overlap_with_skyregion']
 
 # %% ../nbs/10_utilities.ipynb 2
 import numpy as np
@@ -13,6 +14,11 @@ from astropy import units as u
 from astropy.cosmology import FlatLambdaCDM
 from astropy.nddata import CCDData, Cutout2D
 from astropy.coordinates import SkyCoord
+from astropy.wcs import WCS
+from astropy.io.fits import Header
+from regions import PixCoord, RectanglePixelRegion, RectangleSkyRegion
+from shapely.geometry import Polygon
+
 
 from . import ezgal
 
@@ -230,3 +236,67 @@ def parse_input_for_angular_size(angular_size, duplicate=False):
         return (int(duplicate) + 1) * [angular_size]
     else:
         return angular_size
+
+# %% ../nbs/10_utilities.ipynb 10
+def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
+    """Check if an image overlaps with a sky region.
+
+    Parameters
+    ----------
+    hdr : dict-like
+        The FITS header of the image to check for overlap with the sky region.
+        Must be compatible with WCS creation and refer to a 2D image.
+    sky_reg : RectangleSkyRegion
+        The sky region to check for overlap with the image.
+    threshold : float, optional
+        Minimum fraction of overlap required to return True. Default is 0.0,
+        which means any overlap will return True.
+
+    Returns
+    -------
+    bool
+        True if the image overlaps with the sky region by more than the threshold,
+        False otherwise.
+    """
+    # Check if header is a dict-like object
+    if not isinstance(hdr, (dict, Header)) or not hasattr(hdr, "keys"):
+        raise ValueError("Input header must be a dict-like object")
+
+    # Check if the image is 2D
+    if "NAXIS" not in hdr:
+        raise ValueError("Header doesn't contain NAXIS keyword")
+    if hdr["NAXIS"] != 2:
+        raise ValueError("This function only works with 2D images (NAXIS=2)")
+    if "NAXIS1" not in hdr or "NAXIS2" not in hdr:
+        raise ValueError(
+            "Header must contain NAXIS1 and NAXIS2 keywords for a 2D image"
+        )
+
+    # Try to extract WCS information from header
+    try:
+        wcs = WCS(hdr)
+        if not wcs.has_celestial:
+            raise ValueError("Header does not contain valid celestial WCS information.")
+    except Exception as e:
+        raise ValueError(f"Could not create WCS from header: {e}")
+
+    if not isinstance(sky_reg, RectangleSkyRegion):
+        raise ValueError("sky_reg must be a RectangleSkyRegion object.")
+
+    nx = hdr["NAXIS1"]
+    ny = hdr["NAXIS2"]
+    pix_reg_from_sky = sky_reg.to_pixel(wcs)
+    pix_reg_from_img = RectanglePixelRegion(
+        center=PixCoord((nx - 1) / 2, (ny - 1) / 2), width=nx, height=ny
+    )
+    # switch to shapely for intersection calculation because regions has no efficient implementation for that
+    sky_polygon = Polygon(pix_reg_from_sky.corners)
+    img_polygon = Polygon(pix_reg_from_img.corners)
+    if not img_polygon.intersects(sky_polygon):
+        return False
+    num_pix_overlap = img_polygon.intersection(sky_polygon).area
+    num_pix_img = nx * ny
+    num_pix_reg = sky_polygon.area
+    frac1 = num_pix_overlap / num_pix_img
+    frac2 = num_pix_overlap / num_pix_reg
+    return frac1 > threshold or frac2 > threshold

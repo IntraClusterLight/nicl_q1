@@ -292,15 +292,15 @@ def round_up_box_size(x, y):
         return x
     if y <= 1:
         return 1
-    if x % y == 0:
-        return y
+    if x % round(y) == 0:
+        return round(y)
     frac_upper = np.round(x / np.floor(x / y)).astype(int)
     frac_lower = np.round(x / np.ceil(x / y)).astype(int)
     if np.abs(frac_upper - y) < np.abs(frac_lower - y):
         z = frac_upper
     else:
         z = frac_lower
-    # check if z actually reduces the padding/cropping compared to y
-    if np.min([x % z, z - (x % z)]) > np.min([x % y, y - (x % y)]):
+    # check if z actually reduces the padding/cropping compared to round(y)
+    if np.min([x % z, z - (x % z)]) > np.min([x % round(y), round(y) - (x % round(y))]):
         raise ValueError("This should not happen")
     return z
