@@ -363,7 +363,7 @@ def measure(
             if mask is None:
                 if create_mask:
                     mask, _ = fast_mask(
-                        data, estimate_background=estimate_background, verbose=verbose
+                        data, estimate_background=estimate_background
                     )
                 else:
                     mask = np.zeros(data.shape, dtype=bool)
