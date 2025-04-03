@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['TEST_IMAGES_OUTPATH', 'CLUSTER_REDSHIFT', 'PIXEL_SCALE', 'BACKGROUND_RMS_LEVEL', 'BACKGROUND_SCALE', 'SKY_PATCH_SIZE',
            'SKY_PATCH_RA', 'SKY_PATCH_DEC', 'SKY_PATCH_SIZE_PIXELS', 'SKY_PATCH_SHAPE', 'get_bcg_icl_mags',
-           'create_test_images', 'create_basic_cluster_test_images', 'create_test_images_with_shapes' ,'create_basic_sky_test_images',
+           'create_test_images', 'create_basic_cluster_test_images', 'create_test_images_with_shapes_icl_offset' ,'create_basic_sky_test_images',
            'create_varying_background_cluster_test_images', 'create_varying_background_sky_test_images',
            'create_sky_patch', 'create_real_background_cluster_test_images']
 
@@ -235,109 +235,6 @@ def create_real_background_cluster_test_images(background_filenames):
 
 
 # Tutku added
-
-def create_test_images_with_shapes(
-    outpath,
-    cluster_redshift=None,
-    shape=None,
-    background_rms_level=None,
-    background_scale=None,
-    background_filenames=None,
-    background_seed=0,
-    bcg_n = 4.6,
-    bcg_q = 0.6,
-    bcg_theta = 30,
-    icl_n = 0.76,
-    icl_q = 0.6,
-    icl_theta = 60,
-    icl_offset=(0, 0),
-):
-    path = default_data_path("Q1_R1_clusters_test", "MCXCJ1754.6+6803")
-    hdul = fits.open(path / "EUC_NIR_W-STK_H-MCXCJ1754.6+6803.fits")
-    if shape is None:
-        shape = hdul["SCI"].shape
-    else:
-        hdul["SCI"].data = np.zeros_like(hdul["SCI"].data, shape=shape)
-        hdul["RMS"].data = np.zeros_like(hdul["RMS"].data, shape=shape)
-    zp = 23.9  # zeropoint for mJy
-    rms = dict(H=0.023, J=0.023, Y=0.023, VIS=0.023)
-    source_noise_level = 0.05  # relative noise added to sources
-    pixscale = 0.3 * u.arcsec / u.pix
-
-    if cluster_redshift:
-        bcg_appmags, icl_appmags = get_bcg_icl_mags(cluster_redshift)
-        bcg_re = (
-            physical_to_angular(22.6 * u.kpc, cluster_redshift) / pixscale
-        ).to_value(u.pix)
-        # bcg_n = 4.6
-        # bcg_q = 0.6
-        # bcg_theta = 30
-        bcg = galsim.Sersic(n=bcg_n, half_light_radius=bcg_re, flux=1)
-        bcg_shape = galsim.Shear(q=bcg_q, beta=bcg_theta * galsim.degrees)
-        bcg = bcg.shear(bcg_shape)
-        icl_re = (
-            physical_to_angular(189.5 * u.kpc, cluster_redshift) / pixscale
-        ).to_value(u.pix)
-        # icl_n = 0.76
-        # icl_q = 0.6
-        # icl_theta = 60
-        icl = galsim.Sersic(n=icl_n, half_light_radius=icl_re, flux=1)
-        icl_shape = galsim.Shear(q=icl_q, beta=icl_theta * galsim.degrees)
-        icl = icl.shear(icl_shape)
-        print(f"bcg_appmags: {bcg_appmags}")
-        print(f"icl_appmags: {icl_appmags}")
-        print(f"bcg_re: {bcg_re:.2f} pixels")
-        print(f"icl_re: {icl_re:.2f} pixels")
-
-    outpath.mkdir(parents=True, exist_ok=True)
-    image = galsim.ImageF(*shape)
-    label = "cluster" if cluster_redshift else "sky"
-
-    for band in ["H", "J", "Y", "VIS"]:
-        hdul["RMS"].data[:] = rms[band]
-        if cluster_redshift:
-            bcg_flux = _mag_to_flux(bcg_appmags[band], zp)
-            icl_flux = _mag_to_flux(icl_appmags[band], zp)
-            print(f"{band} bcg_flux: {bcg_flux}")
-            print(f"{band} icl_flux: {icl_flux}")
-            print(f"{band} bcg_flux + icl_flux: {bcg_flux + icl_flux}")
-            cluster = bcg * bcg_flux + icl * icl_flux
-            cluster.drawImage(image, method="no_pixel")
-            hdul["SCI"].data[:] = image.array
-            hdul.writeto(outpath / f"{label}_{band}_no_noise.fits", overwrite=True)
-            source_noise = np.random.normal(
-                scale=np.maximum(0, source_noise_level * image.array), size=shape
-            )
-            hdul["SCI"].data[:] += source_noise
-        if background_filenames is not None:
-            fn = default_data_path() / background_filenames[band]
-            bkg_hdul = fits.open(fn)
-            bkg = bkg_hdul["SCI"].data
-            bkg_shape = bkg.shape
-            rng = np.random.default_rng(background_seed)
-            max_y = bkg_shape[0] - shape[0]
-            max_x = bkg_shape[1] - shape[1]
-            if max_y < 0 or max_x < 0:
-                raise ValueError(
-                    f"Background image size {bkg_shape} is too small for the required shape {shape}"
-                )
-            start_y = rng.integers(0, max_y + 1)
-            start_x = rng.integers(0, max_x + 1)
-            bkg = bkg[start_y : start_y + shape[0], start_x : start_x + shape[1]]
-            hdul["SCI"].data[:] += bkg
-        else:
-            if background_rms_level is None:
-                background_rms = None
-            else:
-                background_rms = background_rms_level * rms[band]
-            _, _, background = create_test_background(
-                shape,
-                rms[band],
-                background_scale=background_scale,
-                background_rms=background_rms,
-            )
-            hdul["SCI"].data[:] += background
-        hdul.writeto(outpath / f"{label}_{band}.fits", overwrite=True)
 
 def create_test_images_with_shapes_icl_offset(
     outpath,
