@@ -7,7 +7,6 @@ __all__ = ['VIS', 'NISP', 'MER', 'SWARP_CONFIG_NISP', 'SWARP_CONFIG_VIS', 'SWARP
 
 # %% ../../nbs/euclid/constants.ipynb 2
 from dataclasses import dataclass
-from typing import Tuple
 
 import numpy as np
 
@@ -18,12 +17,12 @@ import numpy as np
 @dataclass(frozen=True)
 class Camera:
     name: str
-    chips: Tuple[str, ...]
-    filters: Tuple[str, ...]
+    chips: tuple[str, ...]
+    filters: tuple[str, ...]
     pix_scale: float
-    chip_subdivisions: Tuple[str, ...] = None
-    readout_unit_size: Tuple[int, int] = None
-    bad_pix_bits: Tuple[int, ...] = None
+    chip_subdivisions: tuple[str, ...] = None
+    readout_unit_size: tuple[int, int] = None
+    bad_pix_bits: tuple[int, ...] = None
     n_dithers_per_obs: int = None
     chip_layout: np.ndarray = None  # 2D array of strings
     # chip_rotations is True if a half-turn rotation is required to align the orientations

@@ -130,7 +130,7 @@ class astro_filter(object):
         self.calc_filter_properties()
 
         # normalization for calculating ab mags for this filter
-        self.ab_flux = self.ab_source_flux * scipy.integrate.simps(
+        self.ab_flux = self.ab_source_flux * scipy.integrate.simpson(
             self.tran / self.vs, self.vs)
 
         # store the cosmology object if passed
@@ -489,7 +489,7 @@ class astro_filter(object):
             return np.nan
 
         interp = interpolate.interp1d(vs, sed)
-        sed_flux = (1 + z) * scipy.integrate.simps(
+        sed_flux = (1 + z) * scipy.integrate.simpson(
             interp(self.vs * (1 + z)) * self.tran / self.vs, self.vs)
 
         return -2.5 * np.log10(sed_flux / self.ab_flux)

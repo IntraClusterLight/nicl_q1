@@ -144,7 +144,7 @@ class DataAccess:
         self,
     ):  # returns a list of observation_ids
         """Obtain a list of all survey obs_ids for observations in the current release."""
-        query = f"""SELECT DISTINCT TOP 1000000 observation_id
+        query = """SELECT DISTINCT TOP 1000000 observation_id
                     FROM sedm.calibrated_frame
                     WHERE (product_type like '%Calibrated%')\n"""
         if self.release_name:

@@ -93,8 +93,8 @@ class Cosmology:
     # Lookback time
     # Difference between the age of the Universe now and the age at z
     def Tl(self, z, s=False, yr=False, myr=False, gyr=False):
-        return self.Th() * integrate.romberg(self.Tfunc, 0,
-                                             z) * self.timeConversion(s=s,
+        return self.Th() * integrate.quad(self.Tfunc, 0,
+                                             z)[0] * self.timeConversion(s=s,
                                                                       yr=yr,
                                                                       myr=myr,
                                                                       gyr=gyr)
@@ -102,8 +102,8 @@ class Cosmology:
     # Line of sight comoving distance
     # Remains constant with epoch if objects are in the Hubble flow
     def Dc(self, z, cm=False, meter=False, pc=False, kpc=False, mpc=False):
-        return self.Dh() * integrate.romberg(
-            self.Efunc, 0, z) * self.lengthConversion(cm=cm,
+        return self.Dh() * integrate.quad(
+            self.Efunc, 0, z)[0] * self.lengthConversion(cm=cm,
                                                       meter=meter,
                                                       pc=pc,
                                                       kpc=kpc,

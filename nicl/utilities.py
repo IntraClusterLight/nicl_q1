@@ -47,20 +47,20 @@ def calc_sb_threshold(z, filter, b_band_sb_threshold=25 * u.ABmag):
 
 
 def sb_to_adu(sb, pix_scale, zp=27 * u.ABmag):
-    sb_to_mag = sb - 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
-    counts = 10 ** (-(sb_to_mag - zp).value / 2.5)
+    mag = sb - 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
+    counts = 10 ** (-(mag - zp).value / 2.5)
     return counts
 
 def adu_to_sb(adu, pix_scale, zp=27 * u.ABmag):
     mag = np.log10(-2.5 * adu) + zp
-    mag_to_sb = sb + 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
+    sb = mag + 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
     return sb
 
 # %% ../nbs/10_utilities.ipynb 4
 def get_pixel_scale(img, wcs=None):
     """Calculate the average pixel scale of the supplied image."""
     if wcs is None:
-        wcs = image.wcs
+        wcs = img.wcs
     return (
         np.mean(
             [s.to_value("arcsec") for s in wcs.celestial.proj_plane_pixel_scales()]
@@ -77,7 +77,7 @@ def get_img_centre_world(img, wcs=None):
     """Calculate the world coordinates at the centre of the supplied image."""
     centre_pixel = get_img_centre_pixel(img)
     if wcs is None:
-        wcs = image.wcs
+        wcs = img.wcs
     return wcs.pixel_to_world(*centre_pixel)
 
 
@@ -257,6 +257,7 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     bool
         True if the image overlaps with the sky region by more than the threshold,
         False otherwise.
+
     """
     # Check if header is a dict-like object
     if not isinstance(hdr, (dict, Header)) or not hasattr(hdr, "keys"):

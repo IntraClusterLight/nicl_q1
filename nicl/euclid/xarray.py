@@ -27,7 +27,7 @@ from kerchunk.combine import MultiZarrToZarr
 from tqdm import tqdm
 
 from ..mask import fast_mask
-from .mask import star_mask
+from .stars import star_mask
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_filter_from_filename,
@@ -90,8 +90,7 @@ def process_file(
     hdu=None,
     infile=None,
 ):
-    """
-    Create JSON references for a single FITS file as a zarr group
+    """Create JSON references for a single FITS file as a zarr group.
 
     Parameters
     ----------
@@ -114,6 +113,7 @@ def process_file(
     Returns
     -------
     dict of the references and the header
+
     """
     storage_options = storage_options or {}
     out = out or {}

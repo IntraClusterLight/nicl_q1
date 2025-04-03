@@ -13,7 +13,6 @@ __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'dq_to_mask'
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
 import re
-from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -245,9 +244,7 @@ def get_vis_dither(obs_id, dither, path):
 
 def get_vis_stack(obs_id, path):
     obs_id = f"{obs_id:06d}"
-    if len(dither) == 3:
-        dither = f"0{dither}"
-    fn = f"EUC_VIS-STK-{obs_id}-{dither}.fits"
+    fn = f"EUC_VIS_SWL-STK-{obs_id}.fits"
     return find_single_file(fn, path)
 
 # %% ../../nbs/euclid/utilities.ipynb 11
