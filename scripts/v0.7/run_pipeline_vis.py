@@ -32,5 +32,5 @@ subset_obs_ids = obs_ids[obs_ids % 10 == 0]
 #    p.create_vis_skyflats()
 
 with pipeline(target_obs_ids=subset_obs_ids) as p:
-    #p.create_stacks(instrument="VIS", bkg_sub=False)
+    p.create_stacks(instrument="VIS", bkg_sub=False)
     p.calculate_background_stats(instrument="VIS", bkg_sub=False)

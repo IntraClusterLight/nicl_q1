@@ -148,7 +148,7 @@ def create_test_images(
             start_y = rng.integers(0, max_y + 1)
             start_x = rng.integers(0, max_x + 1)
             bkg = bkg[start_y : start_y + shape[0], start_x : start_x + shape[1]]
-            hdul["SCI"].data[:] = bkg
+            hdul["SCI"].data[:] += bkg
         else:
             if background_rms_level is None:
                 background_rms = None

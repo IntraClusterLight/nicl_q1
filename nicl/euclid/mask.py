@@ -230,7 +230,7 @@ def create_combined_nir_mask(
             overwrite=True,
         )
 
-    return mask_for_measurement
+    return mask_for_background, mask_for_measurement
 
 
 def create_vis_mask(VIS_filename, output_dir=None, label=None):

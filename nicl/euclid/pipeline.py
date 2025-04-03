@@ -340,7 +340,7 @@ class Pipeline:
             executor=self.executor,
         )
 
-    def _try_combine(self, obs_id, in_dir, out_dir_parent, filters, bkg_sub=True):
+    def _try_combine(self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True):
         """Create stacks for obs_id if the output foler does not already exist."""
         out_dir = out_dir_parent / f"{obs_id}"
         if out_dir.exists():
@@ -354,6 +354,8 @@ class Pipeline:
                     obs_ids=obs_id,
                     filters=filters,
                     bkg_sub=bkg_sub,
+                    autodark_corr=True,
+                    autodark_dir=vis_skyflat_dir,
                 )
             except Exception as e:
                 self.logger.error(f"Error combining {obs_id}: {e}")
@@ -375,9 +377,11 @@ class Pipeline:
         )
         if instrument == "NIR":
             in_dir = processed_path / "persistence" / "NIR"
+            vis_skyflat_dir = None
         else:
             data_path = default_data_path(f"{self.release_name}")
             in_dir = data_path / "VIS_QUAD"
+            vis_skyflat_dir = processed_path / "skyflat" / "VIS"
         if bkg_sub:
             out_dir = processed_path / "stacked" / instrument
         else:
@@ -389,6 +393,7 @@ class Pipeline:
             self.target_obs_ids,
             in_dir=in_dir,
             out_dir_parent=out_dir,
+            vis_skyflat_dir=vis_skyflat_dir,
             filters=filters,
             bkg_sub=bkg_sub,
             executor=self.executor,
