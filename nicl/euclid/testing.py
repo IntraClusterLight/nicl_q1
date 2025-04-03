@@ -53,7 +53,7 @@ def get_bcg_icl_mags(z=0.1):
             band: model.get_observed_absolute_mags(zf=zf, filters=filt, zs=z)
             for band, filt in bands.items()
         }
-        model_I_absmag = model.get_absolute_mags(zf=zf, filters="I", zs=z)
+        model_I_absmag = model.get_absolute_mags(zf=zf, filters="bessell-I.ecsv", zs=z)
         delta_mag = I_absmag - model_I_absmag
         mags = {band: round(mags[band] + delta_mag + distmod, 2) for band in mags}
         return mags
