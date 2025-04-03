@@ -25,7 +25,7 @@ from ..testing import create_test_background
 from ..utilities import physical_to_angular
 
 # %% ../../nbs/euclid/testing.ipynb 5
-TEST_IMAGES_OUTPATH = default_data_path("test_images")
+TEST_IMAGES_OUTPATH = "test_images"
 CLUSTER_REDSHIFT = 0.1
 PIXEL_SCALE = 0.3 * u.arcsec / u.pix
 BACKGROUND_RMS_LEVEL = 0.1  # relative to the pixel rms
@@ -134,7 +134,8 @@ def create_test_images(
             )
             hdul["SCI"].data[:] += source_noise
         if background_filenames is not None:
-            bkg_hdul = fits.open(background_filenames[band])
+            fn = default_data_path() / background_filenames[band]
+            bkg_hdul = fits.open(fn)
             bkg = bkg_hdul["SCI"].data
             bkg_shape = bkg.shape
             rng = np.random.default_rng(background_seed)
@@ -164,17 +165,17 @@ def create_test_images(
 
 # %% ../../nbs/euclid/testing.ipynb 9
 def create_basic_cluster_test_images():
-    outpath = TEST_IMAGES_OUTPATH / "basic_test"
+    outpath = default_data_path(TEST_IMAGES_OUTPATH) / "basic_test"
     create_test_images(outpath, cluster_redshift=CLUSTER_REDSHIFT)
 
 
 def create_basic_sky_test_images():
-    outpath = TEST_IMAGES_OUTPATH / "basic_test"
+    outpath = default_data_path(TEST_IMAGES_OUTPATH) / "basic_test"
     create_test_images(outpath, cluster_redshift=None, shape=SKY_PATCH_SHAPE)
 
 # %% ../../nbs/euclid/testing.ipynb 12
 def create_varying_background_cluster_test_images():
-    outpath = TEST_IMAGES_OUTPATH / "varying_background"
+    outpath = default_data_path(TEST_IMAGES_OUTPATH) / "varying_background"
     create_test_images(
         outpath,
         cluster_redshift=CLUSTER_REDSHIFT,
@@ -184,7 +185,7 @@ def create_varying_background_cluster_test_images():
 
 
 def create_varying_background_sky_test_images():
-    outpath = TEST_IMAGES_OUTPATH / "varying_background"
+    outpath = default_data_path(TEST_IMAGES_OUTPATH) / "varying_background"
     create_test_images(
         outpath,
         cluster_redshift=None,
@@ -224,7 +225,7 @@ def create_sky_patch(outpath, ra, dec, size):
 
 # %% ../../nbs/euclid/testing.ipynb 18
 def create_real_background_cluster_test_images(background_filenames):
-    outpath = TEST_IMAGES_OUTPATH / "real_background"
+    outpath = default_data_path(TEST_IMAGES_OUTPATH) / "real_background"
     create_test_images(
         outpath,
         cluster_redshift=CLUSTER_REDSHIFT,
