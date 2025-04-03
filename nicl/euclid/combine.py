@@ -39,6 +39,7 @@ from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_obs_id_from_filename,
 )
+from nicl.mask import fast_mask  # noqa: F401
 from nicl.utilities import (
     parse_input_for_angular_size,
     parse_input_for_skycoord,
