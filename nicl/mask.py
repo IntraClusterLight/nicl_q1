@@ -50,6 +50,9 @@ def get_label_at_position(
     elif wcs is not None:
         position = tuple(int(x) for x in position.to_pixel(wcs))
     pixel_index = position[::-1]
+    for idx, shape in zip(pixel_index, segm.data.shape):
+        if idx < 0 or idx >= shape:
+            raise ValueError(f"The specified position {position} is outside the image.")
     return segm.data[*pixel_index]
 
 
