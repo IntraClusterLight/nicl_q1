@@ -9,14 +9,26 @@ __all__ = []
 import logging
 
 # %% ../nbs/00_main.ipynb 3
-def configure_logging(name, level="DEBUG"):
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
+def configure_logging(level=None, name=None, logfile=None):
+    # ensure the nicl logger is set up
+    nicl_logger = logging.getLogger("nicl")
+    if logfile is not None or len(nicl_logger.handlers) == 0:
+        nicl_logger.handlers.clear()
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
+        if logfile:
+            handler = logging.FileHandler(logfile)
+        else:
+            handler = logging.StreamHandler()
         handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        nicl_logger.addHandler(handler)
+        nicl_logger.setLevel("WARNING")
+    # set the level for the specific logger
+    if name is None:
+        name = "nicl"
+    logger = logging.getLogger(name)
+    if level is not None:
+        logger.setLevel(level)
+    return logger

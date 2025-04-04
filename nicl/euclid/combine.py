@@ -653,6 +653,9 @@ class NISPCombiner(DithersMixin, Combiner):
             self._combine_images(images, out_fn)
 
     def _combine_images(self, images, out_fn):
+        if (self.out_dir / out_fn).exists() and not self.overwrite:
+            print(f"Output file {out_fn} already exists, but overwrite=False. Skipping combine.")
+            return
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
@@ -738,6 +741,9 @@ class VISCombiner(DithersMixin, Combiner):
             self._combine_images(images, out_fn)
 
     def _combine_images(self, images, out_fn):
+        if (self.out_dir / out_fn).exists() and not self.overwrite:
+            print(f"Output file {out_fn} already exists, but overwrite=False. Skipping combine.")
+            return
         # the default temporary directory may not have enough space for VIS
         # determine the parent directory for the temporary directory based on the host
         hostname = socket.gethostname()
@@ -822,7 +828,7 @@ class MerCombiner(Combiner):
 
     def combine_per_filter(self, filter):
         images = self._find_images(filter)
-        if not list(chain.from_iterable(images)):
+        if not any(chain.from_iterable(images)):
             return
         out_fn = (
             "EUC_MER-MOSAIC-" if self.add_bkg_mod else "EUC_MER_BGSUB-MOSAIC-"
@@ -830,6 +836,9 @@ class MerCombiner(Combiner):
         if len(self.name) > 0:
             out_fn += f"_{self.name}"
         out_fn += ".fits"
+        if (self.out_dir / out_fn).exists() and not self.overwrite:
+            print(f"Output file {out_fn} already exists, but overwrite=False. Skipping combine.")
+            return
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:

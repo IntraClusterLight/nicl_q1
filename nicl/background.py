@@ -16,12 +16,7 @@ from astropy.visualization import AsinhStretch, ImageNormalize
 from photutils.background import Background2D, MedianBackground
 from scipy.stats import median_abs_deviation
 
-from .main import configure_logging
-
 # %% ../nbs/12_background.ipynb 3
-configure_logging(__name__)
-
-# %% ../nbs/12_background.ipynb 4
 def get_background(image, *, box_size, filter_size, mask=None):
     bkg_estimator = MedianBackground()
     sigma_clip = SigmaClip(sigma=3.0, maxiters=10)
@@ -36,7 +31,7 @@ def get_background(image, *, box_size, filter_size, mask=None):
     )
     return bkg
 
-# %% ../nbs/12_background.ipynb 5
+# %% ../nbs/12_background.ipynb 4
 def plot_background(
     img,  # original image to plot
     bkg,  # background image to plot
@@ -76,7 +71,7 @@ def plot_background(
         a.xaxis.set_ticks([])
         a.yaxis.set_ticks([])
 
-# %% ../nbs/12_background.ipynb 6
+# %% ../nbs/12_background.ipynb 5
 def make_background_plot(image, bkg, mask=None, output_dir=None, label=None):
     image = np.where(mask, np.nan, image)
     plot_background(image, bkg, image - bkg.background, "Subtracted")

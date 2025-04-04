@@ -29,13 +29,9 @@ from scipy.stats import median_abs_deviation
 
 from nicl.background import get_background
 from nicl.filter import sampled_median_filter, sampled_mad_filter
-from nicl.main import configure_logging
 from nicl.utilities import get_img_centre_pixel
 
 # %% ../nbs/13_mask.ipynb 3
-configure_logging(__name__, level="DEBUG")
-
-# %% ../nbs/13_mask.ipynb 4
 def get_label_at_position(
     segm,  # a photutils SegmentationImage or numpy array mask
     image=None,  # the image on which the segmentation was performed
@@ -54,6 +50,9 @@ def get_label_at_position(
     elif wcs is not None:
         position = tuple(int(x) for x in position.to_pixel(wcs))
     pixel_index = position[::-1]
+    for idx, shape in zip(pixel_index, segm.data.shape):
+        if idx < 0 or idx >= shape:
+            raise ValueError(f"The specified position {position} is outside the image.")
     return segm.data[*pixel_index]
 
 
@@ -90,7 +89,7 @@ def remove_segment_at_position(
     segm.remove_label(label, relabel=True)
     return segm
 
-# %% ../nbs/13_mask.ipynb 5
+# %% ../nbs/13_mask.ipynb 4
 def smooth_image(image, sigma):
     """Smooth `image` using Gaussian with standard deviation `sigma`."""
     kernel = Gaussian2DKernel(x_stddev=sigma, x_size=6 * sigma + 1)
@@ -100,7 +99,7 @@ def smooth_image(image, sigma):
         smoothed = convolve(image.data, kernel)
     return smoothed
 
-# %% ../nbs/13_mask.ipynb 6
+# %% ../nbs/13_mask.ipynb 5
 def create_bcg_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
@@ -125,7 +124,7 @@ def create_bcg_mask(
     bcg_mask = binary_closing(bcg_mask, iterations=3)
     return bcg_mask
 
-# %% ../nbs/13_mask.ipynb 7
+# %% ../nbs/13_mask.ipynb 6
 def create_icl_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
@@ -197,7 +196,7 @@ def create_icl_mask(
 
     return icl_mask, smoothed_image
 
-# %% ../nbs/13_mask.ipynb 8
+# %% ../nbs/13_mask.ipynb 7
 def fast_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
@@ -262,7 +261,7 @@ def fast_mask(
     else:
         return mask
 
-# %% ../nbs/13_mask.ipynb 9
+# %% ../nbs/13_mask.ipynb 8
 def dilated_object_mask(
     segm: np.ndarray,  # a photutils SegmentationImage
     growth: float = 0.5,  # the relative padding around each source
@@ -297,25 +296,11 @@ def dilated_object_mask(
             if len(segm.labels) == 0:
                 break
             growth_pixels = radius_min * growth
-            radius = max(1, min(1, int(growth_pixels)))
+            radius = max(1, int(growth_pixels))
             logger.debug(
                 f"seeking to grow objects with radius {radius_min} pixels by {growth_pixels} pixels"
             )
             logger.debug(f"applying dilation with radius {radius} pixels")
-            # radius = min(9, max(1, int(np.sqrt(growth_pixels))))
-            # iterations = max(1, int(growth_pixels / radius))
-            # logger.debug(
-            #     f"seeking to grow objects with radius {radius_min} pixels by {growth_pixels} pixels"
-            # )
-            # logger.debug(
-            #     f"applying {iterations} iterations of dilation with a radius of {radius}, equivalent to a growth of {iterations * radius} pixels"
-            # )
-            # big_mask = binary_dilation(
-            #     segm.data > 0,
-            #     structure=circular_footprint(radius),
-            #     iterations=iterations,
-            # )
-
             big_mask = segm.make_source_mask(footprint=circular_footprint(radius))
             logger.debug(f"new mask contains {big_mask.sum()} pixels")
             obj_mask = obj_mask | big_mask
@@ -326,7 +311,7 @@ def dilated_object_mask(
             radius_min *= 2
     return obj_mask
 
-# %% ../nbs/13_mask.ipynb 10
+# %% ../nbs/13_mask.ipynb 9
 def create_object_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
@@ -415,7 +400,7 @@ def create_object_mask(
     obj_mask = dilated_object_mask(segm_deblend, growth)
     return obj_mask, bkg, threshold, new_exclude_mask
 
-# %% ../nbs/13_mask.ipynb 11
+# %% ../nbs/13_mask.ipynb 10
 def create_faint_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
@@ -498,7 +483,7 @@ def create_faint_mask(
     faint_mask = dilated_object_mask(segm_deblend, growth)
     return faint_mask, bkg, threshold
 
-# %% ../nbs/13_mask.ipynb 12
+# %% ../nbs/13_mask.ipynb 11
 def plot_mask(
     img,  # image to plot
     mask,  # mask to plot
@@ -565,7 +550,7 @@ def plot_mask(
         a.xaxis.set_ticks([])
         a.yaxis.set_ticks([])
 
-# %% ../nbs/13_mask.ipynb 13
+# %% ../nbs/13_mask.ipynb 12
 def write_mask(
     image_filename,  # full filename of the image to which the mask corresponds
     mask_name,  # name of the mask
