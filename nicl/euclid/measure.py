@@ -9,5 +9,4 @@ __all__ = []
 import matplotlib.pyplot as plt
 from astropy.io import fits
 
-from ..main import configure_logging
 from .autoprof import run_autoprof

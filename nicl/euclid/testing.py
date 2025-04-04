@@ -122,9 +122,9 @@ def create_test_images(
         if cluster_redshift:
             bcg_flux = _mag_to_flux(bcg_appmags[band], zp)
             icl_flux = _mag_to_flux(icl_appmags[band], zp)
-            print(f"{band} bcg_flux: {bcg_flux}")
-            print(f"{band} icl_flux: {icl_flux}")
-            print(f"{band} bcg_flux + icl_flux: {bcg_flux + icl_flux}")
+            print(f"{band} bcg_flux: {bcg_flux:.2f}")
+            print(f"{band} icl_flux: {icl_flux:.2f}")
+            print(f"{band} bcg_flux + icl_flux: {bcg_flux + icl_flux:.2f}")
             cluster = bcg * bcg_flux + icl * icl_flux
             cluster.drawImage(image, method="no_pixel")
             hdul["SCI"].data[:] = image.array

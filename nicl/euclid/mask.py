@@ -6,7 +6,7 @@
 __all__ = ['calc_sb_threshold', 'create_masks', 'make_mask_plot', 'stack_nir_bands', 'create_combined_nir_mask',
            'create_vis_mask']
 
-# %% ../../nbs/euclid/mask.ipynb 5
+# %% ../../nbs/euclid/mask.ipynb 4
 from pathlib import Path
 
 import numpy as np
@@ -26,13 +26,10 @@ from nicl.utilities import (
     sb_to_adu,
 )
 
-# %% ../../nbs/euclid/mask.ipynb 7
-configure_logging(__name__)
-
-# %% ../../nbs/euclid/mask.ipynb 8
+# %% ../../nbs/euclid/mask.ipynb 6
 plt.style.use("nicl.euclid.v1nicl")
 
-# %% ../../nbs/euclid/mask.ipynb 9
+# %% ../../nbs/euclid/mask.ipynb 7
 def calc_sb_threshold(
     z,  # cluster redshift
     filter,  # Euclid filter: VIS, Y, J or H
@@ -42,7 +39,7 @@ def calc_sb_threshold(
     filter = f"Euclid-{filter}.ecsv"
     return _calc_sb_threshold(z, filter)
 
-# %% ../../nbs/euclid/mask.ipynb 11
+# %% ../../nbs/euclid/mask.ipynb 9
 def create_masks(
     image,  # the image to mask, with bad pixels set to NaN, as a CCDImage or filename
     *,  # the following parameters must be provided as keyword arguments if required
@@ -132,7 +129,7 @@ def create_masks(
     }
     return output_masks
 
-# %% ../../nbs/euclid/mask.ipynb 13
+# %% ../../nbs/euclid/mask.ipynb 11
 def make_mask_plot(image, masks, output_dir=None, label=None):
     for mask_name, mask in masks.items():
         plot_mask(image, mask, detail=True)
@@ -143,7 +140,7 @@ def make_mask_plot(image, masks, output_dir=None, label=None):
             plt.savefig(output_dir / f"{prefix}{mask_name}_mask.pdf")
             plt.close()
 
-# %% ../../nbs/euclid/mask.ipynb 14
+# %% ../../nbs/euclid/mask.ipynb 12
 def stack_nir_bands(H_filename, J_filename, Y_filename, output_dir=None, label=None):
     """Stack NIR images and optionally save to disk."""
     logger = logging.getLogger(__name__)
