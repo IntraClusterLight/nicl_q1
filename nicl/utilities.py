@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['calc_kcorr', 'calc_sb_threshold', 'sb_to_adu', 'adu_to_sb', 'get_pixel_scale', 'get_img_centre_pixel',
            'get_img_centre_world', 'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout',
-           'maybe_to_value', 'parse_input_for_skycoord', 'parse_input_for_angular_size',
+           'maybe_to_value', 'parse_input_for_skycoord', 'parse_input_for_angular_size', 'create_sky_rectangle',
            'does_image_overlap_with_skyregion']
 
 # %% ../nbs/10_utilities.ipynb 2
@@ -14,10 +14,8 @@ from astropy import units as u
 from astropy.cosmology import FlatLambdaCDM
 from astropy.nddata import CCDData, Cutout2D
 from astropy.coordinates import SkyCoord
-from astropy.wcs import WCS
 from astropy.io.fits import Header
-from regions import PixCoord, RectanglePixelRegion, RectangleSkyRegion
-from shapely.geometry import Polygon
+from spherical_geometry.polygon import SphericalPolygon
 
 
 from . import ezgal
@@ -51,6 +49,7 @@ def sb_to_adu(sb, pix_scale, zp=27 * u.ABmag):
     counts = 10 ** (-(mag - zp).value / 2.5)
     return counts
 
+
 def adu_to_sb(adu, pix_scale, zp=27 * u.ABmag):
     mag = np.log10(-2.5 * adu) + zp
     sb = mag + 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
@@ -62,9 +61,7 @@ def get_pixel_scale(img, wcs=None):
     if wcs is None:
         wcs = img.wcs
     return (
-        np.mean(
-            [s.to_value("arcsec") for s in wcs.celestial.proj_plane_pixel_scales()]
-        )
+        np.mean([s.to_value("arcsec") for s in wcs.celestial.proj_plane_pixel_scales()])
         * u.arcsec
     )
 
@@ -238,6 +235,71 @@ def parse_input_for_angular_size(angular_size, duplicate=False):
         return angular_size
 
 # %% ../nbs/10_utilities.ipynb 10
+def create_sky_rectangle(center, width, height, angle=0 * u.deg):
+    """Create a rectangle sky region using SphericalPolygon.
+
+    Parameters
+    ----------
+    center : SkyCoord
+        The center of the rectangle
+    width : Quantity
+        The width of the rectangle
+    height : Quantity
+        The height of the rectangle
+    angle : Quantity, optional
+        The rotation angle of the rectangle, default to 0 degrees
+
+    Returns
+    -------
+    SphericalPolygon
+        The rectangular region on the sky as a `SphericalPolygon` object.
+
+    """
+    # Convert angle to radians
+    angle_rad = angle.to(u.rad).value
+
+    # Calculate half width and height
+    half_width = (width / 2.0).to(u.rad).value
+    half_height = (height / 2.0).to(u.rad).value
+
+    # Get center coordinates
+    ra0, dec0 = center.ra.rad, center.dec.rad
+
+    # Create corner coordinates in the local coordinate system
+    corners_local = np.array(
+        [
+            [half_width, half_height],  # Northeast
+            [-half_width, half_height],  # Northwest
+            [-half_width, -half_height],  # Southwest
+            [half_width, -half_height],  # Southeast
+        ]
+    )
+
+    # Create rotation matrix
+    cos_angle = np.cos(angle_rad)
+    sin_angle = np.sin(angle_rad)
+    rotation_matrix = np.array([[cos_angle, -sin_angle], [sin_angle, cos_angle]])
+
+    # Apply rotation to all corners at once
+    corners_rotated = np.dot(corners_local, rotation_matrix.T)
+    # Calculate angular separations and PAs for all corners
+    separations = (
+        np.sqrt(corners_rotated[:, 0] ** 2 + corners_rotated[:, 1] ** 2) * u.rad
+    )
+    position_angles = np.arctan2(corners_rotated[:, 0], corners_rotated[:, 1]) * u.rad
+    center_sky = SkyCoord(ra=ra0 * u.rad, dec=dec0 * u.rad)
+    corners = center_sky.directional_offset_by(position_angles, separations)
+
+    # Extract RA and Dec values
+    ras = corners.ra.rad
+    decs = corners.dec.rad
+    # Explicitly wrap RA to handle boundary crossings
+    ras = np.mod(ras, 2 * np.pi)
+
+    # Create the SphericalPolygon (the construction method automatically appends first point at the end to close the polygon)
+    return SphericalPolygon.from_radec(ras, decs, center=(ra0, dec0), degrees=False)
+
+
 def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     """Check if an image overlaps with a sky region.
 
@@ -246,7 +308,7 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     hdr : dict-like
         The FITS header of the image to check for overlap with the sky region.
         Must be compatible with WCS creation and refer to a 2D image.
-    sky_reg : RectangleSkyRegion
+    sky_reg : SphericalPolygon
         The sky region to check for overlap with the image.
     threshold : float, optional
         Minimum fraction of overlap required to return True. Default is 0.0,
@@ -272,32 +334,17 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
         raise ValueError(
             "Header must contain NAXIS1 and NAXIS2 keywords for a 2D image"
         )
+    # Check if the input sky region has the correct type
+    if not isinstance(sky_reg, SphericalPolygon):
+        raise ValueError("sky_reg must be a SphericalPolygon object.")
 
-    # Try to extract WCS information from header
-    try:
-        wcs = WCS(hdr)
-        if not wcs.has_celestial:
-            raise ValueError("Header does not contain valid celestial WCS information.")
-    except Exception as e:
-        raise ValueError(f"Could not create WCS from header: {e}")
-
-    if not isinstance(sky_reg, RectangleSkyRegion):
-        raise ValueError("sky_reg must be a RectangleSkyRegion object.")
-
-    nx = hdr["NAXIS1"]
-    ny = hdr["NAXIS2"]
-    pix_reg_from_sky = sky_reg.to_pixel(wcs)
-    pix_reg_from_img = RectanglePixelRegion(
-        center=PixCoord((nx - 1) / 2, (ny - 1) / 2), width=nx, height=ny
-    )
-    # switch to shapely for intersection calculation because regions has no efficient implementation for that
-    sky_polygon = Polygon(pix_reg_from_sky.corners)
-    img_polygon = Polygon(pix_reg_from_img.corners)
-    if not img_polygon.intersects(sky_polygon):
+    sky_reg_from_img = SphericalPolygon.from_wcs(hdr, steps=10)
+    if not sky_reg.intersects_poly(sky_reg_from_img):
         return False
-    num_pix_overlap = img_polygon.intersection(sky_polygon).area
-    num_pix_img = nx * ny
-    num_pix_reg = sky_polygon.area
-    frac1 = num_pix_overlap / num_pix_img
-    frac2 = num_pix_overlap / num_pix_reg
+    overlap = sky_reg.intersection(sky_reg_from_img)
+    area_overlap = overlap.area()
+    area_sky_reg = sky_reg.area()
+    area_img = sky_reg_from_img.area()
+    frac1 = area_overlap / area_img
+    frac2 = area_overlap / area_sky_reg
     return frac1 > threshold or frac2 > threshold
