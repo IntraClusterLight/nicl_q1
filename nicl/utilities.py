@@ -6,7 +6,7 @@
 __all__ = ['calc_kcorr', 'calc_sb_threshold', 'sb_to_adu', 'get_pixel_scale', 'get_img_centre_pixel', 'get_img_centre_world',
            'distance_from_coord', 'physical_to_angular', 'pix2arcmin', 'pix2Mpc', 'get_cutout', 'maybe_to_value',
            'parse_input_for_skycoord', 'parse_input_for_angular_size', 'does_image_overlap_with_skyregion',
-           'bootstrap_median_error', 'fast_median_error']
+           'compute_pixel_scales', 'sigma_clip_stats', 'weighted_median', 'bootstrap_median_error', 'fast_median_error']
 
 # %% ../nbs/10_utilities.ipynb 2
 import numpy as np
@@ -16,9 +16,10 @@ from astropy.nddata import CCDData, Cutout2D
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy.io.fits import Header
-from astropy.stats import mad_std
+from astropy.stats import mad_std, sigma_clip
 from regions import PixCoord, RectanglePixelRegion, RectangleSkyRegion
 from shapely.geometry import Polygon
+from scipy.interpolate import RegularGridInterpolator
 
 
 from . import ezgal
@@ -297,7 +298,241 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     frac2 = num_pix_overlap / num_pix_reg
     return frac1 > threshold or frac2 > threshold
 
+def compute_pixel_scales(hdr, accuracy=1e-4, initial_grid_step=None):
+    """
+    Compute local pixel scales for each pixel in a FITS image using interpolation for speed.
+
+    Parameters:
+      hdr : FITS header (with valid WCS)
+      accuracy : Required accuracy as a fraction of the local pixel scale (default: 1e-4)
+      initial_grid_step : Initial grid spacing for interpolation
+                          (default: half the image size)
+
+    Returns:
+      pixel_scale_eff : 2D array of effective pixel scale (geometric mean of
+                        pixel scales on both dimension in arcsec/pix)
+    """
+    wcs = WCS(hdr)
+    ny, nx = hdr["NAXIS2"], hdr["NAXIS1"]
+
+    if initial_grid_step is None:
+        initial_grid_step = min(ny, nx) // 2
+    if initial_grid_step <= 1:
+        raise ValueError("Initial grid step must be 2 or more for the first iteration.")
+
+    # Function to compute scales on a grid with given step size
+    def compute_grid_scales(grid_step, delta=0.5):
+        # Create a grid for computing scales
+        y_sparse = np.arange(0, ny, grid_step)
+        x_sparse = np.arange(0, nx, grid_step)
+
+        # Ensure the grid includes the last pixel in each dimension
+        if x_sparse[-1] != nx - 1:
+            x_sparse = np.append(x_sparse, nx - 1)
+        if y_sparse[-1] != ny - 1:
+            y_sparse = np.append(y_sparse, ny - 1)
+
+        # Create grid meshes
+        yy_sparse, xx_sparse = np.meshgrid(y_sparse, x_sparse, indexing="ij")
+
+        # Prepare coordinate arrays for vectorized computation
+        coords = np.stack([xx_sparse.ravel(), yy_sparse.ravel()], axis=1).astype(float)
+
+        # Create offset coordinates in batch
+        coords_plus_x = coords.copy()
+        coords_plus_x[:, 0] += delta
+
+        coords_minus_x = coords.copy()
+        coords_minus_x[:, 0] -= delta
+
+        coords_plus_y = coords.copy()
+        coords_plus_y[:, 1] += delta
+
+        coords_minus_y = coords.copy()
+        coords_minus_y[:, 1] -= delta
+
+        # Batch compute world coordinates
+        world_plus_x = wcs.all_pix2world(coords_plus_x, 0)
+        world_minus_x = wcs.all_pix2world(coords_minus_x, 0)
+        world_plus_y = wcs.all_pix2world(coords_plus_y, 0)
+        world_minus_y = wcs.all_pix2world(coords_minus_y, 0)
+
+        # Compute scales in arcsec/pixel
+        # Use astropy SkyCoord to handle spherical geometry correctly
+        ra1, dec1 = world_minus_x[:, 0], world_minus_x[:, 1]
+        ra2, dec2 = world_plus_x[:, 0], world_plus_x[:, 1]
+        coords1 = SkyCoord(ra1, dec1, unit="deg")
+        coords2 = SkyCoord(ra2, dec2, unit="deg")
+        scale_x = coords1.separation(coords2).arcsec / (2 * delta)
+
+        ra1, dec1 = world_minus_y[:, 0], world_minus_y[:, 1]
+        ra2, dec2 = world_plus_y[:, 0], world_plus_y[:, 1]
+        coords1 = SkyCoord(ra1, dec1, unit="deg")
+        coords2 = SkyCoord(ra2, dec2, unit="deg")
+        scale_y = coords1.separation(coords2).arcsec / (2 * delta)
+
+        # Effective scale (geometric mean)
+        scales = np.sqrt(scale_x * scale_y).reshape(len(y_sparse), len(x_sparse))
+
+        return scales, y_sparse, x_sparse
+
+    # Iteratively refine grid step to achieve required accuracy
+    scales_old, y_sparse_old, x_sparse_old = compute_grid_scales(initial_grid_step)
+    iter_count = 0
+
+    while True:  # Will break inside the loop when accuracy is reached
+        if iter_count == 0:
+            grid_step = initial_grid_step // 2
+        scales_new, y_sparse_new, x_sparse_new = compute_grid_scales(grid_step)
+
+        # Interpolate old scales to match new grid for comparison
+        old_interp = RegularGridInterpolator(
+            (y_sparse_old, x_sparse_old),
+            scales_old,
+            method="linear",
+            bounds_error=False,
+            fill_value=None,
+        )
+
+        # Create points for interpolation using the actual sparse coordinates
+        yy_sparse, xx_sparse = np.meshgrid(y_sparse_new, x_sparse_new, indexing="ij")
+        points = np.column_stack((yy_sparse.ravel(), xx_sparse.ravel()))
+
+        # Interpolate old scales to new grid
+        scales_old_interp = old_interp(points).reshape(scales_new.shape)
+
+        # Calculate relative difference
+        rel_diff = np.abs(scales_new - scales_old_interp) / scales_new
+
+        # Check if we've reached desired accuracy or minimum grid step
+        if np.all(rel_diff <= accuracy):
+            # print(f"Converged after {iter_count+1} iterations.")
+            break
+        elif grid_step <= 1:
+            print("Reached minimum grid step, breaking the loop.")
+            break
+
+        # For TPV projections with distortions, a more adaptive approach is better
+        # This combines binary search with a safety factor to avoid oscillations
+        mean_rel_diff = np.abs(np.mean(scales_new - scales_old_interp)) / np.mean(
+            scales_new
+        )
+        if mean_rel_diff > 4 * accuracy:  # Far from target - be aggressive
+            grid_step = max(1, grid_step // 2)
+        elif mean_rel_diff > 2 * accuracy:  # Getting closer
+            grid_step = max(1, int(grid_step * 0.6))
+        else:  # Close to target - fine adjustments
+            grid_step = max(1, int(grid_step * 0.8))
+
+        # Maximum iterations safety check
+        if iter_count >= 100:  # Add iteration counter for safety
+            print("Maximum iterations (100) reached, breaking the loop.")
+            break
+
+        scales_old = scales_new
+        y_sparse_old = y_sparse_new
+        x_sparse_old = x_sparse_new
+        iter_count += 1  # Increment iteration counter
+
+    # Create interpolator for final grid
+    interp = RegularGridInterpolator(
+        (y_sparse_new, x_sparse_new),
+        scales_new,
+        method="linear",
+        bounds_error=False,
+        fill_value=None,
+    )
+
+    # Generate full coordinate grid
+    y_full, x_full = np.mgrid[0:ny, 0:nx]
+    points = np.column_stack((y_full.ravel(), x_full.ravel()))
+
+    # Interpolate to get full grid of pixel scales
+    pixel_scale_eff = interp(points).reshape(ny, nx)
+
+    return pixel_scale_eff
+
 # %% ../nbs/10_utilities.ipynb 11
+def sigma_clip_stats(
+    x, sigma=3, sigma_lower=None, sigma_upper=None, axis=None, maxiters=10, ngood_min=1
+):
+    """
+    Calculate statistics on sigma-clipped data. Replacement for 
+    astropy.stats.sigma_clipped_stats.
+    
+    This function is a wrapper around astropy.stats.sigma_clip that performs
+    sigma clipping on the input data and returns common statistics calculated
+    on the clipped data.
+    
+    Parameters
+    ----------
+    x : array-like
+        The data to be sigma clipped.
+    sigma : float, optional
+        The number of standard deviations to use for both the lower and upper
+        clipping limit. Default is 3.
+    sigma_lower : float or None, optional
+        The number of standard deviations to use as the lower limit. If None,
+        the value of `sigma` is used. Default is None.
+    sigma_upper : float or None, optional
+        The number of standard deviations to use as the upper limit. If None,
+        the value of `sigma` is used. Default is None.
+    axis : int or None, optional
+        The axis along which to sigma clip. If None, the flattened array is used.
+        Default is None.
+    maxiters : int, optional
+        The maximum number of sigma clipping iterations to perform. Default is 10.
+    ngood_min : int, optional
+        The minimum number of good (non-clipped) data points required to return
+        valid statistics. If fewer points remain, NaN values are returned. Default is 1.
+    
+    Returns
+    -------
+    mean : float or ndarray
+        The mean of the sigma-clipped data.
+    median : float or ndarray
+        The median of the sigma-clipped data.
+    std : float or ndarray
+        The standard deviation of the sigma-clipped data.
+    mean_err : float or ndarray
+        The standard error of the mean (std/sqrt(n)) of the sigma-clipped data.
+    """
+
+    clipped = sigma_clip(
+        x,
+        sigma=sigma,
+        sigma_lower=sigma_lower,
+        sigma_upper=sigma_upper,
+        axis=axis,
+        maxiters=maxiters,
+        masked=False,
+    )
+    ngood = np.isfinite(clipped).sum(axis=axis)
+    mean = np.nanmean(clipped, axis=axis)
+    median = np.nanmedian(clipped, axis=axis)
+    std = np.nanstd(clipped, axis=axis)
+    mean_err = std / np.sqrt(ngood)
+    if ngood.ndim < 1:
+        if ngood < ngood_min:
+            return np.nan, np.nan, np.nan, np.nan
+        else:
+            return mean, median, std, mean_err
+    idx = ngood < ngood_min
+    mean[idx] = np.nan
+    median[idx] = np.nan
+    std[idx] = np.nan
+    mean_err[idx] = np.nan
+    return mean, median, std, mean_err
+
+def weighted_median(values, weights):
+    sorter = np.argsort(values)
+    values_sorted = values[sorter]
+    weights_sorted = weights[sorter]
+    cum_weights = np.cumsum(weights_sorted)
+    midpoint = 0.5 * np.sum(weights_sorted)
+    median_idx = np.searchsorted(cum_weights, midpoint)
+    return values_sorted[median_idx]
+
 def bootstrap_median_error(data, errors, nboot=1000, axis=None):
     """
     Estimate the error of the median along a given axis using bootstrapping.
