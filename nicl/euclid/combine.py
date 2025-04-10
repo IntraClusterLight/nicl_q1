@@ -20,11 +20,9 @@ import numpy as np
 from astropy.io import fits
 from astropy import units as u
 from photutils.background import Background2D
-from regions import RectangleSkyRegion
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
-from nicl.mask import fast_mask
 from nicl.euclid.skyflat import read_skyflat, apply_skyflat
 from nicl.euclid.constants import (
     VIS,
@@ -40,10 +38,12 @@ from nicl.euclid.utilities import (
     get_dither_id_from_filename,
     get_obs_id_from_filename,
 )
+from nicl.mask import fast_mask  # noqa: F401
 from nicl.utilities import (
     parse_input_for_angular_size,
     parse_input_for_skycoord,
     does_image_overlap_with_skyregion,
+    create_sky_rectangle,
 )
 
 # %% ../../nbs/euclid/combine.ipynb 4
@@ -379,7 +379,7 @@ class DithersMixin:
                         sci_ext_hdr = hdul[f"{ext}.SCI"].header
                         # check if the cutout region overlaps with the chip/quad
                         if self.cutout_cen is not None and self.cutout_size is not None:
-                            cutout_reg = RectangleSkyRegion(
+                            cutout_reg = create_sky_rectangle(
                                 center=self.cutout_cen,
                                 width=self.cutout_size[0],
                                 height=self.cutout_size[1],
@@ -408,10 +408,15 @@ class DithersMixin:
                         if self.autodark_corr and self.instrument.name == "VIS":
                             obsid = get_obs_id_from_filename(dither.name)
                             # TODO: separate applying autodark correction for short and long exposures
-                            autodark = read_skyflat(
+                            autodark, coarse_factor = read_skyflat(
                                 obsid, "VIS", ext, self.autodark_dir
                             )
-                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear")
+                            sci_data = apply_skyflat(
+                                sci_data,
+                                autodark,
+                                interpolation_method="linear",
+                                coarse_factor=coarse_factor,
+                            )
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
@@ -542,7 +547,7 @@ def sub_bkg(
     mesh_size=None,  # mesh size for background modeling; default to 1x1 mesh if not specified
     **kwargs,  # additional arguments for Background2D
 ):
-    """model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
+    """Model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
     img = np.asarray(img)
     # check if need to build object mask
     if isinstance(obj_mask, str):
@@ -653,6 +658,11 @@ class NISPCombiner(DithersMixin, Combiner):
             self._combine_images(images, out_fn)
 
     def _combine_images(self, images, out_fn):
+        if (self.out_dir / out_fn).exists() and not self.overwrite:
+            print(
+                f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
+            )
+            return
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
@@ -738,6 +748,11 @@ class VISCombiner(DithersMixin, Combiner):
             self._combine_images(images, out_fn)
 
     def _combine_images(self, images, out_fn):
+        if (self.out_dir / out_fn).exists() and not self.overwrite:
+            print(
+                f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
+            )
+            return
         # the default temporary directory may not have enough space for VIS
         # determine the parent directory for the temporary directory based on the host
         hostname = socket.gethostname()
@@ -822,7 +837,7 @@ class MerCombiner(Combiner):
 
     def combine_per_filter(self, filter):
         images = self._find_images(filter)
-        if not list(chain.from_iterable(images)):
+        if not any(chain.from_iterable(images)):
             return
         out_fn = (
             "EUC_MER-MOSAIC-" if self.add_bkg_mod else "EUC_MER_BGSUB-MOSAIC-"
@@ -830,6 +845,11 @@ class MerCombiner(Combiner):
         if len(self.name) > 0:
             out_fn += f"_{self.name}"
         out_fn += ".fits"
+        if (self.out_dir / out_fn).exists() and not self.overwrite:
+            print(
+                f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
+            )
+            return
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:

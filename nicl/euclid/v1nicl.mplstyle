@@ -48,7 +48,7 @@
 ############
 
 figure.figsize:     4.0, 3.0  # figure size in inches
-figure.dpi:         200       # figure dots per inch (just for display)
+figure.dpi:         150       # figure dots per inch (just for display)
 savefig.dpi:        300       # figure dots per inch for saving non-vector graphics
 savefig.format:     pdf       # {png, ps, pdf, svg}
 savefig.bbox:       tight     # {tight, standard}

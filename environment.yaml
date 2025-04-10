@@ -25,6 +25,7 @@ dependencies:
   - ruff
   - setuptools
   - sigfig
+  - spherical-geometry
   - xarray
   - zarr
 prefix: /Users/spb/anaconda/envs/icl
