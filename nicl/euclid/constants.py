@@ -21,6 +21,7 @@ class Camera:
     chips: Tuple[str, ...]
     filters: Tuple[str, ...]
     pix_scale: float
+    gaps: Tuple[float, float] = None  # X, Y gaps in arcsec; more than one value in one dimension repsents different gaps in rotation
     chip_subdivisions: Tuple[str, ...] = None
     readout_unit_size: Tuple[int, int] = None
     bad_pix_bits: Tuple[int, ...] = None
@@ -46,6 +47,7 @@ VIS = Camera(
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.1,
     n_dithers_per_obs=6,
+    gaps=((0, 12.7), (0.4, 64.4)),  # extracted from Table 1 of 2022A&A...662A.112E
     chip_layout=np.array(
         (("1-1.E", "1-1.F", "1-2.E", "1-2.F", "1-3.E", "1-3.F", "1-4.G", "1-4.H", "1-5.G", "1-5.H", "1-6.G", "1-6.H"),
          ("1-1.H", "1-1.G", "1-2.H", "1-2.G", "1-3.H", "1-3.G", "1-4.F", "1-4.E", "1-5.F", "1-5.E", "1-6.F", "1-6.E"),
@@ -69,6 +71,7 @@ NISP = Camera(
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.3,
     n_dithers_per_obs=4,
+    gaps=(50.6, (101.4, 86.1)),   # extracted from Table 1 of 2022A&A...662A.112E
     chip_layout=np.array([[f"DET{y}{x}" for x in range(1, 5)] for y in range(1, 5)]),
 )
 

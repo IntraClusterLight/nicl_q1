@@ -7,7 +7,7 @@ __all__ = ['get_nisp_images_for_observation', 'get_primary_header', 'dq_to_mask'
            'get_invalid_mask', 'get_invalid_mask_without_persistence', 'get_rms', 'fits_append', 'remove_if_necessary',
            'default_data_path', 'euclid_credentials', 'TooManyFilesFoundError', 'find_single_file', 'get_nisp_tile',
            'get_nisp_dither', 'get_nisp_stack', 'get_tile_index_from_filename', 'get_obs_id_from_filename',
-           'get_dither_id_from_filename', 'get_filter_from_filename', 'round_up_box_size']
+           'get_dither_id_from_filename', 'get_filter_from_filename', 'round_up_box_size', 'assemble_fpa_mosaic']
 
 # %% ../../nbs/euclid/utilities.ipynb 2
 import os
@@ -18,8 +18,12 @@ import numpy as np
 import pandas as pd
 import yaml
 from astropy.io import fits
+from astropy.nddata import block_reduce
 
-# %% ../../nbs/euclid/utilities.ipynb 3
+from ..utilities import compute_pixel_scales
+from .constants import VIS, NISP
+
+# %% ../../nbs/euclid/utilities.ipynb 4
 def get_nisp_images_for_observation(
     obs_id,  # the main observation id
     n_prior=0,  # number of previous observations to include
@@ -79,7 +83,7 @@ def get_nisp_images_for_observation(
         info["filename"] = info["filename"].fillna("")
     return info
 
-# %% ../../nbs/euclid/utilities.ipynb 4
+# %% ../../nbs/euclid/utilities.ipynb 5
 def get_primary_header(
     fns,  # an iterable of image filenames
 ):
@@ -105,7 +109,7 @@ def get_primary_header(
         hdr.remove(h)
     return hdr
 
-# %% ../../nbs/euclid/utilities.ipynb 5
+# %% ../../nbs/euclid/utilities.ipynb 6
 def dq_to_mask(dq, maskbits=[0]):
     maskbits = np.atleast_1d(maskbits)
     mask = dq & 2 ** maskbits[0] > 0
@@ -149,13 +153,13 @@ def fits_append(fn, data, ext, primary_header, exthdr=None):
         fits.append(fn, None, primary_header)
     fits.append(fn, data, exthdr)
 
-# %% ../../nbs/euclid/utilities.ipynb 6
+# %% ../../nbs/euclid/utilities.ipynb 7
 def remove_if_necessary(path, fnglob):
     fns = Path(path).glob(fnglob)
     for fn in fns:
         os.remove(fn)
 
-# %% ../../nbs/euclid/utilities.ipynb 7
+# %% ../../nbs/euclid/utilities.ipynb 8
 def default_data_path(*subfolders):
     """Discover the default path to Euclid data, and append `subfolder`.
 
@@ -173,7 +177,7 @@ def default_data_path(*subfolders):
         path = path / Path(*subfolders)
     return path
 
-# %% ../../nbs/euclid/utilities.ipynb 8
+# %% ../../nbs/euclid/utilities.ipynb 9
 def euclid_credentials():
     """Get Euclid user and password from `~/.euclid_credentials`, if it exists."""
     fn = Path("~/.euclid_credentials").expanduser()
@@ -182,7 +186,7 @@ def euclid_credentials():
             credentials = yaml.safe_load(stream)
         return credentials
 
-# %% ../../nbs/euclid/utilities.ipynb 9
+# %% ../../nbs/euclid/utilities.ipynb 10
 class TooManyFilesFoundError(Exception):
     pass
 
@@ -213,7 +217,7 @@ def get_nisp_stack(obs_id, filter, path):
     fn = f"EUC_NIR_W-STK-IMAGE_{filter}-{obs_id}.fits"
     return find_single_file(fn, path)
 
-# %% ../../nbs/euclid/utilities.ipynb 11
+# %% ../../nbs/euclid/utilities.ipynb 12
 def get_tile_index_from_filename(fn):
     fn = os.path.basename(fn)
     match = re.search(r"TILE(?P<id>(\d)*)[-_.]", fn)
@@ -246,7 +250,7 @@ def get_filter_from_filename(fn):
     filter = match.group("filter") if match else None
     return filter
 
-# %% ../../nbs/euclid/utilities.ipynb 13
+# %% ../../nbs/euclid/utilities.ipynb 14
 def round_up_box_size(x, y):
     """Return an integer z closest to y that approximate integer * z = x."""
     if not isinstance(x, int) or x < 0:
@@ -267,3 +271,76 @@ def round_up_box_size(x, y):
     if np.min([x % z, z - (x % z)]) > np.min([x % round(y), round(y) - (x % round(y))]):
         raise ValueError("This should not happen")
     return z
+
+# %% ../../nbs/euclid/utilities.ipynb 16
+def assemble_fpa_mosaic(hdus, instrument="NISP", binsize=None, unify_zpt=None, unify_pix_scl=None):
+    """Assemble the focal plane mosaic image from a multi-extension FITS file.
+
+    Parameters
+    ----------
+    hdus : astropy.io.fits.HDUList
+        The HDUs from a FITS file, where each extension contains the data of one detector.
+    instrument : str, optional
+        Instrument name, either "NISP" or "VIS". Default is "NISP".
+    binsize : int, optional
+        If provided, bin the final mosaic image by this factor using median combining.
+    unify_zpt : float, optional
+        If provided, scale all detector images to a common magnitude zero point.
+    unify_pix_scl : float, optional
+        If provided, scale all pixel values to a common pixel scale. Use caution with this
+        option, as it can significantly slow down the processing.
+
+    Returns
+    -------
+    np.ndarray
+        A 2D numpy array representing the assembled focal plane mosaic image. Gaps between
+        detectors are filled with NaN values.
+    """
+    inst = NISP if instrument == "NISP" else VIS
+    if instrument == "NISP":
+        zpt_key = "ZPAB"
+    else:
+        zpt_key = "MAGZEROP"
+    chips = inst.chip_layout
+    pixel_scale = inst.pix_scale
+    gap_x =  inst.gaps[0]
+    gap_y =  inst.gaps[1]
+    gap_x_pixels = np.round(np.array(gap_x) / pixel_scale).astype(int)
+    gap_y_pixels = np.round(np.array(gap_y) / pixel_scale).astype(int)
+    # broadcast the gaps array to match number of chips in both dimensions
+    gap_x_pixels = np.resize(gap_x_pixels, chips.shape[1])
+    gap_y_pixels = np.resize(gap_y_pixels, chips.shape[0])
+    # set the gap for the last row/column to 0
+    gap_x_pixels[-1] = 0
+    gap_y_pixels[-1] = 0
+    imgs_all_rows = []
+    for chip_row, gap_y in zip(chips, gap_y_pixels):
+        imgs_per_row = []
+        for chip, gap_x in zip(chip_row, gap_x_pixels):
+            chip = str(chip)
+            img = hdus[chip+".SCI"].data
+            # NISP DET[34][*] are rotated by 180 degrees; 
+            # VIS rotation already embodied in chip layout (EFGH arrangement)
+            if instrument == "NISP":
+                if int(chip[3]) > 2:
+                    img = img[::-1, ::-1]
+            if unify_zpt is not None:
+                unify_zpt = float(unify_zpt)
+                zpt = hdus[chip+".SCI"].header[zpt_key]
+                img = img * 10**((unify_zpt - zpt) / 2.5)
+            if unify_pix_scl is not None:
+                unify_pix_scl = float(unify_pix_scl)
+                eff_pix_scl = compute_pixel_scales(hdus[chip+".SCI"].header)
+                img = img * (unify_pix_scl / eff_pix_scl)**2
+            # pad the image with NaNs
+            img = np.pad(img, ((0, gap_y), (0, gap_x)), mode="constant", constant_values=np.nan)
+            imgs_per_row.append(img)
+        mosaic_per_row = np.concatenate(imgs_per_row, axis=1)
+        imgs_all_rows.append(mosaic_per_row)
+    mosaic = np.concatenate(imgs_all_rows, axis=0)
+    # optionally bin the mosaic
+    if binsize is not None:
+        binsize= np.round(binsize).astype(int)
+        mosaic = block_reduce(mosaic, binsize, np.median)
+    return mosaic
+
