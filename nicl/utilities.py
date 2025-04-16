@@ -17,6 +17,7 @@ from astropy.nddata import CCDData, Cutout2D
 from astropy.coordinates import SkyCoord
 from astropy.io.fits import Header
 from astropy.stats import mad_std, sigma_clip
+from astropy.wcs import WCS
 from scipy.interpolate import RegularGridInterpolator
 from spherical_geometry.polygon import SphericalPolygon
 
@@ -341,7 +342,7 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     if not isinstance(sky_reg, SphericalPolygon):
         raise ValueError("sky_reg must be a SphericalPolygon object.")
 
-    sky_reg_from_img = SphericalPolygon.from_wcs(hdr, steps=10)
+    sky_reg_from_img = SphericalPolygon.from_wcs(hdr)
     if not sky_reg.intersects_poly(sky_reg_from_img):
         return False
     overlap = sky_reg.intersection(sky_reg_from_img)

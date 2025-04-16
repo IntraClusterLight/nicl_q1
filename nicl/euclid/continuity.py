@@ -12,12 +12,11 @@ from astropy.io import fits
 import numpy as np
 from spherical_geometry.polygon import SphericalPolygon
 import warnings
-from regions import RectanglePixelRegion, PixCoord
 from astropy.wcs import WCS
 from regions import PolygonSkyRegion
 from astropy.coordinates import SkyCoord
-import astropy.units as u
 from numpy.linalg import lstsq
+from spherical_geometry.polygon import SphericalPolygon
 
 from nicl.euclid.constants import NISP, VIS
 from nicl.euclid.utilities import (
@@ -27,12 +26,8 @@ from nicl.utilities import does_image_overlap_with_skyregion, sigma_clip_stats
 
 # %% ../../nbs/euclid/continuity.ipynb 4
 def get_overlap_chip(hdr, hdul, chip_layout, threshold=0.01):
-    """Get the chip id (target dither) that overlaps with the chip pair in the current dither. Use regions for coarse overlap check."""
-    nx, ny = hdr["NAXIS1"], hdr["NAXIS2"]
-    pix_reg = RectanglePixelRegion(
-        center=PixCoord((nx - 1) / 2, (ny - 1) / 2), width=nx, height=ny
-    )
-    sky_reg = pix_reg.to_sky(WCS(hdr))
+    """Get the chip id (target dither) that overlaps with the chip pair in the current dither. Sparsely sampling image boundary for better speed."""
+    sky_reg = SphericalPolygon.from_wcs(hdr)
     chips = []
     for chip in np.nditer(chip_layout):
         chip = str(chip)
