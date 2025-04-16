@@ -13,6 +13,7 @@ import numpy as np
 import astropy.units as u
 from astropy.io import fits
 from astropy.wcs import WCS
+import matplotlib.pyplot as plt
 
 from nicl.mask import (
     create_bcg_mask,
@@ -127,7 +128,7 @@ def create_masks(
         "object": object_mask,
         "faint": faint_mask,
     }
-    return output_masks
+    return output_masks, bkg
 
 # %% ../../nbs/euclid/mask.ipynb 11
 def make_mask_plot(image, masks, output_dir=None, label=None):
