@@ -5,20 +5,20 @@
 # %% auto 0
 __all__ = ['get_overlap_chip', 'compute_offset_between_chips', 'polygon_photometry', 'form_dither_pairs',
            'measure_offset_per_dither_pair', 'measure_offset_per_observation', 'solve_for_correction_per_observation',
-           'apply_correction']
+           'apply_correction', 'correct_dither']
 
 # %% ../../nbs/euclid/continuity.ipynb 2
-from astropy.io import fits
+import multiprocessing as mp
+from functools import partial
+
 import numpy as np
-from spherical_geometry.polygon import SphericalPolygon
-import warnings
-from astropy.wcs import WCS
-from regions import PolygonSkyRegion
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.wcs import WCS
 from numpy.linalg import lstsq
+from regions import PolygonSkyRegion
 from spherical_geometry.polygon import SphericalPolygon
 
-from nicl.euclid.constants import NISP, VIS
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
 )
@@ -31,22 +31,26 @@ def get_overlap_chip(hdr, hdul, chip_layout, threshold=0.01):
     chips = []
     for chip in np.nditer(chip_layout):
         chip = str(chip)
-        hdr = hdul[chip+".SCI"].header
-        is_overlapped = does_image_overlap_with_skyregion(hdr, sky_reg, threshold=threshold)
+        hdr = hdul[chip + ".SCI"].header
+        is_overlapped = does_image_overlap_with_skyregion(
+            hdr, sky_reg, threshold=threshold
+        )
         if is_overlapped:
             chips.append(chip)
     return chips
-    
+
+
 def compute_offset_between_chips(hdu, target_hdus, steps=10):
-    """Compute the offsets between the overlapping chips in the target dither and the given chip in the current dither.
-    """
+    """Compute the offsets between the overlapping chips in the target dither and the given chip in the current dither."""
     # use SphericalPolygon to compute the accurate overlap region
     current_poly = SphericalPolygon.from_wcs(hdu.header, steps=steps)
     offsets = []
     for target_hdu in target_hdus:
         target_poly = SphericalPolygon.from_wcs(target_hdu.header, steps=steps)
         if not current_poly.intersects_poly(target_poly):
-            raise ValueError(f"Chip {target_hdu.header['extname']} does not overlap with the current dither chip {hdu.header['extname']}.")
+            raise ValueError(
+                f"Chip {target_hdu.header['extname']} does not overlap with the current dither chip {hdu.header['extname']}."
+            )
         overlap_poly = current_poly.intersection(target_poly)
         sb, sb_err = polygon_photometry(overlap_poly, hdu)
         target_sb, target_sb_err = polygon_photometry(overlap_poly, target_hdu)
@@ -55,9 +59,11 @@ def compute_offset_between_chips(hdu, target_hdus, steps=10):
         offset_err = np.sqrt(sb_err**2 + target_sb_err**2)
         offsets.append((offset, offset_err))
     return offsets
-            
+
+
 def polygon_photometry(skyreg, hdu):
     """Perform polygon photometry on the given data using the provided sky region and WCS.
+
     This function computes the mean value of the pixels within the polygon region.
     """
     img = hdu.data
@@ -73,7 +79,9 @@ def polygon_photometry(skyreg, hdu):
         target_pix_scl = 0.3
         mag_zpt = hdr.get("ZPAB")
     if mag_zpt is None:
-        raise ValueError("Magnitude zero point not found in header (missing MAGZEROP and ZPAB keys)")
+        raise ValueError(
+            "Magnitude zero point not found in header (missing MAGZEROP and ZPAB keys)"
+        )
     # construct a PolygonSkyRegion to do photometry
     ra, dec = list(skyreg.to_radec())[0]
     skyreg_ = PolygonSkyRegion(SkyCoord(ra[:-1], dec[:-1], unit="deg"))
@@ -86,19 +94,31 @@ def polygon_photometry(skyreg, hdu):
     nanmask = np.isnan(img)
     extracted_data = regmask.get_values(img, mask=nanmask)
     # print(extracted_data)
-    robust_mean, _, _, robust_mean_err = sigma_clip_stats(extracted_data, sigma_upper=2.5, sigma_lower=3, ngood_min=3)
+    robust_mean, _, _, robust_mean_err = sigma_clip_stats(
+        extracted_data, sigma_upper=2.5, sigma_lower=3, ngood_min=3
+    )
     # print(f"robust mean: {robust_mean}, robust mean error: {robust_mean_err}")
     if not np.isnan(robust_mean):
         pix_area = pixreg.area
         # convert sky area from steradians to square arcseconds
-        sky_area = sky_area * (180 * 3600 / np.pi)**2
+        sky_area = sky_area * (180 * 3600 / np.pi) ** 2
         sky_area_per_pix = sky_area / pix_area
         # sky_area_per_pix=wcs.proj_plane_pixel_area().to(u.arcsec**2).value
         # print(f"sky area per pixel: {sky_area_per_pix}")
         # generalize to the same zpt and pixel scale
-        adjusted_intensity = robust_mean / sky_area_per_pix * target_pix_scl**2 * 10**(-0.4 * (mag_zpt - target_mag_zpt))
-        adjusted_intensity_error = robust_mean_err / sky_area_per_pix * target_pix_scl**2 * 10**(-0.4 * (mag_zpt - target_mag_zpt))
-        # adjusted_intensity = robust_mean / sky_area_per_pix * target_pix_scl**2 
+        adjusted_intensity = (
+            robust_mean
+            / sky_area_per_pix
+            * target_pix_scl**2
+            * 10 ** (-0.4 * (mag_zpt - target_mag_zpt))
+        )
+        adjusted_intensity_error = (
+            robust_mean_err
+            / sky_area_per_pix
+            * target_pix_scl**2
+            * 10 ** (-0.4 * (mag_zpt - target_mag_zpt))
+        )
+        # adjusted_intensity = robust_mean / sky_area_per_pix * target_pix_scl**2
         # adjusted_intensity_error = robust_mean_err / sky_area_per_pix * target_pix_scl**2
         # adjusted_intensity = robust_mean
         # adjusted_intensity_error = robust_mean_err
@@ -106,27 +126,26 @@ def polygon_photometry(skyreg, hdu):
     else:
         return np.nan, np.nan
 
-        
+
 def form_dither_pairs(dithers):
-    """Form dither pairs from the list of dither files. It removes short exposures for now.
-    """
+    """Form dither pairs from the list of dither files. It removes short exposures for now."""
     dithers.sort()
-    dithers_=[]
+    dithers_ = []
     for dither in dithers:
-        dither_id=get_dither_id_from_filename(dither)
-        if len(dither_id)>1 and dither_id.endswith("1"):
+        dither_id = get_dither_id_from_filename(dither)
+        if len(dither_id) > 1 and dither_id.endswith("1"):
             continue
         dithers_.append(dither)
     # form unique dither pairs among four dithers
     dither_pairs = []
     for i in range(len(dithers_)):
-        for j in range(i+1, len(dithers_)):
+        for j in range(i + 1, len(dithers_)):
             dither_pairs.append((dithers_[i], dithers_[j]))
     return dither_pairs
 
+
 def _mask_in_place(hdu, mask):
-    """Mask the data in place. So we don't need to pass around the dq hdu.
-    """
+    """Mask the data in place. So we don't need to pass around the dq hdu."""
     if mask is None:
         return
     if hdu.data is None:
@@ -139,14 +158,14 @@ def _mask_in_place(hdu, mask):
 # %% ../../nbs/euclid/continuity.ipynb 5
 def measure_offset_per_dither_pair(dither_pair, instrument):
     dither1, dither2 = dither_pair
-    chip_pairs= []
+    chip_pairs = []
     offsets = []
     with fits.open(dither1) as hdul1, fits.open(dither2) as hdul2:
         # collect all headers from hdul2
         # target_hdrs = [hdul2[chip + ".SCI"].header for chip in np.nditer(instrument.chip_layout)]
         # loop over chips in hdul1
         for chip in np.nditer(instrument.chip_layout):
-            chip=str(chip)
+            chip = str(chip)
             hdr = hdul1[chip + ".SCI"].header
             target_chips = get_overlap_chip(hdr, hdul2, instrument.chip_layout)
             # measure the offset between the chips in dither1 and dither2
@@ -178,12 +197,24 @@ def measure_offset_per_dither_pair(dither_pair, instrument):
             offset = compute_offset_between_chips(hdul1[chip + ".SCI"], hdus)
             chip_pairs.extend([(chip, target_chip) for target_chip in target_chips])
             offsets.extend(offset)
-        # print(offsets, chip_pairs)
-        res = {"instrument": instrument, "dither pair": dither_pair, "chip pair": chip_pairs, "offset": offsets}
+        dither_id1 = get_dither_id_from_filename(dither1)
+        dither_id2 = get_dither_id_from_filename(dither2)
+        res = {
+            "instrument": instrument,
+            "dither pair": (dither_id1, dither_id2),
+            "chip pair": chip_pairs,
+            "offset": offsets,
+        }
         return res
-    
+
+
+# | export
+
+
 def measure_offset_per_observation(dir, obsid, instrument, filter):
     """Measure the offset between the overlapping chips among the dithers of one observation.
+
+    Uses multiprocessing to parallelize processing of dither pairs.
     """
     if filter not in instrument.filters:
         raise ValueError(f"Filter {filter} is not available for {instrument.name}.")
@@ -193,37 +224,49 @@ def measure_offset_per_observation(dir, obsid, instrument, filter):
     dithers = list(dir.glob(f"**/EUC_*{filter}*{obsid}-*.fits"))
     # form dither pairs
     dither_pairs = form_dither_pairs(dithers)
-    # loop over dither pairs
-    offset_dicts = []
-    for dither_pair in dither_pairs:
-        offset_dict = measure_offset_per_dither_pair(dither_pair, instrument)
-        dither1, dither2 = dither_pair
-        dither_id1 = get_dither_id_from_filename(dither1)
-        dither_id2 = get_dither_id_from_filename(dither2)
-        offset_dict["dither pair"] = (dither_id1, dither_id2)
-        offset_dict["obsid"] = obsid
-        offset_dict["filter"] = filter
-        offset_dict["instrument"] = instrument
-        offset_dicts.append(offset_dict)
-    return offset_dicts
 
+    if not dither_pairs:
+        return []
+
+    # Use multiprocessing to process dither pairs in parallel
+    num_processes = min(mp.cpu_count(), len(dither_pairs))
+    process_func = partial(measure_offset_per_dither_pair, instrument=instrument)
+    with mp.Pool(processes=num_processes) as pool:
+        results = pool.map(process_func, dither_pairs)
+
+    # Post-process the results to add additional information
+    offset_dicts = []
+    for result in results:
+        result["obsid"] = obsid
+        result["filter"] = filter
+        offset_dicts.append(result)
+
+    return offset_dicts
 
 # %% ../../nbs/euclid/continuity.ipynb 6
 def solve_for_correction_per_observation(offset_dicts):
     instrument = offset_dicts[0]["instrument"]
     # Flatten the tuples of dither pairs before making the set
-    unique_dithers = set(dither for offset_dict in offset_dicts for dither in offset_dict["dither pair"])
-    solutions_finder_chart = [dither+"."+str(chip) for dither in unique_dithers for chip in np.nditer(instrument.chip_layout)]
+    unique_dithers = set(
+        dither for offset_dict in offset_dicts for dither in offset_dict["dither pair"]
+    )
+    solutions_finder_chart = [
+        dither + "." + str(chip)
+        for dither in unique_dithers
+        for chip in np.nditer(instrument.chip_layout)
+    ]
     num_solutions = len(solutions_finder_chart)
     a = []
     b = []
     for offset_dict in offset_dicts:
         dither1, dither2 = offset_dict["dither pair"]
-        for (chip1, chip2), (offset, offset_err) in zip(offset_dict["chip pair"], offset_dict["offset"]):
+        for (chip1, chip2), (offset, offset_err) in zip(
+            offset_dict["chip pair"], offset_dict["offset"]
+        ):
             if np.isfinite(offset):
                 coeff_array = np.zeros(num_solutions)
-                idx1 = solutions_finder_chart.index(dither1+"."+chip1)
-                idx2 = solutions_finder_chart.index(dither2+"."+chip2)
+                idx1 = solutions_finder_chart.index(dither1 + "." + chip1)
+                idx2 = solutions_finder_chart.index(dither2 + "." + chip2)
                 coeff_array[idx1] = 1
                 coeff_array[idx2] = -1
                 a.append(coeff_array)
@@ -237,10 +280,15 @@ def solve_for_correction_per_observation(offset_dicts):
         residuals = np.linalg.norm(b - a @ solutions)
     print(f"rank: {rank}, residuals: {residuals}")
     # map solutions to the dither chips using the solutions_finder_chart
-    mapped_solutions = {chart: solution for chart, solution in zip(solutions_finder_chart, solutions)}
-    return mapped_solutions
+    mapped_solutions = {
+        chart: solution for chart, solution in zip(solutions_finder_chart, solutions)
+    }
+    return mapped_solutions, residuals / np.sqrt(len(b))
 
-def apply_correction(dir, obsid, instrument, filter, solutions, out_dir=None, overwrite=False):
+
+def apply_correction(
+    dir, obsid, instrument, filter, solutions, out_dir=None, overwrite=False
+):
     if filter not in instrument.filters:
         raise ValueError(f"Filter {filter} is not available for {instrument.name}.")
     if instrument.name == "VIS":
@@ -254,22 +302,51 @@ def apply_correction(dir, obsid, instrument, filter, solutions, out_dir=None, ov
         zpt_key = "ZPAB"
     # find the dither files
     dithers = list(dir.glob(f"**/EUC_*{filter}*{obsid}-*.fits"))
-    for dither in dithers:
-        dither_id = get_dither_id_from_filename(dither)
-        with fits.open(dither) as hdul:
-            # loop over chips in hdul
-            for chip in np.nditer(instrument.chip_layout):
-                chip=str(chip)
-                hdr = hdul[chip + ".SCI"].header
-                mag_zpt = hdr.get(zpt_key)
-                eff_pix_scl = compute_pixel_scales(hdr)
-                corr = solutions[dither_id+"."+chip]
-                corr_arr = corr / target_pix_scl**2 * eff_pix_scl**2 * 10**(0.4 * (mag_zpt - target_mag_zpt))
-                hdul[chip + ".SCI"].data += corr_arr
-                # update the header
-                hdr.add_history(f"Applied discontinuity correction {corr} to {chip}.")
-            if out_dir is None:
-                out_dir = dither.parent
-            out_fn = out_dir / (dither.stem + "_corr.fits")
-            hdul.writeto(out_fn, overwrite=overwrite)
+    num_processes = min(mp.cpu_count(), len(dithers))
+    process_func = partial(
+        correct_dither,
+        instrument=instrument,
+        solutions=solutions,
+        target_pix_scl=target_pix_scl,
+        target_mag_zpt=target_mag_zpt,
+        zpt_key=zpt_key,
+        out_dir=out_dir,
+        overwrite=overwrite,
+    )
+    with mp.Pool(processes=num_processes) as pool:
+        pool.map(process_func, dithers)
 
+
+def correct_dither(
+    dither,
+    instrument,
+    solutions,
+    target_pix_scl,
+    target_mag_zpt,
+    zpt_key,
+    out_dir=None,
+    overwrite=False,
+):
+    """Apply the discontinuity correction to a dither."""
+    dither_id = get_dither_id_from_filename(dither)
+    with fits.open(dither) as hdul:
+        # loop over chips in hdul
+        for chip in np.nditer(instrument.chip_layout):
+            chip = str(chip)
+            hdr = hdul[chip + ".SCI"].header
+            mag_zpt = hdr.get(zpt_key)
+            eff_pix_scl = compute_pixel_scales(hdr)
+            corr = solutions[dither_id + "." + chip]
+            corr_arr = (
+                corr
+                / target_pix_scl**2
+                * eff_pix_scl**2
+                * 10 ** (0.4 * (mag_zpt - target_mag_zpt))
+            )
+            hdul[chip + ".SCI"].data += corr_arr
+            # update the header
+            hdr.add_history(f"Applied discontinuity correction {corr} to {chip}.")
+        if out_dir is None:
+            out_dir = dither.parent
+        out_fn = out_dir / (dither.stem + "_corr.fits")
+        hdul.writeto(out_fn, overwrite=overwrite)
