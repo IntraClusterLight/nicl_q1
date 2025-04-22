@@ -29,6 +29,7 @@ from photutils.background import Background2D
 from tqdm import tqdm
 
 from ..mask import fast_mask
+from ..utilities import adu_to_sb
 
 # %% ../../nbs/euclid/background_stats.ipynb 5
 def measure_aperture_stats(
@@ -205,32 +206,35 @@ def stats_versus_size(
     return results
 
 # %% ../../nbs/euclid/background_stats.ipynb 7
-def convert_to_mag(results, zp):
-    results["expected_std_mean"] = zp - 2.5 * np.log10(results["expected_std_mean"])
-    results["expected_std_median"] = zp - 2.5 * np.log10(results["expected_std_median"])
-    results["err_std_mean"] = (
+def convert_to_mag(results, zp, pix_scl):
+    results_ = results.copy()
+    results_["expected_std_mean"] = adu_to_sb(results["expected_std_mean"], pix_scl, zp)
+    results_["expected_std_median"] = adu_to_sb(
+        results["expected_std_median"], pix_scl, zp
+    )
+    results_["err_std_mean"] = (
         (results["err_std_mean"] / results["std_mean"]) * 2.5 / np.log(10)
     )
-    results["err_std_median"] = (
+    results_["err_std_median"] = (
         (results["err_std_median"] / results["std_median"]) * 2.5 / np.log(10)
     )
-    results["err_bs_std_mean"] = (
+    results_["err_bs_std_mean"] = (
         (results["err_bs_std_mean"] / results["std_mean"]) * 2.5 / np.log(10)
     )
-    results["err_bs_std_median"] = (
+    results_["err_bs_std_median"] = (
         (results["err_bs_std_median"] / results["std_median"]) * 2.5 / np.log(10)
     )
-    results["std_mean"] = zp - 2.5 * np.log10(results["std_mean"])
-    results["std_median"] = zp - 2.5 * np.log10(results["std_median"])
+    results_["std_mean"] = adu_to_sb(results["std_mean"], pix_scl, zp)
+    results_["std_median"] = adu_to_sb(results["std_median"], pix_scl, zp)
     if "expected_std_from_rms_mean" in results.columns:
-        results["expected_std_from_rms_mean"] = zp - 2.5 * np.log10(
-            results["expected_std_from_rms_mean"]
+        results_["expected_std_from_rms_mean"] = adu_to_sb(
+            results["expected_std_from_rms_mean"], pix_scl, zp
         )
     if "expected_std_from_rms_median" in results.columns:
-        results["expected_std_from_rms_median"] = zp - 2.5 * np.log10(
-            results["expected_std_from_rms_median"]
+        results_["expected_std_from_rms_median"] = adu_to_sb(
+            results["expected_std_from_rms_median"], pix_scl, zp
         )
-    return results
+    return results_
 
 # %% ../../nbs/euclid/background_stats.ipynb 8
 def background_stats_plot(
@@ -362,9 +366,7 @@ def measure(
             rms[data_mask] = np.nan
             if mask is None:
                 if create_mask:
-                    mask, _ = fast_mask(
-                        data, estimate_background=estimate_background
-                    )
+                    mask, _ = fast_mask(data, estimate_background=estimate_background)
                 else:
                     mask = np.zeros(data.shape, dtype=bool)
             mask |= data_mask
