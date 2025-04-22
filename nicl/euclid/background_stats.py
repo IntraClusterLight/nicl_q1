@@ -206,7 +206,7 @@ def stats_versus_size(
     return results
 
 # %% ../../nbs/euclid/background_stats.ipynb 7
-def convert_to_mag(results, zp, pix_scl):
+def convert_to_mag(results, zp=23.9, pix_scl=0.3):
     results_ = results.copy()
     results_["expected_std_mean"] = adu_to_sb(results["expected_std_mean"], pix_scl, zp)
     results_["expected_std_median"] = adu_to_sb(
@@ -238,10 +238,15 @@ def convert_to_mag(results, zp, pix_scl):
 
 # %% ../../nbs/euclid/background_stats.ipynb 8
 def background_stats_plot(
-    results, true_bkg_std=None, errorbars=False, zp_mag=None, filename=None
+    results,
+    true_bkg_std=None,
+    errorbars=False,
+    zp_mag=None,
+    pix_scl=None,
+    filename=None,
 ):
     if zp_mag is not None:
-        results = convert_to_mag(results, zp_mag)
+        results = convert_to_mag(results, zp_mag, pix_scl)
     fig, ax = plt.subplots()
     ax.plot(
         results["sqrt_n_pix"],
@@ -308,7 +313,7 @@ def background_stats_plot(
     if zp_mag is None:
         ax.set_yscale("log")
     else:
-        ax.set_ylim(30, 24.5)
+        ax.invert_yaxis()
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
     ax.xaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:g}"))
     ax.xaxis.set_ticks(results["sqrt_n_pix"])
@@ -338,7 +343,7 @@ def measure(
     annular_thickness=None,  # None for solid apertures, or a number on range (0, 1) to specify relative thickness of annulus
     n_pix_tolerance=0.1,  # the largest allowed relative deviation from the requested n_pix
     n_steps=25,  # the number of different sqrt_n_pix to measure
-    zp_mag=21.286,  # convert to magntiudes using this zero point, unless it is None
+    zp_mag=23.9,  # convert to magntiudes using this zero point, unless it is None
     errorbars=True,  # plot errorbars
     debug=False,  # save debug images
     verbose=False,  # print verbose output
