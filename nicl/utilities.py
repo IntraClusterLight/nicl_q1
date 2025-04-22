@@ -48,15 +48,14 @@ def calc_sb_threshold(z, filter, b_band_sb_threshold=25 * u.ABmag):
     return b_band_sb_threshold + k_corr + dimming
 
 
-def sb_to_adu(sb, pix_scale, zp=27 * u.ABmag):
-    mag = sb - 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
-    counts = 10 ** (-(mag - zp).value / 2.5)
+def sb_to_adu(sb, pix_scale, zp=23.9):
+    mag = sb - 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2)
+    counts = 10 ** (-(mag - zp) / 2.5)
     return counts
 
 
-def adu_to_sb(adu, pix_scale, zp=27 * u.ABmag):
-    mag = np.log10(-2.5 * adu) + zp
-    sb = mag + 2.5 * np.log10(pix_scale.to_value(u.arcsec) ** 2) * u.mag
+def adu_to_sb(adu, pix_scale, zp=23.9):
+    sb = -2.5 * np.log10(adu / pix_scale**2) + zp
     return sb
 
 # %% ../nbs/10_utilities.ipynb 4
