@@ -150,6 +150,8 @@ class Combiner(ABC):
                     "Autodark correction requires specifying the directory to find autodarks."
                 )
             self.autodark_dir = Path(autodark_dir).expanduser()
+        else:
+            self.autodark_dir = None
         # assemble command line arguments to pass to SWarp
         self._swarp_extra_args = self._parse_swarp_args(kwargs)
         print(f"Initialized {self}")
@@ -718,6 +720,8 @@ class VISCombiner(DithersMixin, Combiner):
                         cutout_size=self.cutout_size,
                         individual_dithers=True,
                         bkg_sub=False,
+                        autodark_corr=self.autodark_corr,
+                        autodark_dir=self.autodark_dir,
                         release_name=self.release_name,
                         debug=self.debug,
                     )
