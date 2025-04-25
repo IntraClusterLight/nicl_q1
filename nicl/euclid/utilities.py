@@ -137,7 +137,7 @@ def get_invalid_mask_without_persistence(fn, extname):
 
 
 def get_nir_saturation_only_mask(fn, extname):
-    sat = get_dq_mask(fn, extname, [10]) 
+    sat = get_dq_mask(fn, extname, [10])
     otherwise_invalid = get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 13, 16, 23])
     return sat & ~otherwise_invalid
 
@@ -265,9 +265,9 @@ def get_obs_id_from_filename(fn):
 
 def get_dither_id_from_filename(fn):
     fn = os.path.basename(fn)
-    match = re.search(r"VIS.*[-_]0?(?P<id>\d-\d)[-_]", fn)
+    match = re.search(r"VIS.*[-_]0?(?P<id>\d-\d)[-_.]", fn)
     if match is None:
-        match = re.search(r"[-_](?P<id>\d)[-_]", fn)
+        match = re.search(r"[-_](?P<id>\d)[-_.]", fn)
     dither_id = match.group("id") if match else None
     return dither_id
 

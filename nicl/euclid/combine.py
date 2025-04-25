@@ -730,6 +730,9 @@ class VISCombiner(DithersMixin, Combiner):
                 rmtree(tmpdir)
                 raise
             self.in_dir = tmpdir
+            # disable autodark correction for the second pass combining
+            self.autodark_corr = False
+            self.autodark_dir = None
             print("-" * 80)
             print("Actually start combining the dithers now.")
         images = self._find_images()
