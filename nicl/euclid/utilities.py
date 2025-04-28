@@ -137,7 +137,7 @@ def get_invalid_mask_without_persistence(fn, extname):
 
 
 def get_nir_saturation_only_mask(fn, extname):
-    sat = get_dq_mask(fn, extname, [10]) 
+    sat = get_dq_mask(fn, extname, [10])
     otherwise_invalid = get_dq_mask(fn, extname, [2, 3, 4, 6, 7, 8, 9, 13, 16, 23])
     return sat & ~otherwise_invalid
 
