@@ -10,6 +10,7 @@ __all__ = ['get_overlap_chip', 'compute_offset_between_chips', 'polygon_photomet
 # %% ../../nbs/euclid/continuity.ipynb 2
 import multiprocessing as mp
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -22,6 +23,7 @@ from spherical_geometry.polygon import SphericalPolygon
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
 )
+from nicl.mask import fast_mask
 from nicl.utilities import does_image_overlap_with_skyregion, sigma_clip_stats
 
 # %% ../../nbs/euclid/continuity.ipynb 4
@@ -70,10 +72,10 @@ def polygon_photometry(skyreg, hdu):
     hdr = hdu.header
     sky_area = skyreg.area()
     # get magnitude zero point; MAGZEROP is for VIS, ZPAB is the default key for NISP
-    if "QUAD_ID" in hdr:
+    if "QUADID" in hdr:
         target_mag_zpt = 24.56605
         target_pix_scl = 0.1
-        mag_zpt = hdr.get("MAGZEROP")
+        mag_zpt = float(hdr.get("MAGZEROP"))
     else:
         target_mag_zpt = 30
         target_pix_scl = 0.3
@@ -133,7 +135,7 @@ def form_dither_pairs(dithers):
     dithers_ = []
     for dither in dithers:
         dither_id = get_dither_id_from_filename(dither)
-        if len(dither_id) > 1 and dither_id.endswith("1"):
+        if len(dither_id) > 1 and dither_id.endswith("2"):
             continue
         dithers_.append(dither)
     # form unique dither pairs among four dithers
@@ -161,38 +163,50 @@ def measure_offset_per_dither_pair(dither_pair, instrument):
     chip_pairs = []
     offsets = []
     with fits.open(dither1) as hdul1, fits.open(dither2) as hdul2:
-        # collect all headers from hdul2
+        # first masking out bad pixels and objects
+        for chip in np.nditer(instrument.chip_layout):
+            chip = str(chip)
+            # first mask out bad pixels
+            if instrument.name == "VIS":
+                dq_img1 = hdul1[chip + ".FLG"].data
+                dq_img2 = hdul2[chip + ".FLG"].data
+                # additional bits: bright star, detected sources
+                bits = list(instrument.bad_pix_bits) + [18, 24]
+            elif instrument.name == "NISP":
+                dq_img1 = hdul1[chip + ".DQ"].data
+                dq_img2 = hdul2[chip + ".DQ"].data
+                # additional bits: scattered Light, moving Object, Transients; unfortunately no bit for detected sources
+                bits = list(instrument.bad_pix_bits) + [19, 20, 21]
+            mask1 = np.any(
+                [(dq_img1 & 2**bit > 0) for bit in bits],
+                axis=0,
+            )
+            mask2 = np.any(
+                [(dq_img2 & 2**bit > 0) for bit in bits],
+                axis=0,
+            )
+            if instrument.name == "NISP":
+                obj_mask1, _ = fast_mask(
+                    hdul1[chip + ".SCI"].data,
+                    estimate_background=True,
+                )
+                obj_mask2, _ = fast_mask(
+                    hdul2[chip + ".SCI"].data,
+                    estimate_background=True,
+                )
+                mask1 = mask1 | obj_mask1
+                mask2 = mask2 | obj_mask2
+            _mask_in_place(hdul1[chip + ".SCI"], mask1)
+            _mask_in_place(hdul2[chip + ".SCI"], mask2)
         # target_hdrs = [hdul2[chip + ".SCI"].header for chip in np.nditer(instrument.chip_layout)]
         # loop over chips in hdul1
         for chip in np.nditer(instrument.chip_layout):
             chip = str(chip)
             hdr = hdul1[chip + ".SCI"].header
             target_chips = get_overlap_chip(hdr, hdul2, instrument.chip_layout)
+            if not target_chips:
+                continue
             # measure the offset between the chips in dither1 and dither2
-            # first mask out bad pixels
-            if instrument.name == "VIS":
-                dq_img = hdul1[chip + ".FLG"].data
-                # additional bits: bright star, detected sources
-                bits = list(instrument.bad_pix_bits) + [18, 24]
-            elif instrument.name == "NISP":
-                dq_img = hdul1[chip + ".DQ"].data
-                # additional bits: scattered Light, moving Object, Transients; unfortunately no bit for detected sources
-                bits = list(instrument.bad_pix_bits) + [19, 20, 21]
-            mask = np.any(
-                [(dq_img & 2**bit > 0) for bit in bits],
-                axis=0,
-            )
-            _mask_in_place(hdul1[chip + ".SCI"], mask)
-            for target_chip in target_chips:
-                if instrument.name == "VIS":
-                    dq_img = hdul2[target_chip + ".FLG"].data
-                elif instrument.name == "NISP":
-                    dq_img = hdul2[target_chip + ".DQ"].data
-                mask = np.any(
-                    [(dq_img & 2**bit > 0) for bit in bits],
-                    axis=0,
-                )
-                _mask_in_place(hdul2[target_chip + ".SCI"], mask)
             hdus = [hdul2[chip + ".SCI"] for chip in target_chips]
             offset = compute_offset_between_chips(hdul1[chip + ".SCI"], hdus)
             chip_pairs.extend([(chip, target_chip) for target_chip in target_chips])
@@ -219,8 +233,9 @@ def measure_offset_per_observation(dir, obsid, instrument, filter):
     if filter not in instrument.filters:
         raise ValueError(f"Filter {filter} is not available for {instrument.name}.")
     if instrument.name == "VIS":
-        filter = ""
+        filter = "VIS"
     # find the dither files
+    dir = Path(dir).expanduser()
     dithers = list(dir.glob(f"**/EUC_*{filter}*{obsid}-*.fits"))
     # form dither pairs
     dither_pairs = form_dither_pairs(dithers)
@@ -292,7 +307,7 @@ def apply_correction(
     if filter not in instrument.filters:
         raise ValueError(f"Filter {filter} is not available for {instrument.name}.")
     if instrument.name == "VIS":
-        filter = ""
+        filter = "VIS"
         target_mag_zpt = 24.56605
         target_pix_scl = 0.1
         zpt_key = "MAGZEROP"
@@ -300,8 +315,13 @@ def apply_correction(
         target_mag_zpt = 30
         target_pix_scl = 0.3
         zpt_key = "ZPAB"
+    dir = Path(dir).expanduser()
+    out_dir = Path(out_dir).expanduser() if out_dir else None
     # find the dither files
     dithers = list(dir.glob(f"**/EUC_*{filter}*{obsid}-*.fits"))
+    # exlcude short exposures of VIS
+    if instrument.name == "VIS":
+        dithers = [dither for dither in dithers if "-2" not in dither.name]
     num_processes = min(mp.cpu_count(), len(dithers))
     process_func = partial(
         correct_dither,
@@ -334,7 +354,7 @@ def correct_dither(
         for chip in np.nditer(instrument.chip_layout):
             chip = str(chip)
             hdr = hdul[chip + ".SCI"].header
-            mag_zpt = hdr.get(zpt_key)
+            mag_zpt = float(hdr.get(zpt_key))
             eff_pix_scl = compute_pixel_scales(hdr)
             corr = solutions[dither_id + "." + chip]
             corr_arr = (
@@ -348,5 +368,7 @@ def correct_dither(
             hdr.add_history(f"Applied discontinuity correction {corr} to {chip}.")
         if out_dir is None:
             out_dir = dither.parent
+        if not out_dir.exists():
+            out_dir.mkdir(parents=True, exist_ok=True)
         out_fn = out_dir / (dither.stem + "_corr.fits")
         hdul.writeto(out_fn, overwrite=overwrite)
