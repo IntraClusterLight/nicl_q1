@@ -157,6 +157,9 @@ class Pipeline:
     def __del__(self):
         pass
 
+    def _create_data_access(self):
+        return DataAccess(esac_server_url=self.esac_server_url, release_name=self.release_name)
+
     def get_nir_data(self):
         """Download NIR data files."""
         self.logger.info("=== Downloading NIR Data ===")
@@ -164,7 +167,7 @@ class Pipeline:
         outpath = default_data_path(self.release_name)
         self.logger.info(f"Saving data to {outpath}")
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         nir_obs_ids = get_required_obs_ids(
@@ -186,7 +189,7 @@ class Pipeline:
         outpath = default_data_path(self.release_name)
         self.logger.info(f"Saving data to {outpath}")
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         vis_obs_ids = get_required_obs_ids(
@@ -263,7 +266,7 @@ class Pipeline:
             instrument,
         )
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         if instrument == "VIS":
