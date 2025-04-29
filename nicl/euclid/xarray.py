@@ -383,11 +383,15 @@ def write_da_to_fits(
     """Write a DataArray to a FITS file."""
     header = Header(header) if header is not None else None
     hdul = HDUList(PrimaryHDU(header=header))
-    if "detector" in da.coords: 
+    if "detector" in da.coords:
         for det in da["detector"].to_numpy():
             if da_wcs is not None:
-                wcs = WCS(da_wcs.sel(detector=det).as_numpy().to_pandas())
-                hdr = wcs.to_header()
+                wcs_df = da_wcs.sel(detector=det).as_numpy().to_pandas()
+                if wcs_df.isna().any(axis=None):
+                    hdr = None
+                else:
+                    wcs = WCS(wcs_df)
+                    hdr = wcs.to_header()
             else:
                 hdr = None
             hdul.append(ImageHDU(da.sel(detector=det), name=det, header=hdr))
