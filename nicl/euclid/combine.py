@@ -562,9 +562,11 @@ def sub_bkg(
             raise ValueError(f"{obj_mask} is not a valid function name")
         match obj_mask.__name__:
             case "fast_mask":
-                obj_mask, _ = obj_mask(
+                obj_mask = obj_mask(
                     img,
+                    dq_mask=dq_mask,
                     estimate_background=True,
+                    return_threshold=False,
                 )
             case _:
                 obj_mask = obj_mask(img)

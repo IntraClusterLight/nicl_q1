@@ -201,12 +201,16 @@ def fast_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
     mask_params=None,  # mask parameters
+    dq_mask=None,  # data quality or coverage mask
     estimate_background=False,  # estimate the background from the image median
     max_repeat=10,  # maximum number of masking iterations
     relative_rms_tolerance=0.001,  # relative tolerance in the rms required to stop iterating
     return_threshold=True,  # return the threshold
 ):
     logger = logging.getLogger(__name__)
+    if dq_mask is not None:
+        logger.debug("Applying data quality mask")
+        image = np.where(dq_mask, np.nan, image)
     params = {
         "nsigma": 2.0,
         "smooth_sigma": 1.0,
