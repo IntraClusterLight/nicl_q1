@@ -595,18 +595,9 @@ def sub_bkg(
             raise ValueError(f"{obj_mask} is not a valid function name")
         match obj_mask.__name__:
             case "fast_mask":
-                if dq_mask is not None:
-                    combined_mask = dq_mask
-                    if coverage_mask is not None:
-                        combined_mask = combined_mask | coverage_mask
-                else:
-                    if coverage_mask is not None:
-                        combined_mask = coverage_mask
-                    else:
-                        combined_mask = None
                 obj_mask = obj_mask(
                     img,
-                    dq_mask=combined_mask,
+                    coverage_mask=coverage_mask,
                     estimate_background=True,
                     return_threshold=False,
                 )
