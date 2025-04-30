@@ -487,11 +487,17 @@ class DithersMixin:
                         )
                     else:
                         bkg_mesh_size_pix = None
+                    # this includes bad pixels and blank pixels
                     bad_pix_mask = weight_img == 0
+                    # coverage mask for blank pixels
+                    coverage_mask = (weight_img == 0) & (sci_img == 0)
+                    # remove blank pixels from the bad pixel mask
+                    bad_pix_mask[coverage_mask] = False
                     sci_img = sub_bkg(
                         sci_img,
                         dq_mask=bad_pix_mask,
                         obj_mask="fast_mask",
+                        coverage_mask=coverage_mask,
                         mesh_size=bkg_mesh_size_pix,
                         filter_size=(
                             self.bkg_filter_size,
@@ -559,12 +565,25 @@ class DithersMixin:
 def sub_bkg(
     img,  # input image
     dq_mask=None,  # data quality mask for bad pixels
+    coverage_mask=None,  # mask for blank pixels
     obj_mask="fast_mask",  # object mask; can be a callable function or an array
     mesh_size=None,  # mesh size for background modeling; default to 1x1 mesh if not specified
     **kwargs,  # additional arguments for Background2D
 ):
     """Model background and subtract it from the input image. Optionally building an object mask if the user provides a function name instead of an array via `obj_mask`."""
     img = np.asarray(img)
+    if dq_mask is not None:
+        dq_mask = np.asarray(dq_mask).astype(bool)
+        if dq_mask.shape != img.shape:
+            raise ValueError(
+                "The shape of the data quality mask does not match that of the input image."
+            )
+    if coverage_mask is not None:
+        coverage_mask = np.asarray(coverage_mask).astype(bool)
+        if coverage_mask.shape != img.shape:
+            raise ValueError(
+                "The shape of the coverage mask does not match that of the input image."
+            )
     # check if need to build object mask
     if isinstance(obj_mask, str):
         # determine if obj_mask is a callable function
@@ -576,9 +595,18 @@ def sub_bkg(
             raise ValueError(f"{obj_mask} is not a valid function name")
         match obj_mask.__name__:
             case "fast_mask":
+                if dq_mask is not None:
+                    combined_mask = dq_mask
+                    if coverage_mask is not None:
+                        combined_mask = combined_mask | coverage_mask
+                else:
+                    if coverage_mask is not None:
+                        combined_mask = coverage_mask
+                    else:
+                        combined_mask = None
                 obj_mask = obj_mask(
                     img,
-                    dq_mask=dq_mask,
+                    dq_mask=combined_mask,
                     estimate_background=True,
                     return_threshold=False,
                 )
@@ -586,18 +614,12 @@ def sub_bkg(
                 obj_mask = obj_mask(img)
     else:
         obj_mask = np.asarray(obj_mask).astype(bool)
-    # check if the shape matches
-    if obj_mask.shape != img.shape:
-        raise ValueError(
-            "The shape of the object mask does not match that of the input image."
-        )
-    # combine the dq_mask and obj_mask
-    if dq_mask is not None:
-        dq_mask = np.asarray(dq_mask).astype(bool)
-        if dq_mask.shape != img.shape:
+        if obj_mask.shape != img.shape:
             raise ValueError(
-                "The shape of the data quality mask does not match that of the input image."
+                "The shape of the object mask does not match that of the input image."
             )
+    # combine the dq_mask and obj_mask for bkg subtraction
+    if dq_mask is not None:
         mask = dq_mask | obj_mask
     else:
         mask = obj_mask
@@ -608,6 +630,7 @@ def sub_bkg(
         img,
         mesh_size,
         mask=mask,
+        coverage_mask=coverage_mask,
         **kwargs,
     )
     return img - bg.background
