@@ -123,7 +123,9 @@ def create_test_images(
         icl = galsim.Sersic(n=icl_n, half_light_radius=icl_re, flux=1)
         icl_shape = galsim.Shear(q=icl_q, beta=icl_theta * galsim.degrees)
         icl = icl.shear(icl_shape)
-        icl = icl.shift(icl_offset * pixscale * galsim.arcsec)
+        icl = icl.shift(
+            icl_offset * pixscale.to_value(u.arcsec / u.pix) * galsim.arcsec
+        )
         print(f"bcg_appmags: {bcg_appmags}")
         print(f"icl_appmags: {icl_appmags}")
         print(f"bcg_re: {bcg_re:.2f} pixels")
