@@ -408,19 +408,17 @@ class DithersMixin:
                                 coarse_factor=coarse_factor,
                             )
                         if self.instrument.name == "NISP":
-                            # compute FLXSCALE for swarp only for NISP; save the value to PHOSCALE because FLXSCALE is occupied
+                            # compute FLXSCALE for swarp only for NISP
                             # VIS already has the proper FLXSCALE in the headers
                             exptime = primary_hdr["EXPTIME"]
                             photfnu = primary_hdr["PHOTFNU"]
                             phrelex = primary_hdr["PHRELEX"]
                             phreldt = sci_ext_hdr["PHRELDT"]
-                            phoscale = (1.0 / exptime) * photfnu * phrelex * phreldt
-                            sci_ext_hdr.append(
-                                (
-                                    "PHOSCALE",
-                                    phoscale,
-                                    "Combined photometric scaling factors",
-                                )
+                            flxscale = (1.0 / exptime) * photfnu * phrelex * phreldt
+                            sci_ext_hdr.set(
+                                "FLXSCALE",
+                                flxscale,
+                                "Combined photometric scaling factors",
                             )
                         # compute weight map
                         with np.errstate(divide="ignore"):
