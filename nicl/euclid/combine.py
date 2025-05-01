@@ -328,7 +328,7 @@ class DithersMixin:
     def _prepare_dithers_for_swarp(self, dithers, tmpdir):
         start_time = datetime.now()
         sci_fns = []
-        for i, dither in enumerate(dithers):
+        for dither in dithers:
             # for now we throw away the short exposures
             if self.autodark_corr and self.instrument.name == "VIS":
                 dither_id = get_dither_id_from_filename(dither.name)
@@ -439,8 +439,8 @@ class DithersMixin:
                                 fits.ImageHDU(rms_data, rms_ext_hdr),
                             ]
                         )
-                        sci_fn = f"sci_{i}_{ext}.fits"
-                        wt_fn = f"sci_{i}_{ext}.weight.fits"
+                        sci_fn = f"{dither.stem}.{ext}.fits"
+                        wt_fn = sci_fn.replace(".fits", ".weight.fits")
                         sci_fns.append(sci_fn)
                         sci_hdul.writeto(tmpdir / sci_fn)
                         weight_hdul.writeto(tmpdir / wt_fn)
