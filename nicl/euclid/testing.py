@@ -4,8 +4,8 @@
 
 # %% auto 0
 __all__ = ['TEST_IMAGES_OUTPATH', 'CLUSTER_REDSHIFT', 'PIXEL_SCALE', 'BACKGROUND_RMS_LEVEL', 'BACKGROUND_SCALE', 'SKY_PATCH_SIZE',
-           'SKY_PATCH_RA', 'SKY_PATCH_DEC', 'SKY_PATCH_SIZE_PIXELS', 'SKY_PATCH_SHAPE', 'get_bcg_icl_mags',
-           'create_test_images', 'create_basic_cluster_test_images', 'create_basic_sky_test_images',
+           'SKY_PATCH_RA', 'SKY_PATCH_DEC', 'SKY_PATCH_SIZE_PIXELS', 'SKY_PATCH_SHAPE', 'TEMPLATE_IMAGE_PATH',
+           'get_bcg_icl_mags', 'create_test_images', 'create_basic_cluster_test_images', 'create_basic_sky_test_images',
            'create_varying_background_cluster_test_images', 'create_varying_background_sky_test_images',
            'create_sky_patch', 'create_real_background_cluster_test_images']
 
@@ -36,6 +36,10 @@ SKY_PATCH_DEC = -50.1 * u.deg
 
 SKY_PATCH_SIZE_PIXELS = (SKY_PATCH_SIZE / PIXEL_SCALE).to_value(u.pix).astype(int)
 SKY_PATCH_SHAPE = (SKY_PATCH_SIZE_PIXELS, SKY_PATCH_SIZE_PIXELS)
+
+# This images needs to already exist. It is used as a template (header and shape) for the test images.
+TEMPLATE_IMAGE_PATH = default_data_path("Q1_R1_clusters_v0.7", "tutku")
+TEMPLATE_IMAGE_PATH /= "EUC_NIR_W-STK_Y-1eRASS J035423.6-475145.fits"
 
 # %% ../../nbs/euclid/testing.ipynb 6
 def get_bcg_icl_mags(
@@ -77,9 +81,22 @@ def create_test_images(
     background_scale=None,
     background_filenames=None,
     background_seed=0,
+    bcg_n=4.6,
+    bcg_re=22.6,
+    bcg_q=0.6,
+    bcg_theta=30,
+    icl_n=0.76,
+    icl_re=189.5,
+    icl_q=0.6,
+    icl_theta=60,
+    icl_offset=(0, 0),  # offset in pixels (dx, dy)
+    bcg_I_absmag=-24.5,
+    icl_I_absmag=-24.5,
+    bcg_zf=3.0,
+    icl_zf=1.0,
+    template_image_path=TEMPLATE_IMAGE_PATH,
 ):
-    path = default_data_path("Q1_R1_clusters_test", "MCXCJ1754.6+6803")
-    hdul = fits.open(path / "EUC_NIR_W-STK_H-MCXCJ1754.6+6803.fits")
+    hdul = fits.open(template_image_path)
     if shape is None:
         shape = hdul["SCI"].shape
     else:
@@ -91,25 +108,22 @@ def create_test_images(
     pixscale = 0.3 * u.arcsec / u.pix
 
     if cluster_redshift:
-        bcg_appmags, icl_appmags = get_bcg_icl_mags(cluster_redshift)
+        bcg_appmags, icl_appmags = get_bcg_icl_mags(
+            cluster_redshift, bcg_I_absmag, icl_I_absmag, bcg_zf, icl_zf
+        )
         bcg_re = (
-            physical_to_angular(22.6 * u.kpc, cluster_redshift) / pixscale
+            physical_to_angular(bcg_re * u.kpc, cluster_redshift) / pixscale
         ).to_value(u.pix)
-        bcg_n = 4.6
-        bcg_q = 0.6
-        bcg_theta = 30
         bcg = galsim.Sersic(n=bcg_n, half_light_radius=bcg_re, flux=1)
         bcg_shape = galsim.Shear(q=bcg_q, beta=bcg_theta * galsim.degrees)
         bcg = bcg.shear(bcg_shape)
         icl_re = (
-            physical_to_angular(189.5 * u.kpc, cluster_redshift) / pixscale
+            physical_to_angular(icl_re * u.kpc, cluster_redshift) / pixscale
         ).to_value(u.pix)
-        icl_n = 0.76
-        icl_q = 0.6
-        icl_theta = 60
         icl = galsim.Sersic(n=icl_n, half_light_radius=icl_re, flux=1)
         icl_shape = galsim.Shear(q=icl_q, beta=icl_theta * galsim.degrees)
         icl = icl.shear(icl_shape)
+        icl = icl.shift(icl_offset * pixscale * galsim.arcsec)
         print(f"bcg_appmags: {bcg_appmags}")
         print(f"icl_appmags: {icl_appmags}")
         print(f"bcg_re: {bcg_re:.2f} pixels")
