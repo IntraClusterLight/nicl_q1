@@ -38,11 +38,13 @@ SKY_PATCH_SIZE_PIXELS = (SKY_PATCH_SIZE / PIXEL_SCALE).to_value(u.pix).astype(in
 SKY_PATCH_SHAPE = (SKY_PATCH_SIZE_PIXELS, SKY_PATCH_SIZE_PIXELS)
 
 # %% ../../nbs/euclid/testing.ipynb 6
-def get_bcg_icl_mags(z=0.1):
-    bcg_I_absmag = -25.0
-    icl_I_absmag = -25.5
-    bcg_zf = 3.0
-    icl_zf = 1.0
+def get_bcg_icl_mags(
+    z=0.1,
+    bcg_I_absmag=-25.0,
+    icl_I_absmag=-25.5,
+    bcg_zf=3.0,
+    icl_zf=1.0,
+):
     model = ezgal.model("bc03_ssp_z_0.02_chab.model")
     model.set_cosmology(Om=0.3, Ol=0.7, h=0.70, w=-1)
     distmod = model.get_distance_moduli(z, 1)
