@@ -458,7 +458,6 @@ def xr_fast_mask(
     estimate_background=False,  # estimate the background from the image median
     max_repeat=10,  # maximum number of masking iterations
     relative_rms_tolerance=0.01,
-    verbose=False,
 ):
     mask = xr.apply_ufunc(
         fast_mask,
@@ -468,7 +467,6 @@ def xr_fast_mask(
             estimate_background=estimate_background,
             max_repeat=max_repeat,
             relative_rms_tolerance=relative_rms_tolerance,
-            verbose=verbose,
             return_threshold=False,
         ),
         vectorize=True,

@@ -90,13 +90,13 @@ def remove_segment_at_position(
     return segm
 
 # %% ../nbs/13_mask.ipynb 4
-def smooth_image(image, sigma):
+def smooth_image(image, sigma, mask=None, preserve_nan=True):
     """Smooth `image` using Gaussian with standard deviation `sigma`."""
     kernel = Gaussian2DKernel(x_stddev=sigma, x_size=6 * sigma + 1)
     kernel.normalize()
     with catch_warnings():
         filterwarnings("ignore", ".*NaN values detected post convolution.*")
-        smoothed = convolve(image.data, kernel)
+        smoothed = convolve(image.data, kernel, mask=mask, preserve_nan=preserve_nan)
     return smoothed
 
 # %% ../nbs/13_mask.ipynb 5
@@ -201,12 +201,16 @@ def fast_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
     mask_params=None,  # mask parameters
+    coverage_mask=None,  # coverage mask
     estimate_background=False,  # estimate the background from the image median
     max_repeat=10,  # maximum number of masking iterations
     relative_rms_tolerance=0.001,  # relative tolerance in the rms required to stop iterating
     return_threshold=True,  # return the threshold
 ):
     logger = logging.getLogger(__name__)
+    if coverage_mask is not None:
+        logger.debug("Applying coverage mask")
+        image = np.where(coverage_mask, np.nan, image)
     params = {
         "nsigma": 2.0,
         "smooth_sigma": 1.0,

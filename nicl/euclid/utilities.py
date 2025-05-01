@@ -270,9 +270,9 @@ def get_obs_id_from_filename(fn):
 
 def get_dither_id_from_filename(fn):
     fn = os.path.basename(fn)
-    match = re.search(r"VIS.*[-_]0?(?P<id>\d-\d)[-_]", fn)
+    match = re.search(r"VIS.*[-_]0?(?P<id>\d-\d)[-_.]", fn)
     if match is None:
-        match = re.search(r"[-_](?P<id>\d)[-_]", fn)
+        match = re.search(r"[-_](?P<id>\d)[-_.]", fn)
     dither_id = match.group("id") if match else None
     return dither_id
 

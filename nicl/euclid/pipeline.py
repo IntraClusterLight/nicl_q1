@@ -279,7 +279,9 @@ class Pipeline:
 
         # Create zarr references and coarse data for all required observations
         obs_ids = get_required_obs_ids(self.target_obs_ids, available_obs_ids, hw)
+        self.logger.info(f"Creating zarr refs for {len(obs_ids)} {instrument} observations")
         self.create_zarr_refs(obs_ids, instrument)
+        self.logger.info(f"Creating coarse data for {len(obs_ids)} {instrument} observations")
         self.create_coarse_data(obs_ids, instrument)
 
         ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob="*")
@@ -316,14 +318,14 @@ class Pipeline:
     def create_vis_skyflats(self):
         self._create_skyflats(instrument="VIS")
 
-    def _try_correct_persistence(self, obs_id, path, processed_path):
+    def _try_correct_persistence(self, obs_id, path, processed_path, **kwargs):
         self.logger.info(f"Processing {obs_id}...")
         outpath = processed_path / f"persistence/NIR/{obs_id}/"
         skyflat_path = processed_path / "skyflat/NIR/"
-        correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
+        correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs)
         self.logger.info(f"Completed {obs_id}...")
 
-    def do_persistence_correction(self):
+    def do_persistence_correction(self, **kwargs):
         """Perform persistence correction."""
         self.logger.info("=== Performing Persistence Correction ===")
         path = default_data_path(self.release_name)
@@ -337,6 +339,7 @@ class Pipeline:
             self.target_obs_ids,
             path=path,
             processed_path=processed_path,
+            **kwargs,
             executor=self.executor,
         )
 
