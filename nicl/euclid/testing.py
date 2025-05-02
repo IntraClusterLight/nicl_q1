@@ -124,7 +124,7 @@ def create_test_images(
         icl_shape = galsim.Shear(q=icl_q, beta=icl_theta * galsim.degrees)
         icl = icl.shear(icl_shape)
         icl = icl.shift(
-            icl_offset * pixscale.to_value(u.arcsec / u.pix) * galsim.arcsec
+            tuple(x * pixscale.to_value(u.arcsec / u.pix) for x in icl_offset)
         )
         print(f"bcg_appmags: {bcg_appmags}")
         print(f"icl_appmags: {icl_appmags}")
