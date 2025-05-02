@@ -130,7 +130,9 @@ class Pipeline:
         max_workers=MAX_WORKERS,
         filters=FILTERS,
     ):
-        self.target_obs_ids = target_obs_ids
+        self.target_obs_ids = list(
+            dict.fromkeys(target_obs_ids)
+        )  # remove duplicates, preserving order
         self.release_name = release_name
         self.esac_server_url = esac_server_url
         self.processing_version = processing_version
@@ -158,7 +160,9 @@ class Pipeline:
         pass
 
     def _create_data_access(self):
-        return DataAccess(esac_server_url=self.esac_server_url, release_name=self.release_name)
+        return DataAccess(
+            esac_server_url=self.esac_server_url, release_name=self.release_name
+        )
 
     def get_nir_data(self):
         """Download NIR data files."""
@@ -282,9 +286,13 @@ class Pipeline:
 
         # Create zarr references and coarse data for all required observations
         obs_ids = get_required_obs_ids(self.target_obs_ids, available_obs_ids, hw)
-        self.logger.info(f"Creating zarr refs for {len(obs_ids)} {instrument} observations")
+        self.logger.info(
+            f"Creating zarr refs for {len(obs_ids)} {instrument} observations"
+        )
         self.create_zarr_refs(obs_ids, instrument)
-        self.logger.info(f"Creating coarse data for {len(obs_ids)} {instrument} observations")
+        self.logger.info(
+            f"Creating coarse data for {len(obs_ids)} {instrument} observations"
+        )
         self.create_coarse_data(obs_ids, instrument)
 
         ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob="*")
@@ -325,7 +333,9 @@ class Pipeline:
         self.logger.info(f"Processing {obs_id}...")
         outpath = processed_path / f"persistence/NIR/{obs_id}/"
         skyflat_path = processed_path / "skyflat/NIR/"
-        correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs)
+        correct_persistence(
+            obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs
+        )
         self.logger.info(f"Completed {obs_id}...")
 
     def do_persistence_correction(self, **kwargs):
@@ -346,7 +356,9 @@ class Pipeline:
             executor=self.executor,
         )
 
-    def _try_combine(self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True):
+    def _try_combine(
+        self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True
+    ):
         """Create stacks for obs_id if the output foler does not already exist."""
         out_dir = out_dir_parent / f"{obs_id}"
         if out_dir.exists():
