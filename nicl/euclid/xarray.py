@@ -383,11 +383,15 @@ def write_da_to_fits(
     """Write a DataArray to a FITS file."""
     header = Header(header) if header is not None else None
     hdul = HDUList(PrimaryHDU(header=header))
-    if "detector" in da.coords: 
+    if "detector" in da.coords:
         for det in da["detector"].to_numpy():
             if da_wcs is not None:
-                wcs = WCS(da_wcs.sel(detector=det).as_numpy().to_pandas())
-                hdr = wcs.to_header()
+                wcs_df = da_wcs.sel(detector=det).as_numpy().to_pandas()
+                if wcs_df.isna().any(axis=None):
+                    hdr = None
+                else:
+                    wcs = WCS(wcs_df)
+                    hdr = wcs.to_header()
             else:
                 hdr = None
             hdul.append(ImageHDU(da.sel(detector=det), name=det, header=hdr))
@@ -458,7 +462,6 @@ def xr_fast_mask(
     estimate_background=False,  # estimate the background from the image median
     max_repeat=10,  # maximum number of masking iterations
     relative_rms_tolerance=0.01,
-    verbose=False,
 ):
     mask = xr.apply_ufunc(
         fast_mask,
@@ -468,7 +471,6 @@ def xr_fast_mask(
             estimate_background=estimate_background,
             max_repeat=max_repeat,
             relative_rms_tolerance=relative_rms_tolerance,
-            verbose=verbose,
             return_threshold=False,
         ),
         vectorize=True,

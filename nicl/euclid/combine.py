@@ -20,7 +20,6 @@ import numpy as np
 from astropy.io import fits
 from astropy import units as u
 from photutils.background import Background2D
-from regions import RectangleSkyRegion
 from datetime import datetime
 
 from nicl.euclid.data_access import DataAccess
@@ -44,6 +43,7 @@ from nicl.utilities import (
     parse_input_for_angular_size,
     parse_input_for_skycoord,
     does_image_overlap_with_skyregion,
+    create_sky_rectangle,
 )
 
 # %% ../../nbs/euclid/combine.ipynb 4
@@ -150,6 +150,8 @@ class Combiner(ABC):
                     "Autodark correction requires specifying the directory to find autodarks."
                 )
             self.autodark_dir = Path(autodark_dir).expanduser()
+        else:
+            self.autodark_dir = None
         # assemble command line arguments to pass to SWarp
         self._swarp_extra_args = self._parse_swarp_args(kwargs)
         print(f"Initialized {self}")
@@ -379,7 +381,7 @@ class DithersMixin:
                         sci_ext_hdr = hdul[f"{ext}.SCI"].header
                         # check if the cutout region overlaps with the chip/quad
                         if self.cutout_cen is not None and self.cutout_size is not None:
-                            cutout_reg = RectangleSkyRegion(
+                            cutout_reg = create_sky_rectangle(
                                 center=self.cutout_cen,
                                 width=self.cutout_size[0],
                                 height=self.cutout_size[1],
@@ -411,7 +413,12 @@ class DithersMixin:
                             autodark, coarse_factor = read_skyflat(
                                 obsid, "VIS", ext, self.autodark_dir
                             )
-                            sci_data = apply_skyflat(sci_data, autodark, interpolation_method="linear", coarse_factor=coarse_factor)
+                            sci_data = apply_skyflat(
+                                sci_data,
+                                autodark,
+                                interpolation_method="linear",
+                                coarse_factor=coarse_factor,
+                            )
                         # subtract background if requested
                         if self.bkg_sub:
                             if self.bkg_mesh_size is not None:
@@ -654,7 +661,9 @@ class NISPCombiner(DithersMixin, Combiner):
 
     def _combine_images(self, images, out_fn):
         if (self.out_dir / out_fn).exists() and not self.overwrite:
-            print(f"Output file {out_fn} already exists, but overwrite=False. Skipping combine.")
+            print(
+                f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
+            )
             return
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)
@@ -711,6 +720,8 @@ class VISCombiner(DithersMixin, Combiner):
                         cutout_size=self.cutout_size,
                         individual_dithers=True,
                         bkg_sub=False,
+                        autodark_corr=self.autodark_corr,
+                        autodark_dir=self.autodark_dir,
                         release_name=self.release_name,
                         debug=self.debug,
                     )
@@ -719,6 +730,9 @@ class VISCombiner(DithersMixin, Combiner):
                 rmtree(tmpdir)
                 raise
             self.in_dir = tmpdir
+            # disable autodark correction for the second pass combining
+            self.autodark_corr = False
+            self.autodark_dir = None
             print("-" * 80)
             print("Actually start combining the dithers now.")
         images = self._find_images()
@@ -742,7 +756,9 @@ class VISCombiner(DithersMixin, Combiner):
 
     def _combine_images(self, images, out_fn):
         if (self.out_dir / out_fn).exists() and not self.overwrite:
-            print(f"Output file {out_fn} already exists, but overwrite=False. Skipping combine.")
+            print(
+                f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
+            )
             return
         # the default temporary directory may not have enough space for VIS
         # determine the parent directory for the temporary directory based on the host
@@ -837,7 +853,9 @@ class MerCombiner(Combiner):
             out_fn += f"_{self.name}"
         out_fn += ".fits"
         if (self.out_dir / out_fn).exists() and not self.overwrite:
-            print(f"Output file {out_fn} already exists, but overwrite=False. Skipping combine.")
+            print(
+                f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
+            )
             return
         with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
             tmpdir = Path(tmpdir)

@@ -25,7 +25,7 @@ from nicl.euclid.xarray import (
 )
 
 # %% ../../nbs/euclid/skyflat.ipynb 7
-def mask_for_coarsening(ds, instrument, verbose=False):
+def mask_for_coarsening(ds, instrument):
     """Mask the data for coarsening."""
     if instrument == "VIS":
         bitmask = ds["FLG"]
@@ -44,11 +44,11 @@ def mask_for_coarsening(ds, instrument, verbose=False):
     mask = bitmask & 1 > 0
     mask = xr_star_mask(bitmask, instrument=instrument)
     data = ds["SCI"].where(~mask)
-    mask |= xr_fast_mask(data, estimate_background=True, mask_params=params, verbose=verbose)
+    mask |= xr_fast_mask(data, estimate_background=True, mask_params=params)
     return mask
 
 
-def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51, verbose=False, debug=False):
+def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51):
     """Create and store the coarse data for a given observation ID.
 
     Coarse data is computed by taking the median in boxes of size `n_pix` x `n_pix`.
@@ -56,7 +56,7 @@ def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51, verbose=False, d
     coarse_path = zarr_path / f"{obs_id}/coarse_{n_pix}.zarr"
     if not coarse_path.exists():
         ds, _, _ = read_all_zarr_refs(zarr_path, obs_id)
-        mask = mask_for_coarsening(ds, instrument, verbose=verbose)
+        mask = mask_for_coarsening(ds, instrument)
         masked_data = ds["SCI"].where(~mask)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
@@ -66,7 +66,7 @@ def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51, verbose=False, d
             except (Exception, KeyboardInterrupt):
                 if coarse_path.exists():
                     shutil.rmtree(coarse_path)
-
+                raise
 
 # %% ../../nbs/euclid/skyflat.ipynb 9
 def group_obs_ids(

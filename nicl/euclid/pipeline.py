@@ -130,7 +130,9 @@ class Pipeline:
         max_workers=MAX_WORKERS,
         filters=FILTERS,
     ):
-        self.target_obs_ids = target_obs_ids
+        self.target_obs_ids = list(
+            dict.fromkeys(target_obs_ids)
+        )  # remove duplicates, preserving order
         self.release_name = release_name
         self.esac_server_url = esac_server_url
         self.processing_version = processing_version
@@ -157,6 +159,11 @@ class Pipeline:
     def __del__(self):
         pass
 
+    def _create_data_access(self):
+        return DataAccess(
+            esac_server_url=self.esac_server_url, release_name=self.release_name
+        )
+
     def get_nir_data(self):
         """Download NIR data files."""
         self.logger.info("=== Downloading NIR Data ===")
@@ -164,7 +171,7 @@ class Pipeline:
         outpath = default_data_path(self.release_name)
         self.logger.info(f"Saving data to {outpath}")
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         nir_obs_ids = get_required_obs_ids(
@@ -186,7 +193,7 @@ class Pipeline:
         outpath = default_data_path(self.release_name)
         self.logger.info(f"Saving data to {outpath}")
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         vis_obs_ids = get_required_obs_ids(
@@ -263,7 +270,7 @@ class Pipeline:
             instrument,
         )
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         if instrument == "VIS":
@@ -279,7 +286,13 @@ class Pipeline:
 
         # Create zarr references and coarse data for all required observations
         obs_ids = get_required_obs_ids(self.target_obs_ids, available_obs_ids, hw)
+        self.logger.info(
+            f"Creating zarr refs for {len(obs_ids)} {instrument} observations"
+        )
         self.create_zarr_refs(obs_ids, instrument)
+        self.logger.info(
+            f"Creating coarse data for {len(obs_ids)} {instrument} observations"
+        )
         self.create_coarse_data(obs_ids, instrument)
 
         ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob="*")
@@ -316,14 +329,16 @@ class Pipeline:
     def create_vis_skyflats(self):
         self._create_skyflats(instrument="VIS")
 
-    def _try_correct_persistence(self, obs_id, path, processed_path):
+    def _try_correct_persistence(self, obs_id, path, processed_path, **kwargs):
         self.logger.info(f"Processing {obs_id}...")
         outpath = processed_path / f"persistence/NIR/{obs_id}/"
         skyflat_path = processed_path / "skyflat/NIR/"
-        correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path)
+        correct_persistence(
+            obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs
+        )
         self.logger.info(f"Completed {obs_id}...")
 
-    def do_persistence_correction(self):
+    def do_persistence_correction(self, **kwargs):
         """Perform persistence correction."""
         self.logger.info("=== Performing Persistence Correction ===")
         path = default_data_path(self.release_name)
@@ -337,6 +352,7 @@ class Pipeline:
             self.target_obs_ids,
             path=path,
             processed_path=processed_path,
+            **kwargs,
             executor=self.executor,
         )
 
