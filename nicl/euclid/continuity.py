@@ -9,6 +9,7 @@ __all__ = ['form_exp_pairs', 'do_resamp_images_overlap', 'bkg_match', 'get_overl
            'correct_dither']
 
 # %% ../../nbs/euclid/continuity.ipynb 2
+import logging
 import multiprocessing as mp
 from functools import partial
 from pathlib import Path
@@ -42,6 +43,7 @@ def form_exp_pairs(ids):
 
 def do_resamp_images_overlap(path1, path2, threshold=0.01):
     """Check if two resampled images overlap."""
+    logger = logging.getLogger(__name__)
     # find the original images before resampling
     path1_orig = path1.parent / f"{path1.stem.stem.stem}.{path1.suffix}"
     path2_orig = path2.parent / f"{path2.stem.stem.stem}.{path2.suffix}"
@@ -50,6 +52,7 @@ def do_resamp_images_overlap(path1, path2, threshold=0.01):
         raise FileNotFoundError(
             f"One of the original images does not exist: {path1_orig}, {path2_orig}"
         )
+    logger.debug(f"Checking overlap between {path1_orig} and {path2_orig}")
     # create sky regions from the headers
     hdr1 = fits.getheader(path1_orig, 1)
     hdr2 = fits.getheader(path2_orig, 1)
@@ -64,10 +67,14 @@ def do_resamp_images_overlap(path1, path2, threshold=0.01):
     area2 = sky_reg2.area()
     frac1 = area_overlap / area2
     frac2 = area_overlap / area1
+    logger.debug(
+        f"Overlap area: {area_overlap}, area1: {area1}, area2: {area2}, frac1: {frac1}, frac2: {frac2}"
+    )
     return frac1 > threshold or frac2 > threshold
 
 
 def bkg_match(paths):
+    logger = logging.getLogger(__name__)
     paths.sort()
     ids = []
     for path in paths:
@@ -75,6 +82,9 @@ def bkg_match(paths):
         dither_id = get_dither_id_from_filename(path.name)
         ids.append((obs_id, dither_id))
     exp_pairs = form_exp_pairs(list(set(ids)))
+    logger.debug(
+        f"Found {len(exp_pairs)} exposure pairs (obsid, dither_id): {exp_pairs}"
+    )
     for i, path in enumerate(paths):
         obs_id, dither_id = ids[i]
         # look up exp_pairs to find the other exposure
@@ -95,6 +105,9 @@ def bkg_match(paths):
                 if obs_id_ == other_obs_id and dither_id_ == other_dither_id:
                     if do_resamp_images_overlap(path, path2):
                         other_paths.append(path2)
+        logger.debug(
+            f"Found {len(other_paths)} overlapping images for {path.name}: {[other.name for other in other_paths]}"
+        )
 
 # %% ../../nbs/euclid/continuity.ipynb 5
 def get_overlap_chip(hdr, hdul, chip_layout, threshold=0.01):
