@@ -340,7 +340,9 @@ class Pipeline:
             executor=self.executor,
         )
 
-    def _try_combine(self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True):
+    def _try_combine(
+        self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True
+    ):
         """Create stacks for obs_id if the output foler does not already exist."""
         out_dir = out_dir_parent / f"{obs_id}"
         if out_dir.exists():
