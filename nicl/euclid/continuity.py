@@ -108,6 +108,40 @@ def bkg_match(paths):
         logger.debug(
             f"Found {len(other_paths)} overlapping images for {path.name}: {[other.name for other in other_paths]}"
         )
+        if other_paths:
+            with (
+                fits.open(path, mode="update") as hdul,
+                fits.open(
+                    path.with_suffix(".weight.fits"), mode="update"
+                ) as hdul_weight,
+            ):
+                # apply flux scaling
+                sci_hdr = hdul[0].header
+                flxscale = sci_hdr.get("FLXSCALE", 1.0)
+                hdul[0].data = hdul[0].data * flxscale
+                hdul[0].header["FLXSCALE"] = 1.0
+                hdul_weight[0].data = hdul_weight[0].data * flxscale
+                hdul_weight[0].header["FLXSCALE"] = 1.0
+                hdul.flush()
+                hdul_weight.flush()
+                for other_path in other_paths:
+                    with (
+                        fits.open(other_path, mode="update") as other_hdul,
+                        fits.open(
+                            other_path.with_suffix(".weight.fits"), mode="update"
+                        ) as other_hdul_weight,
+                    ):
+                        # apply flux scaling
+                        sci_hdr2 = other_hdul[0].header
+                        flxscale2 = sci_hdr2.get("FLXSCALE", 1.0)
+                        other_hdul[0].data = other_hdul[0].data * flxscale2
+                        other_hdul[0].header["FLXSCALE"] = 1.0
+                        other_hdul_weight[0].data = (
+                            other_hdul_weight[0].data * flxscale2
+                        )
+                        other_hdul_weight[0].header["FLXSCALE"] = 1.0
+                        other_hdul.flush()
+                        other_hdul_weight.flush()
 
 # %% ../../nbs/euclid/continuity.ipynb 5
 def get_overlap_chip(hdr, hdul, chip_layout, threshold=0.01):
