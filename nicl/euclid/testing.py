@@ -95,6 +95,7 @@ def create_test_images(
     bcg_zf=3.0,
     icl_zf=1.0,
     template_image_path=TEMPLATE_IMAGE_PATH,
+    name=None,
 ):
     hdul = fits.open(template_image_path)
     if shape is None:
@@ -134,6 +135,8 @@ def create_test_images(
     outpath.mkdir(parents=True, exist_ok=True)
     image = galsim.ImageF(*shape)
     label = "cluster" if cluster_redshift else "sky"
+    if name is not None:
+        label = f"{label}_{name}"
 
     for band in ["H", "J", "Y", "VIS"]:
         hdul["RMS"].data[:] = rms[band]
