@@ -10,6 +10,7 @@ __all__ = ['calc_sb_threshold', 'create_masks', 'make_mask_plot', 'stack_nir_ban
 from pathlib import Path
 
 import astropy.units as u
+import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
 
