@@ -120,7 +120,7 @@ def bkg_match(paths):
                 flxscale = sci_hdr.get("FLXSCALE", 1.0)
                 hdul[0].data = hdul[0].data * flxscale
                 hdul[0].header["FLXSCALE"] = 1.0
-                hdul_weight[0].data = hdul_weight[0].data * flxscale
+                hdul_weight[0].data = hdul_weight[0].data / flxscale**2
                 hdul_weight[0].header["FLXSCALE"] = 1.0
                 hdul.flush()
                 hdul_weight.flush()
@@ -137,7 +137,7 @@ def bkg_match(paths):
                         other_hdul[0].data = other_hdul[0].data * other_flxscale
                         other_hdul[0].header["FLXSCALE"] = 1.0
                         other_hdul_weight[0].data = (
-                            other_hdul_weight[0].data * other_flxscale
+                            other_hdul_weight[0].data / other_flxscale**2
                         )
                         other_hdul_weight[0].header["FLXSCALE"] = 1.0
                         other_hdul.flush()
