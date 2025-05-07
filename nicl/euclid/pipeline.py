@@ -462,7 +462,7 @@ class Pipeline:
         possibly_concurrent(
             self._try_background_stats,
             obs_ids_and_filters,
-            zp_mag="ZP_AB",
+            zp_mag="ZPAB",
             path=path,
             overwrite=overwrite,
             executor=self.executor,
