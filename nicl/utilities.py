@@ -56,8 +56,8 @@ def adu_to_sb(adu, pix_scale, zp=27 * u.ABmag):
     return sb
 
 # %% ../nbs/10_utilities.ipynb 4
-def get_pixel_scale(img, wcs=None):
-    """Calculate the average pixel scale of the supplied image."""
+def get_pixel_scale(img=None, wcs=None):
+    """Calculate the average pixel scale of the supplied image or wcs."""
     if wcs is None:
         wcs = img.wcs
     return (
