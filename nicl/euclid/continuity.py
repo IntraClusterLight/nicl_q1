@@ -45,8 +45,12 @@ def do_resamp_images_overlap(path1, path2, threshold=0.01):
     """Check if two resampled images overlap."""
     logger = logging.getLogger(__name__)
     # find the original images before resampling
-    path1_orig = path1.parent / f"{path1.stem.stem.stem}.{path1.suffix}"
-    path2_orig = path2.parent / f"{path2.stem.stem.stem}.{path2.suffix}"
+    path1_orig = (
+        path1.with_suffix("").with_suffix("").with_suffix("").with_suffix(path1.suffix)
+    )
+    path2_orig = (
+        path2.with_suffix("").with_suffix("").with_suffix("").with_suffix(path2.suffix)
+    )
     # check if they both exist
     if not path1_orig.exists() or not path2_orig.exists():
         raise FileNotFoundError(
