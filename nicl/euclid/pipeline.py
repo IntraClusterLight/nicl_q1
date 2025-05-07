@@ -5,7 +5,8 @@
 # %% auto 0
 __all__ = ['RELEASE_NAME', 'ESAC_SERVER_URL', 'PROCESSING_VERSION', 'SKYFLAT_N_PIX_NIR', 'SKYFLAT_FILTER_SIZE_NIR',
            'SKYFLAT_N_PIX_VIS', 'SKYFLAT_FILTER_SIZE_VIS', 'SKYFLAT_HALF_WINDOW_NIR', 'SKYFLAT_HALF_WINDOW_VIS',
-           'MAX_WORKERS', 'NIR_FILTERS', 'FILTERS', 'possibly_concurrent', 'get_required_obs_ids', 'Pipeline']
+           'PIXEL_SCALE', 'MAX_WORKERS', 'NIR_FILTERS', 'FILTERS', 'possibly_concurrent', 'get_required_obs_ids',
+           'Pipeline']
 
 # %% ../../nbs/euclid/pipeline.ipynb 2
 import concurrent.futures
@@ -41,6 +42,7 @@ SKYFLAT_FILTER_SIZE_VIS = None
 SKYFLAT_HALF_WINDOW_NIR = 3
 SKYFLAT_HALF_WINDOW_VIS = 5
 
+PIXEL_SCALE = 0.3
 MAX_WORKERS = 8
 NIR_FILTERS = ["H", "J", "Y"]
 FILTERS = NIR_FILTERS + ["I"]
@@ -127,6 +129,7 @@ class Pipeline:
         skyflat_filter_size_vis=SKYFLAT_FILTER_SIZE_VIS,
         skyflat_half_window_nir=SKYFLAT_HALF_WINDOW_NIR,
         skyflat_half_window_vis=SKYFLAT_HALF_WINDOW_VIS,
+        pixel_scale=PIXEL_SCALE,
         max_workers=MAX_WORKERS,
         filters=FILTERS,
     ):
@@ -142,6 +145,7 @@ class Pipeline:
         self.skyflat_filter_size_vis = skyflat_filter_size_vis
         self.skyflat_half_window_nir = skyflat_half_window_nir
         self.skyflat_half_window_vis = skyflat_half_window_vis
+        self.pixel_scale = pixel_scale
         self.filters = filters
         self.executor = None
         if max_workers > 1:
@@ -366,7 +370,7 @@ class Pipeline:
         else:
             self.logger.info(f"Creating stacks for obs_id: {obs_id}")
             try:
-                combine(
+                kwargs = dict(
                     in_dir=in_dir,
                     out_dir=out_dir,
                     obs_ids=obs_id,
@@ -375,6 +379,9 @@ class Pipeline:
                     autodark_corr=True,
                     autodark_dir=vis_skyflat_dir,
                 )
+                if self.pixel_scale is not None:
+                    kwargs["pixel_scale"] = self.pixel_scale
+                combine(**kwargs)
             except Exception as e:
                 self.logger.error(f"Error combining {obs_id}: {e}")
                 raise
