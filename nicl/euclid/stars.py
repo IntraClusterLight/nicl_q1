@@ -11,7 +11,7 @@ from warnings import catch_warnings, filterwarnings
 import numpy as np
 from photutils.segmentation import detect_sources
 from photutils.utils import circular_footprint
-from scipy.ndimage import binary_erosion
+from nicl.mask import fft_binary_erosion
 
 # %% ../../nbs/euclid/stars.ipynb 3
 def star_mask(bitmask, instrument, verbose=False):
@@ -26,7 +26,7 @@ def star_mask(bitmask, instrument, verbose=False):
         mask = bitmask & 2**18 > 0
         erosion_radius = 20
         footprint = circular_footprint(radius=erosion_radius)
-        mask = binary_erosion(mask, structure=footprint)
+        mask = fft_binary_erosion(mask, structure=footprint)
         growth_factor = 0.5
     else:
         # identify stars as saturated pixels that are not otherwise invalid (ignoring persistence)
