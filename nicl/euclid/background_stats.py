@@ -174,11 +174,13 @@ def stats_versus_size(
     n_steps=20,
     rms=None,
     verbose=False,
+    progress=False,
 ):
     sqrt_n_pix_list = np.logspace(0, np.log10(max_sqrt_n_pix), n_steps)
     sqrt_n_pix_list = np.unique(sqrt_n_pix_list.astype(int))
     results = []
-    for sqrt_n_pix in tqdm(sqrt_n_pix_list):
+    pbar = tqdm(sqrt_n_pix_list) if progress else sqrt_n_pix_list
+    for sqrt_n_pix in pbar:
         results.append(
             aperture_stats(
                 data,
@@ -362,9 +364,7 @@ def measure(
             rms[data_mask] = np.nan
             if mask is None:
                 if create_mask:
-                    mask, _ = fast_mask(
-                        data, estimate_background=estimate_background
-                    )
+                    mask, _ = fast_mask(data, estimate_background=estimate_background)
                 else:
                     mask = np.zeros(data.shape, dtype=bool)
             mask |= data_mask
