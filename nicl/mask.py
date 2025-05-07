@@ -43,6 +43,7 @@ def get_label_at_position(
     The `position` can be provided as (x, y) pixels or a SkyCoord, in which case the `wcs` must be supplied.
     If no `position` is provided, the image centre is assumed, in which case the `image` must be supplied.
     """
+    logger = logging.getLogger(__name__)
     if not isinstance(segm, SegmentationImage):
         segm = label(segm)
     if position is None:
@@ -50,6 +51,7 @@ def get_label_at_position(
     elif wcs is not None:
         position = tuple(int(x) for x in position.to_pixel(wcs))
     pixel_index = position[::-1]
+    logger.debug(f"Determining label at pixel index {pixel_index}")
     for idx, shape in zip(pixel_index, segm.data.shape):
         if idx < 0 or idx >= shape:
             raise ValueError(f"The specified position {position} is outside the image.")
@@ -67,7 +69,9 @@ def keep_segment_at_position(
     The `position` can be provided as (x, y) pixels or a SkyCoord, in which case the `wcs` must be supplied.
     If no `position` is provided, the image centre is assumed, in which case the `image` must be supplied.
     """
+    logger = logging.getLogger(__name__)
     label = get_label_at_position(segm, image, position, wcs)
+    logger.debug(f"Keeping segment with label {label}")
     segm = segm.copy()
     segm.keep_label(label, relabel=True)
     return segm
@@ -177,9 +181,11 @@ def create_icl_mask(
 
     logger.debug("Detecting sources")
     segm = detect_sources(data=smoothed_image, threshold=threshold, npixels=5)
+    logger.debug(f"Initial segmentation map contains {segm.nlabels} sources")
 
     logger.debug("Keeping segment at specified position")
     segm = keep_segment_at_position(segm, image, centre_pos, wcs)
+    logger.debug(f"Segmentation map now contains {segm.nlabels} sources")
 
     if dilation_radius is not None:
         logger.debug(f"Creating source mask with dilation radius {dilation_radius}")
