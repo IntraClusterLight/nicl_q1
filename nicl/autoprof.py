@@ -5,15 +5,35 @@
 # %% auto 0
 __all__ = ['create_bkgsub_images', 'run_autoprof', 'Extract_SB_using_AP_shapes']
 
+# %% ../nbs/14_autoprof.ipynb 2
+import os
+import re
+import traceback
+from pathlib import Path
+from textwrap import dedent
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from astropy.io import fits
+from astropy.nddata import CCDData
+from astropy.stats import sigma_clip
+from astropy.visualization import simple_norm
+from autoprof import Pipeline
+from matplotlib.patches import Circle, Ellipse
+from photutils.aperture import CircularAnnulus, EllipticalAnnulus
+from scipy.stats import median_abs_deviation
+
+from nicl.background import get_background
+
 # %% ../nbs/14_autoprof.ipynb 4
 def create_bkgsub_images(
     image_paths,
     background_mask_path,
     output_background_dir,
     temp_cleaned_dir,
-    box_size=None,
-    filter_size=None,
-    centre_pos=False,
+    box_size,
+    filter_size,
     label=None,
     savebkg=True,
     clean_nans=False,
@@ -23,9 +43,6 @@ def create_bkgsub_images(
     Loads images, applies the measurement mask to estimate background,
     saves the background maps, and writes cleaned background-subtracted images with NaNs set to 99.
     """
-    if box_size is None:
-        raise ValueError("No box_size is specified!")
-
     Path(output_background_dir).mkdir(parents=True, exist_ok=True)
     Path(temp_cleaned_dir).mkdir(parents=True, exist_ok=True)
 
