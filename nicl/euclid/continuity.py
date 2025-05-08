@@ -21,6 +21,7 @@ from astropy.wcs import WCS
 from numpy.linalg import lstsq
 from regions import PolygonSkyRegion
 from spherical_geometry.polygon import SphericalPolygon
+from astropy.nddata import reshape_as_blocks
 
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
@@ -182,8 +183,11 @@ def do_resamp_images_overlap(path1, path2, threshold=0.01):
 def bkg_match(
     paths,
     corr_order=0,
+    bin=1,
 ):
     logger = logging.getLogger(__name__)
+    if corr_order not in (0, 1, 2):
+        raise ValueError(f"corr_order must be 0, 1 or 2, got {corr_order} instead.")
     paths.sort()
     ids = []
     for path in paths:
@@ -252,14 +256,14 @@ def bkg_match(
                         slice1, slice2 = get_overlap_slices(sci_hdr, other_sci_hdr)
                         if slice1 is None or slice2 is None:
                             continue
-                        diff_img = hdul[0].data[slice1] - other_hdul[0].data[slice2]
+                        diff_img = other_hdul[0].data[slice2] - hdul[0].data[slice1]
                         diff_img_rms = np.sqrt(
                             1 / hdul_weight[0].data[slice1]
                             + 1 / other_hdul_weight[0].data[slice2]
                         )
                         idx_valid = np.isfinite(diff_img_rms)
-                        n_eqs = np.sum(idx_valid)
-                        if n_eqs == 0:
+                        npix_valid = np.sum(idx_valid)
+                        if npix_valid == 0:
                             continue
                         idx = paths.index(path)
                         idx_other = paths.index(other_path)
@@ -275,82 +279,92 @@ def bkg_match(
                             idx_other_solution = len(solution_map) - 1
                         match corr_order:
                             case 0:
-                                coeff_array = np.zeros(
-                                    (n_eqs, n_unknowns_per_img * len(solution_map)),
-                                    dtype=np.float32,
+                                if bin > max(diff_img.shape):
+                                    bin_ = diff_img.shape
+                                else:
+                                    bin_ = (bin, bin)
+                                # pad the image to be divisible by bin, don't wanna miss any pixels
+                                diff_img = np.pad(
+                                    diff_img,
+                                    (
+                                        (0, bin_[0] - diff_img.shape[0] % bin_[0]),
+                                        (0, bin_[1] - diff_img.shape[1] % bin_[1]),
+                                    ),
+                                    mode="constant",
+                                    constant_values=0,
                                 )
-                                coeff_array[:, idx_solution] = 1
-                                coeff_array[:, idx_other_solution] = -1
-                                offset = -diff_img[idx_valid].ravel()
-                                rms = diff_img_rms[idx_valid].ravel()
+                                diff_img_rms = np.pad(
+                                    diff_img_rms,
+                                    (
+                                        (0, bin_[0] - diff_img_rms.shape[0] % bin_[0]),
+                                        (0, bin_[1] - diff_img_rms.shape[1] % bin_[1]),
+                                    ),
+                                    mode="constant",
+                                    constant_values=np.inf,
+                                )
+                                diff_img_blocks = reshape_as_blocks(diff_img, bin_)
+                                diff_img_rms_blocks = reshape_as_blocks(
+                                    diff_img_rms, bin_
+                                )
+                                diff_img_rms_reduced_blocks = np.sqrt(
+                                    1 / np.sum(1 / diff_img_rms_blocks**2, axis=(2, 3))
+                                )
+                                idx_valid_blocks = np.isfinite(
+                                    diff_img_rms_reduced_blocks
+                                )
+                                # remove blocks with no valid pixels
+                                diff_img_rms_blocks = diff_img_rms_blocks[
+                                    idx_valid_blocks
+                                ]
+                                diff_img_rms_reduced_blocks = (
+                                    diff_img_rms_reduced_blocks[idx_valid_blocks]
+                                )
+                                diff_img_blocks = diff_img_blocks[idx_valid_blocks]
+                                diff_img_reduced_blocks = np.average(
+                                    diff_img_blocks,
+                                    axis=(-2, -1),
+                                    weights=1 / diff_img_rms_blocks**2,
+                                )
+                                coeff0_blocks = np.ones_like(diff_img_blocks)
+                                coeff0_reduced = np.average(
+                                    coeff0_blocks,
+                                    axis=(-2, -1),
+                                    weights=1 / diff_img_rms_blocks**2,
+                                )
+                                # check if there are eqs/blocks with no valid pixels
+                                if np.sum(coeff0_reduced.ravel() == 0) > 0:
+                                    raise Exception(
+                                        "coeff0_reduced still has zero values, this should not happen"
+                                    )
+                                coeff_array = np.zeros(
+                                    (
+                                        coeff0_reduced.size,
+                                        n_unknowns_per_img * len(solution_map),
+                                    )
+                                )
+                                coeff_array[:, idx_solution] = coeff0_reduced.ravel()
+                                coeff_array[
+                                    :, idx_other_solution
+                                ] = -coeff0_reduced.ravel()
+                                offset = diff_img_reduced_blocks.ravel()
+                                rms = diff_img_rms_reduced_blocks.ravel()
+                                # weight the eqs by the inverse of the rms
                                 coeff_array = coeff_array / rms[:, np.newaxis]
                                 offset = offset / rms
                             case 1:
-                                coords1 = slice_to_coords(slice1)
-                                coords2 = slice_to_coords(slice2)
-                                coeff_array = np.zeros(
-                                    (n_eqs, n_unknowns_per_img * len(solution_map))
+                                raise NotImplementedError(
+                                    "First order correction is not implemented yet."
                                 )
-                                coeff_array[:, idx_solution * n_unknowns_per_img] = 1
-                                coeff_array[
-                                    :, idx_solution * n_unknowns_per_img + 1
-                                ] = coords1[:, 0]
-                                coeff_array[
-                                    :, idx_solution * n_unknowns_per_img + 2
-                                ] = coords1[:, 1]
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img
-                                ] = -1
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img + 1
-                                ] = -coords2[:, 0]
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img + 2
-                                ] = -coords2[:, 1]
-                                offset = -diff_img[idx_valid].ravel()
-                                rms = diff_img_rms[idx_valid].ravel()
-                                coeff_array = coeff_array / rms[:, np.newaxis]
-                                offset = offset / rms
                             case 2:
-                                coords1 = slice_to_coords(slice1)
-                                coords2 = slice_to_coords(slice2)
-                                coeff_array = np.zeros(
-                                    (n_eqs, n_unknowns_per_img * len(solution_map))
+                                raise NotImplementedError(
+                                    "Second order correction is not implemented yet."
                                 )
-                                coeff_array[:, idx_solution * n_unknowns_per_img] = 1
-                                coeff_array[
-                                    :, idx_solution * n_unknowns_per_img + 1
-                                ] = coords1[:, 0]
-                                coeff_array[
-                                    :, idx_solution * n_unknowns_per_img + 2
-                                ] = coords1[:, 1]
-                                coeff_array[
-                                    :, idx_solution * n_unknowns_per_img + 3
-                                ] = coords1[:, 0] ** 2
-                                coeff_array[
-                                    :, idx_solution * n_unknowns_per_img + 4
-                                ] = coords1[:, 1] ** 2
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img
-                                ] = -1
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img + 1
-                                ] = -coords2[:, 0]
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img + 2
-                                ] = -coords2[:, 1]
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img + 3
-                                ] = -(coords2[:, 0] ** 2)
-                                coeff_array[
-                                    :, idx_other_solution * n_unknowns_per_img + 4
-                                ] = -(coords2[:, 1] ** 2)
-                                offset = -diff_img[idx_valid].ravel()
-                                rms = diff_img_rms[idx_valid].ravel()
-                                coeff_array = coeff_array / rms[:, np.newaxis]
-                                offset = offset / rms
                         a.append(coeff_array)
                         b.append(offset)
+    n_imgs_in_eqs = len(solution_map)
+    n_imgs = len(paths)
+    if n_imgs > n_imgs_in_eqs:
+        logger.debug("Some images have no significant overlap with others.")
     # padd zeros to coeff_array to match the longest one
     max_len = max([coeff.shape[1] for coeff in a])
     for i in range(len(a)):
@@ -368,10 +382,13 @@ def bkg_match(
     num_solutions = a.shape[1]
     logger.debug(f"number of equations: {len(a)}")
     logger.debug(f"number of unknowns: {num_solutions}")
-    solutions, residuals, rank, _ = lstsq(a, b, rcond=None)
+    solutions, chi2, rank, _ = lstsq(a, b, rcond=None)
     if rank < num_solutions or len(a) < num_solutions:
-        residuals = np.linalg.norm(b - a @ solutions) / np.sqrt(len(b))
-    logger.debug(f"rank: {rank}, residuals: {residuals}")
+        chi2 = np.sum((b - a @ solutions) ** 2)
+    chi2_reduced = chi2 / (len(b) - num_solutions)
+    logger.debug(f"rank: {rank}, reduced chi^2: {chi2_reduced:.2f}")
+    logger.debug(f"solutions map: {solution_map}")
+    logger.debug(f"solutions: {solutions}")
     # apply the solutions to the images
     for i, path in enumerate(paths):
         idx_sol = solution_map.index(i)
