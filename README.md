@@ -66,10 +66,13 @@ The `-e` here performs an ‘editable’ installation, i.e. the files in the
 repository are used directly, rather than being copied to a central
 location.
 
+To run particular elements of the code you will also need to have SWarp
+and/or AutoProf installed; see the instructions above.
+
 The core code, documentation, tests and applications are written in
 Jupyter notebooks. To faciliate this, the development of this software
-uses [nbdev](https://nbdev.fast.ai). To understand this system, you
-should familiarise yourself with the [introductory
+uses [nbdev](https://nbdev.fast.ai). To understand this system, you must
+familiarise yourself with the [introductory
 walkthrough](https://nbdev.fast.ai/tutorials/tutorial.html).
 
 To ensure the code committed to the repository is well-formatted and
