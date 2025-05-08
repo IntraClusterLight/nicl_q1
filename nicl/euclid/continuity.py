@@ -17,11 +17,11 @@ from pathlib import Path
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy.nddata import reshape_as_blocks
 from astropy.wcs import WCS
 from numpy.linalg import lstsq
 from regions import PolygonSkyRegion
 from spherical_geometry.polygon import SphericalPolygon
-from astropy.nddata import reshape_as_blocks
 
 from nicl.euclid.utilities import (
     get_dither_id_from_filename,
@@ -390,19 +390,25 @@ def bkg_match(
     logger.debug(f"solutions map: {solution_map}")
     logger.debug(f"solutions: {solutions}")
     # apply the solutions to the images
-    for i, path in enumerate(paths):
-        idx_sol = solution_map.index(i)
-        solution = solutions[idx_sol : idx_sol + n_unknowns_per_img]
-        with fits.open(path, mode="update") as hdul:
+    for idx_sol, idx in enumerate(solution_map):
+        path = paths[idx]
+        solution = solutions[
+            idx_sol * n_unknowns_per_img : (idx_sol + 1) * n_unknowns_per_img
+        ]
+        with (
+            fits.open(path, mode="update") as hdul,
+            fits.open(path.with_suffix(".weight.fits")) as hdul_weight,
+        ):
+            idx_not_blank = (hdul[0].data != 0) | (hdul_weight[0].data != 0)
             if corr_order == 0:
-                hdul[0].data = hdul[0].data + solution[0]
+                hdul[0].data[idx_not_blank] += solution[0]
             elif corr_order == 1:
                 # Apply a first-order polynomial correction to the image data
                 # solution = [offset, coeff_x, coeff_y]
                 ny, nx = hdul[0].data.shape
                 y, x = np.indices((ny, nx))
                 correction = solution[0] + solution[1] * x + solution[2] * y
-                hdul[0].data = hdul[0].data + correction
+                hdul[0].data[idx_not_blank] += correction[idx_not_blank]
             elif corr_order == 2:
                 # Apply a second-order polynomial correction to the image data
                 # solution = [offset, coeff_x, coeff_y, coeff_x2, coeff_y2]
@@ -415,9 +421,7 @@ def bkg_match(
                     + solution[3] * x**2
                     + solution[4] * y**2
                 )
-                hdul[0].data = hdul[0].data + correction
-            else:
-                raise ValueError(f"Unknown correction order: {corr_order}")
+                hdul[0].data[idx_not_blank] += correction[idx_not_blank]
             hdul.flush()
 
 # %% ../../nbs/euclid/continuity.ipynb 6
