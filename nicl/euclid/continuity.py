@@ -239,10 +239,11 @@ def bkg_match(
                         if slice1 is None or slice2 is None:
                             continue
                         diff_img = other_hdul[0].data[slice2] - hdul[0].data[slice1]
-                        diff_img_rms = np.sqrt(
-                            1 / hdul_weight[0].data[slice1]
-                            + 1 / other_hdul_weight[0].data[slice2]
-                        )
+                        with np.errstate(divide="ignore"):
+                            diff_img_rms = np.sqrt(
+                                1 / hdul_weight[0].data[slice1]
+                                + 1 / other_hdul_weight[0].data[slice2]
+                            )
                         idx_valid = np.isfinite(diff_img_rms)
                         npix_valid = np.sum(idx_valid)
                         if npix_valid == 0:
@@ -288,9 +289,13 @@ def bkg_match(
                                 diff_img_rms_blocks = reshape_as_blocks(
                                     diff_img_rms, bin_
                                 )
-                                diff_img_rms_reduced_blocks = np.sqrt(
-                                    1 / np.sum(1 / diff_img_rms_blocks**2, axis=(2, 3))
-                                )
+                                with np.errstate(divide="ignore"):
+                                    diff_img_rms_reduced_blocks = np.sqrt(
+                                        1
+                                        / np.sum(
+                                            1 / diff_img_rms_blocks**2, axis=(2, 3)
+                                        )
+                                    )
                                 idx_valid_blocks = np.isfinite(
                                     diff_img_rms_reduced_blocks
                                 )
