@@ -150,18 +150,10 @@ def get_overlap_slices(hdr1, hdr2):
 def do_resamp_images_overlap(path1, path2, threshold=0.01):
     """Check if two resampled images overlap."""
     logger = logging.getLogger(__name__)
-    # find the original images before resampling
-    path1_orig = path1.with_suffix("").with_suffix("").with_suffix(path1.suffix)
-    path2_orig = path2.with_suffix("").with_suffix("").with_suffix(path2.suffix)
-    # check if they both exist
-    if not path1_orig.exists() or not path2_orig.exists():
-        raise FileNotFoundError(
-            f"One of the original images does not exist: {path1_orig}, {path2_orig}"
-        )
-    logger.debug(f"Checking overlap between {path1_orig} and {path2_orig}")
+    logger.debug(f"Checking overlap between {path1} and {path2}")
     # create sky regions from the headers
-    hdr1 = fits.getheader(path1_orig, 1)
-    hdr2 = fits.getheader(path2_orig, 1)
+    hdr1 = fits.getheader(path1, 0)
+    hdr2 = fits.getheader(path2, 0)
     sky_reg1 = SphericalPolygon.from_wcs(hdr1)
     sky_reg2 = SphericalPolygon.from_wcs(hdr2)
     # check if they overlap
