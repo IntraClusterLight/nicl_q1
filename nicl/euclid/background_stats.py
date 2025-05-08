@@ -11,24 +11,27 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from astropy.io import fits
 from astropy import table
-from matplotlib.ticker import FuncFormatter, NullLocator
+from astropy.io import fits
+from astropy.wcs import WCS
 from matplotlib import patheffects as pe
-from scipy.stats import bootstrap, median_abs_deviation
-
+from matplotlib.ticker import FuncFormatter, NullLocator
 from photutils.aperture import (
-    CircularAperture,
-    CircularAnnulus,
-    RectangularAperture,
-    RectangularAnnulus,
     ApertureStats,
+    CircularAnnulus,
+    CircularAperture,
+    RectangularAnnulus,
+    RectangularAperture,
 )
 from photutils.background import Background2D
+from scipy.stats import bootstrap, median_abs_deviation
 from tqdm import tqdm
 
 from ..mask import fast_mask
+from ..utilities import get_pixel_scale
+
+# %% ../../nbs/euclid/background_stats.ipynb 4
+plt.style.use("nicl.euclid.v1nicl")
 
 # %% ../../nbs/euclid/background_stats.ipynb 5
 def measure_aperture_stats(
@@ -174,11 +177,13 @@ def stats_versus_size(
     n_steps=20,
     rms=None,
     verbose=False,
+    progress=False,
 ):
     sqrt_n_pix_list = np.logspace(0, np.log10(max_sqrt_n_pix), n_steps)
     sqrt_n_pix_list = np.unique(sqrt_n_pix_list.astype(int))
     results = []
-    for sqrt_n_pix in tqdm(sqrt_n_pix_list):
+    pbar = tqdm(sqrt_n_pix_list) if progress else sqrt_n_pix_list
+    for sqrt_n_pix in pbar:
         results.append(
             aperture_stats(
                 data,
@@ -334,7 +339,7 @@ def measure(
     annular_thickness=None,  # None for solid apertures, or a number on range (0, 1) to specify relative thickness of annulus
     n_pix_tolerance=0.1,  # the largest allowed relative deviation from the requested n_pix
     n_steps=25,  # the number of different sqrt_n_pix to measure
-    zp_mag=21.286,  # convert to magntiudes using this zero point, unless it is None
+    zp_mag=21.286,  # unless None, convert to magnitudes using this zeropoint value or header keyword
     errorbars=True,  # plot errorbars
     debug=False,  # save debug images
     verbose=False,  # print verbose output
@@ -355,6 +360,12 @@ def measure(
                 out_fn_stem = f"{fn.stem}_{ext}"
             else:
                 out_fn_stem = f"{fn.stem}"
+            if isinstance(zp_mag, str):
+                hdr = hdul[ext].header
+                zp_mag = hdr[zp_mag]
+                wcs = WCS(hdr)
+                pixel_scale = get_pixel_scale(wcs=wcs)
+                zp_mag += 2.5 * np.log10(pixel_scale.to_value("arcsec") ** 2)
             data = hdul[ext].data
             rms = hdul[ext.replace("SCI", "RMS")].data
             data_mask = (rms > 1e6) | np.isnan(rms) | np.isnan(data)
@@ -362,9 +373,7 @@ def measure(
             rms[data_mask] = np.nan
             if mask is None:
                 if create_mask:
-                    mask, _ = fast_mask(
-                        data, estimate_background=estimate_background
-                    )
+                    mask, _ = fast_mask(data, estimate_background=estimate_background)
                 else:
                     mask = np.zeros(data.shape, dtype=bool)
             mask |= data_mask
