@@ -22,7 +22,7 @@ from astropy.stats import sigma_clip
 from astropy.visualization import simple_norm
 from matplotlib.patches import Circle, Ellipse
 from photutils.aperture import CircularAnnulus, EllipticalAnnulus
-from scipy.stats import median_abs_deviation
+# from scipy.stats import median_abs_deviation
 
 from nicl.background import get_background
 
@@ -352,13 +352,6 @@ def Extract_SB_using_AP_shapes(
             std_flux = (
                 np.nanstd(valid_flux_values) if len(valid_flux_values) > 1 else np.nan
             )
-            # mad_flux = (
-            #     median_abs_deviation(
-            #         valid_flux_values, scale="normal", nan_policy="omit"
-            #     )
-            #     if len(valid_flux_values) > 1
-            #     else np.nan
-            # )
 
             clipped = sigma_clip(
                 valid_flux_values, sigma=3, cenfunc="median", maxiters=5
@@ -371,11 +364,6 @@ def Extract_SB_using_AP_shapes(
             clipped_std_flux = (
                 np.nanstd(clipped_valid) if len(clipped_valid) > 1 else np.nan
             )
-            # clipped_mad_flux = (
-            #     median_abs_deviation(clipped_valid, scale="normal", nan_policy="omit")
-            #     if len(clipped_valid) > 1
-            #     else np.nan
-            # )
 
         flux_stats.append(
             {
@@ -392,13 +380,11 @@ def Extract_SB_using_AP_shapes(
                 "Mean_flux_annulus": mean_flux,
                 "Median_flux_annulus": median_flux,
                 "Std_flux_annulus": std_flux,
-                # "MAD_flux_annulus": mad_flux,
                 "Total_valid_pix_annulus": total_valid,
                 "Total_masked_pix_annulus": total_masked,
                 "Clipped_mean_flux_annulus": clipped_mean_flux,
                 "Clipped_median_flux_annulus": clipped_median_flux,
                 "Std_clipped_flux_annulus": clipped_std_flux,
-                # "MAD_clipped_flux_annulus": clipped_mad_flux,
             }
         )
 
