@@ -6,6 +6,7 @@
 __all__ = ['process_cluster_pipeline']
 
 # %% ../../nbs/euclid/measure.ipynb 2
+import logging
 from pathlib import Path
 
 import astropy.units as u
@@ -60,6 +61,7 @@ def process_cluster_pipeline(
     external_bkg_mask_path=None,
     noise_file_path=None,
 ):
+    logger = logging.getLogger(__name__)
     image_dir = Path(image_dir)
     outdir = Path(outdir)
 
@@ -85,21 +87,21 @@ def process_cluster_pipeline(
             cluster_z = 0.1
             bcg_pos = None
 
-        print(
-            f"Cluster information:\n id: {cluster_id}\n redshift: {cluster_z}\n BCG coords: {bcg_pos}"
+        logger.info(
+            f"Cluster id: {cluster_id}, redshift: {cluster_z}, BCG coords: {bcg_pos}"
         )
 
         if box_size is None:
-            print(
+            logger.debug(
                 "Calculating the redshift dependent box size for background calculation in pixels for 1Mpc..."
             )
             if cluster_z is None:
-                raise ValueError("z needs to be provided to calculate 1MPC  boxsize")
+                raise ValueError("z needs to be provided to calculate 1 Mpc boxsize")
             else:
                 box_size = int(
                     mpc_to_pixels(z=cluster_z, pixel_scale_arcsec=pixelscale)
                 )
-                print(
+                logger.info(
                     f'1 Mpc at z={cluster_z} corresponds to {box_size} pixels at {pixelscale}"/px.'
                 )
 
@@ -110,7 +112,7 @@ def process_cluster_pipeline(
             filters = [filters]
 
         for filter in filters:
-            print(
+            logger.info(
                 f"Using {filter} band image and {mask_filter} band mask for {cluster_id}"
             )
 
@@ -132,55 +134,16 @@ def process_cluster_pipeline(
                 f"{cluster_id}_{image_prefix}" if image_prefix else f"{cluster_id}"
             )
 
-            if masking:
-                if mask_filter is not None:
-                    mask_label = f"{mask_filter}"
-                    if mask_prefix:
-                        mask_label += f"_{mask_prefix}"
-                        mask_file_output_label += f"_{mask_prefix}"
-
-                    final_output_label = f"{image_label}_{mask_label}"
-
-                else:
-                    raise ValueError(
-                        "Mask filter has to be provided when masking=True!"
-                    )
-
-            else:
+            if mask_filter is None:
                 final_output_label = f"{image_label}_nomask"
-
-            if filter in ["H", "J", "Y", "YJH"]:
-                if filter != "YJH":
-                    image_filename = (
-                        f"{image_label}.fits"
-                        if mock_image
-                        else f"EUC_NIR_W-STK_{filter}-{cluster_id}.fits"
-                    )
-                    fn = image_dir / image_filename
-                else:
-                    image_filename = (
-                        f"{cluster_id}_{image_prefix}_NIR_YJH_COADDED.fits"
-                        if image_prefix
-                        else f"{cluster_id}_NIR_YJH_COADDED.fits"
-                    )
-                    fn = cluster_output_dir / image_filename
-
-            elif filter in ["VIS"]:
-                image_filename = (
-                    f"{image_label}.fits"
-                    if mock_image
-                    else f"EUC_VIS_SWL-STK-{cluster_id}.fits"
-                )
-                print(image_filename)
-                fn = image_dir / image_filename
-
-            if masking:
-                if mask_filter is None:
-                    raise ValueError(
-                        "Mask filter has to be provided when masking=True!"
-                    )
-
-                elif mask_filter in ["H", "J", "Y", "YJH"]:
+            else:
+                masking = True
+                mask_label = f"{mask_filter}"
+                if mask_prefix:
+                    mask_label += f"_{mask_prefix}"
+                    mask_file_output_label += f"_{mask_prefix}"
+                final_output_label = f"{image_label}_{mask_label}"
+                if mask_filter in ["H", "J", "Y", "YJH"]:
                     default_mask_path = (
                         cluster_output_dir
                         / f"{mask_file_output_label}_NIR_measurement_mask.fits"
@@ -201,30 +164,41 @@ def process_cluster_pipeline(
                 else:
                     raise ValueError(f"Unknown mask filter: {mask_filter}")
 
-                print(
-                    f"Processing image {fn}, measurement mask is {default_mask_path} and background mask is {default_bkg_mask_path}"
+            if filter in ["H", "J", "Y"]:
+                image_filename = (
+                    f"{image_label}.fits"
+                    if mock_image
+                    else f"EUC_NIR_W-STK_{filter}-{cluster_id}.fits"
                 )
+                fn = image_dir / image_filename
+            elif filter == "YJH":
+                image_filename = (
+                    f"{cluster_id}_{image_prefix}_NIR_YJH_coadded.fits"
+                    if image_prefix
+                    else f"{cluster_id}_NIR_YJH_coadded.fits"
+                )
+                fn = cluster_output_dir / image_filename
+            elif filter in ["VIS"]:
+                image_filename = (
+                    f"{image_label}.fits"
+                    if mock_image
+                    else f"EUC_VIS_SWL-STK-{cluster_id}.fits"
+                )
+                fn = image_dir / image_filename
+
+            if masking:
+                logger.info(f"Processing image {fn}")
+                logger.info(f"Measurement mask is {default_mask_path}")
+                logger.info(f"Background mask is {default_bkg_mask_path}")
 
                 if not default_mask_path.exists() or not default_bkg_mask_path.exists():
                     if mask_filter in ["H", "J", "Y", "YJH"]:
-                        print("Creating new NIR masks...")
+                        logger.info("Creating new NIR masks...")
                         if mock_image:
-                            image_H = (
-                                image_dir / f"{cluster_id}_H_{image_prefix}.fits"
-                                if image_prefix
-                                else f"{cluster_id}_H.fits"
-                            )
-                            image_J = (
-                                image_dir / f"{cluster_id}_J_{image_prefix}.fits"
-                                if image_prefix
-                                else f"{cluster_id}_J.fits"
-                            )
-                            image_Y = (
-                                image_dir / f"{cluster_id}_Y_{image_prefix}.fits"
-                                if image_prefix
-                                else f"{cluster_id}_Y.fits"
-                            )
-
+                            suffix = f"_{image_prefix}" if image_prefix else ""
+                            image_H = image_dir / f"{cluster_id}_H{suffix}.fits"
+                            image_J = image_dir / f"{cluster_id}_J{suffix}.fits"
+                            image_Y = image_dir / f"{cluster_id}_Y{suffix}.fits"
                         else:
                             image_H = image_dir / f"EUC_NIR_W-STK_H-{cluster_id}.fits"
                             image_J = image_dir / f"EUC_NIR_W-STK_J-{cluster_id}.fits"
@@ -242,10 +216,10 @@ def process_cluster_pipeline(
                             ICL_BKG_BOX_SIZE=ICL_BKG_BOX_SIZE,
                             NIR_STACK_BKG_BOX_SIZE=NIR_STACK_BKG_BOX_SIZE,
                         )
-                        print("Created NIR masks!")
+                        logger.info("Created NIR masks!")
 
                     elif mask_filter == "VIS":
-                        print("Creating new VIS masks...")
+                        logger.info("Creating new VIS masks...")
 
                         create_vis_mask(
                             str(fn),
@@ -256,13 +230,13 @@ def process_cluster_pipeline(
                             ICL_BKG_BOX_SIZE=ICL_BKG_BOX_SIZE,
                             output_dir=str(cluster_output_dir),
                         )
-                        print("Created VIS mask!")
+                        logger.info("Created VIS mask!")
 
                     else:
                         raise ValueError(f"Unknown mask filter: {mask_filter}")
 
             else:
-                print(
+                logger.info(
                     "Measurement and Background masks already exist. Skipping creation."
                 )
 
@@ -289,7 +263,7 @@ def process_cluster_pipeline(
                 temp_cleaned_dir = cluster_output_dir / "temp_cleaned"
                 temp_cleaned_dir.mkdir(exist_ok=True)
 
-                print(f"Creating background with boxsize {box_size}")
+                logger.info(f"Creating background with boxsize {box_size}")
 
                 cleaned_paths = create_bkgsub_images(
                     image_paths={filter: str(fn)},
@@ -321,18 +295,18 @@ def process_cluster_pipeline(
 
             if forced_photometry:
                 if forced_profile_filter is not None:
-                    print(
+                    logger.info(
                         f"The elliptical shapes will be taken from detection in {forced_profile_filter} band"
                     )
                     final_output_label += f"_{forced_profile_filter}"
                 else:
                     raise ValueError(
-                        "forced_profile_filter should be prvided for forced_photometry=True"
+                        "forced_profile_filter should be provided for forced_photometry=True"
                     )
             else:
                 forced_profile_filter = filter
                 final_output_label += f"_{forced_profile_filter}"
-                print(
+                logger.info(
                     f"The elliptical shapes will be taken from detection in {forced_profile_filter} band"
                 )
 
@@ -340,7 +314,7 @@ def process_cluster_pipeline(
                 final_output_label += f"_{other_prefix}"
 
             if run_autoprof_function:
-                print(
+                logger.info(
                     f"Autoprof running on {cleaned_image_path}, with mask {mask_path.name if masking else 'None'} ..."
                 )
 
@@ -382,13 +356,13 @@ def process_cluster_pipeline(
                             continue
                         try:
                             f.unlink()
-                            print(f"Deleted: {name}")
+                            logger.debug(f"Deleted: {name}")
                         except Exception as e:
-                            print(f"Could not delete {name}: {e}")
+                            logger.warning(f"Could not delete {name}: {e}")
 
             if SB_extraction:
                 if masking:
-                    print(f"Creating background with boxsize {box_size}")
+                    logger.info(f"Creating background with boxsize {box_size}")
 
                     cleaned_paths = create_bkgsub_images(
                         image_paths={filter: str(fn)},
@@ -404,7 +378,7 @@ def process_cluster_pipeline(
 
                     cleaned_image_path = cleaned_paths[filter]
 
-                print(
+                logger.info(
                     f"Extracting SB profile for {cluster_id} in {filter} with masking {mask_filter} band detection and shapes from {forced_profile_filter} band results.."
                 )
 
@@ -448,14 +422,14 @@ def process_cluster_pipeline(
                 ]
 
                 # Loading noise file and finding appropriate box sized one...
-                if masking:
+                if noise_file_path is not None:
                     noise_bkg_sizes = np.array(
                         [450, 500, 550, 650, 750, 1000, 1800, 2350]
                     )
                     idx = (np.abs(noise_bkg_sizes - box_size)).argmin()
                     closest_bs = noise_bkg_sizes[idx]
-                    print(
-                        f"1Mpc of cluster corresponds to {box_size} and closest box size used in noise measurements is: {closest_bs}"
+                    logger.info(
+                        f"1 Mpc at cluster corresponds to {box_size} and closest box size used in noise measurements is: {closest_bs}"
                     )
 
                     noise_file = (
@@ -466,8 +440,8 @@ def process_cluster_pipeline(
                     if noise_file.exists():
                         noise_df = pd.read_csv(noise_file)
                     else:
-                        print(
-                            f"Warning: Noise file {noise_file.name} not found. Creating dummy noise data filled with zeros."
+                        logger.warning(
+                            f"Noise file {noise_file.name} not found. Creating dummy noise data filled with zeros."
                         )
                         n_rows = len(data_df)
                         noise_df = pd.DataFrame(
@@ -496,34 +470,20 @@ def process_cluster_pipeline(
                 data_df["I"] = data_df["I"] + AP_background_level
 
                 # Unit and column lists
-                if masking:
-                    for col, unit in zip(
-                        [
-                            "SMA_annulus_centre",
-                            "Median_flux_annulus",
-                            "SMA_annulus_centre_noise",
-                            "MAD_median_clipped_flux_noise",
-                            "MAD_bkg_subtracted_flux_noise",
-                        ],
-                        [
-                            "arcsec",
-                            "flux*arcsec^-2",
-                            "arcsec",
-                            "flux*arcsec^-2",
-                            "flux*arcsec^-2",
-                        ],
-                    ):
-                        if col not in column_list:
-                            column_list.append(col)
-                            unit_list.append(unit)
-                else:
-                    for col, unit in zip(
-                        ["SMA_annulus_centre", "Median_flux_annulus"],
-                        ["arcsec", "flux*arcsec^-2"],
-                    ):
-                        if col not in column_list:
-                            column_list.append(col)
-                            unit_list.append(unit)
+                # FIXME: This would be more straightforward if we used an astropy table, rather than a pandas dataframe
+                new_cols = ["SMA_annulus_centre", "Median_flux_annulus"]
+                new_units = ["arcsec", "flux*arcsec^-2"]
+                if noise_file_path is not None:
+                    new_cols += [
+                        "SMA_annulus_centre_noise",
+                        "MAD_median_clipped_flux_noise",
+                        "MAD_bkg_subtracted_flux_noise",
+                    ]
+                    new_units += ["arcsec", "flux*arcsec^-2", "flux*arcsec^-2"]
+                for col, unit in zip(new_cols, new_units):
+                    if col not in column_list:
+                        column_list.append(col)
+                        unit_list.append(unit)
 
                 # Updating the .prof file...
                 with open(prof_path, "w") as f:
@@ -531,7 +491,9 @@ def process_cluster_pipeline(
                     f.write(",".join(column_list) + "\n")
                     data_df.to_csv(f, index=False, header=False)
 
-                print("Final updated .prof file with SB + Noise written successfully.")
+                logger.info(
+                    "Final updated .prof file with SB + Noise written successfully."
+                )
 
                 if show_profiles:
                     fig, ax = plt.subplots(1, 1)

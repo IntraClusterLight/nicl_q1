@@ -242,6 +242,7 @@ def create_combined_nir_mask(
     NIR_STACK_BKG_BOX_SIZE=300,
 ):
     """Create a combined NIR mask for use when measuring ICL."""
+    logger = logging.getLogger(__name__)
     filenames = {"H": H_filename, "J": J_filename, "Y": Y_filename}
     images = {}
 
@@ -281,11 +282,11 @@ def create_combined_nir_mask(
         filenames[band] = temp_filename
 
     # Now pass temp files to stacking function
-    print("Proceeding to stack_nir_bands...")
+    logger.info("Proceeding to stack_nir_bands...")
     combined_ccd = stack_nir_bands(
         filenames["H"], filenames["J"], filenames["Y"], output_dir=None, label=None
     )
-    print("stack_nir_bands is complete...")
+    logger.info("stack_nir_bands is complete...")
 
     if output_dir:
         output_dir = Path(output_dir)
@@ -294,14 +295,14 @@ def create_combined_nir_mask(
         header = combined_ccd.wcs.to_header()
 
         fits.writeto(
-            output_dir / f"{prefix}NIR_YJH_COADDED.fits",
+            output_dir / f"{prefix}NIR_YJH_coadded.fits",
             combined_ccd.data,
             header=header,
             overwrite=True,
         )
-        print("Coadded image is saved.")
+        logger.info("Coadded image is saved.")
 
-    print("Masking the coadded image...")
+    logger.info("Masking the coadded image...")
 
     masks = create_masks(
         combined_ccd, centre_pos=centre_pos, z=redshift, filter=filter, zeropoint=23.9
@@ -319,7 +320,7 @@ def create_combined_nir_mask(
     )
     mask_for_measurement = masks["badpixel"] | masks["object"] | faint_mask
 
-    print("Masks are generated...")
+    logger.info("Masks are generated...")
 
     if output_dir:
         output_dir = Path(output_dir)

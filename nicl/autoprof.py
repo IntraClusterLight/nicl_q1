@@ -6,10 +6,11 @@
 __all__ = ['create_bkgsub_images', 'run_autoprof', 'Extract_SB_using_AP_shapes']
 
 # %% ../nbs/14_autoprof.ipynb 2
+import logging
 import os
 import re
-import traceback
 from pathlib import Path
+import subprocess
 from textwrap import dedent
 
 import matplotlib.pyplot as plt
@@ -19,14 +20,13 @@ from astropy.io import fits
 from astropy.nddata import CCDData
 from astropy.stats import sigma_clip
 from astropy.visualization import simple_norm
-from autoprof import Pipeline
 from matplotlib.patches import Circle, Ellipse
 from photutils.aperture import CircularAnnulus, EllipticalAnnulus
 from scipy.stats import median_abs_deviation
 
 from nicl.background import get_background
 
-# %% ../nbs/14_autoprof.ipynb 4
+# %% ../nbs/14_autoprof.ipynb 3
 def create_bkgsub_images(
     image_paths,
     background_mask_path,
@@ -88,7 +88,7 @@ def create_bkgsub_images(
 
     return filenames_cleaned
 
-# %% ../nbs/14_autoprof.ipynb 5
+# %% ../nbs/14_autoprof.ipynb 4
 def run_autoprof(
     ids,
     image_files,
@@ -100,7 +100,6 @@ def run_autoprof(
     zeropoint=23.9,
     out_dir="./",
     config_name="basic_config.py",
-    log_path="AutoProf.log",
     fourier_orders=None,
     forced_photometry=False,
     forced_profile_filter=None,
@@ -111,6 +110,7 @@ def run_autoprof(
     If forced_photometry=True, the reference profile in forced_profile_path is used,
     and the pipeline steps are adjusted accordingly.
     """
+    logger = logging.getLogger(__name__)
     os.makedirs(out_dir, exist_ok=True)
     config_file = os.path.join(out_dir, config_name)
 
@@ -145,6 +145,7 @@ def run_autoprof(
             "isophoteextract",
             "writeprof",
         ]
+    # FIXME: Should background be removed from pipeline steps?
 
     if mask_files is not None:
         pipeline_steps.insert(0, "mask segmentation map")
@@ -190,32 +191,30 @@ ap_initial_ellipticity = 0.3
         f.write(f"ap_new_pipeline_steps = {pipeline_steps}\n")
 
     # Run AutoProf
-    os.chdir(out_dir)
+    log_file = Path(out_dir) / "AutoProf.log"
+    env = os.environ.copy()
     try:
-        import sys
+        del env["MPLBACKEND"]
+    except KeyError:
+        pass
+    with open(log_file, "w") as log:
+        process = subprocess.run(
+            ["autoprof", config_name],
+            cwd=out_dir,
+            stderr=subprocess.STDOUT,
+            stdout=log,
+            text=True,
+            # shell=True,
+            env=env,
+        )
 
-        if config_name.replace(".py", "") in sys.modules:
-            del sys.modules[config_name.replace(".py", "")]
+    if process.returncode == 0:
+        logger.info(f"AutoProf completed successfully for {ids}!")
+    else:
+        logger.error(f"AutoProf failed for {ids}.")
+        raise RuntimeError(f"AutoProf failed, see {log_file} for details.")
 
-        PIPELINE = Pipeline.Isophote_Pipeline(loggername=log_path)
-        PIPELINE.Process_ConfigFile(config_name.replace(".py", ""))
-
-        print(f"AutoProf completed successfully for {ids}!")
-
-    except Exception as e:
-        print(f"AutoProf failed for {ids}. Logging error...")
-
-        error_log_file = Path(out_dir) / f"autoprof_error_{ids[0]}.log"
-        with open(error_log_file, "w") as log:
-            log.write(f"AutoProf failed for {ids}\n")
-            log.write(f"Error type: {type(e).__name__}\n")
-            log.write(f"Error message: {str(e)}\n")
-            log.write("Full traceback:\n")
-            log.write(traceback.format_exc())
-
-        print(f"Error log saved to: {error_log_file}")
-
-# %% ../nbs/14_autoprof.ipynb 6
+# %% ../nbs/14_autoprof.ipynb 5
 def Extract_SB_using_AP_shapes(
     image_path,
     object_mask_path=None,
@@ -239,6 +238,7 @@ def Extract_SB_using_AP_shapes(
     Compute flux statistics for elliptical or circular annuli centred either at bcg_pos (SkyCoord)
     or at image centre if bcg_pos is not given.
     """
+    logger = logging.getLogger(__name__)
     profile = pd.read_csv(profile_path, skiprows=1)
 
     ccd = CCDData.read(image_path, unit="adu")
@@ -307,7 +307,7 @@ def Extract_SB_using_AP_shapes(
     else:
         AP_background_level = 0
 
-    print(
+    logger.debug(
         f"The background level to add in isophote measurements will be: {AP_background_level}"
     )
 
