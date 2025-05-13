@@ -330,27 +330,14 @@ def bkg_match_corr(
                                     axis=(-2, -1),
                                     weights=1 / diff_img_rms_blocks**2,
                                 )
-                                coeff0_blocks = np.ones_like(diff_img_blocks)
-                                coeff0_reduced = np.average(
-                                    coeff0_blocks,
-                                    axis=(-2, -1),
-                                    weights=1 / diff_img_rms_blocks**2,
-                                )
-                                # check if there are eqs/blocks with no valid pixels
-                                if np.sum(coeff0_reduced.ravel() == 0) > 0:
-                                    raise Exception(
-                                        "coeff0_reduced still has zero values, this should not happen"
-                                    )
                                 coeff_array = np.zeros(
                                     (
-                                        coeff0_reduced.size,
+                                        diff_img_reduced_blocks.size,
                                         n_unknowns_per_img * len(solution_map),
                                     )
                                 )
-                                coeff_array[:, idx_solution] = coeff0_reduced.ravel()
-                                coeff_array[
-                                    :, idx_other_solution
-                                ] = -coeff0_reduced.ravel()
+                                coeff_array[:, idx_solution] = 1
+                                coeff_array[:, idx_other_solution] = -1
                                 offset = diff_img_reduced_blocks.ravel()
                                 rms = diff_img_rms_reduced_blocks.ravel()
                                 # weight the eqs by the inverse of the rms
