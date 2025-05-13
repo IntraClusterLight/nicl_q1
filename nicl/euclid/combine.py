@@ -29,6 +29,7 @@ from nicl.euclid.constants import (
     SWARP_CONFIG_VIS,
     VIS,
 )
+from nicl.euclid.continuity import bkg_match_corr
 from nicl.euclid.data_access import DataAccess
 from nicl.euclid.skyflat import apply_skyflat, read_skyflat
 from nicl.euclid.utilities import (
@@ -456,8 +457,14 @@ class DithersMixin:
         return True
 
     def _prepare_resampled_for_stack(self, tmpdir):
-        """Background subtraction and/or matching before stacking."""
+        """Background matching and/or subtraction before stacking."""
         resamp_sci_images = list(tmpdir.glob("*resamp.fits"))
+        if self.bkg_match:
+            start_time = datetime.now()
+            bkg_match_corr(resamp_sci_images)
+            end_time = datetime.now()
+            elapsed_mins = (end_time - start_time).total_seconds() / 60
+            print(f"Background matching took {elapsed_mins:.1f} mins.")
         # subtract background if requested
         if self.bkg_sub:
             start_time = datetime.now()
@@ -508,8 +515,6 @@ class DithersMixin:
             end_time = datetime.now()
             elapsed_mins = (end_time - start_time).total_seconds() / 60
             print(f"Background subtraction took {elapsed_mins:.1f} mins.")
-        if self.bkg_match:
-            raise NotImplementedError("Background matching is not implemented yet.")
         with open(tmpdir / "resamp_images.list", "w") as f:
             for fn in resamp_sci_images:
                 f.write(f"{fn}\n")
