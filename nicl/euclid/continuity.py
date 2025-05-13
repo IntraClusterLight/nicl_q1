@@ -162,6 +162,7 @@ def bkg_match_corr(
             n_unknowns_per_img = 3
         case 2:
             n_unknowns_per_img = 5
+    logger.info("Start building equations...")
     for i, path in enumerate(paths[:-1]):
         obs_id, dither_id = ids[i]
         # find out all images that belong to the other exposures and overlap with the current one
@@ -234,7 +235,9 @@ def bkg_match_corr(
                                 return_threshold=False,
                             )
                             # append the mask to the HDU list
-                            hdul.append(fits.ImageHDU(obj_mask, name="mask"))
+                            hdul.append(
+                                fits.ImageHDU(obj_mask.astype(np.uint8), name="mask")
+                            )
                         else:
                             logger.debug(f"Object mask for {path.name} already built.")
                             obj_mask = hdul["mask"].data.astype(bool)
@@ -253,7 +256,9 @@ def bkg_match_corr(
                             )
                             # append the mask to the HDU list
                             other_hdul.append(
-                                fits.ImageHDU(other_obj_mask, name="mask")
+                                fits.ImageHDU(
+                                    other_obj_mask.astype(np.uint8), name="mask"
+                                )
                             )
                         else:
                             logger.debug(
@@ -390,7 +395,7 @@ def bkg_match_corr(
     n_imgs_in_eqs = len(solution_map)
     n_imgs = len(paths)
     if n_imgs > n_imgs_in_eqs:
-        logger.debug("Some images have no significant overlap with others.")
+        logger.warning("Some images have no useful overlap with others.")
     # padd zeros to coeff_array to match the longest one
     max_len = max([coeff.shape[1] for coeff in a])
     for i in range(len(a)):
@@ -405,6 +410,7 @@ def bkg_match_corr(
     # stack all offset
     b = np.hstack(b, dtype=np.float32)
     # solve the system of equations
+    logger.info("Obtain least-squares solution for the equations.")
     num_solutions = a.shape[1]
     logger.debug(f"number of equations: {len(a)}")
     logger.debug(f"number of unknowns: {num_solutions}")
@@ -415,7 +421,18 @@ def bkg_match_corr(
     logger.debug(f"rank: {rank}, reduced chi^2: {chi2_reduced:.2f}")
     logger.debug(f"solutions map: {solution_map}")
     logger.debug(f"solutions: {solutions}")
+    # remove the mask extension from the images
+    logger.info("Removing the mask extension from the images...")
+    for path in paths:
+        with fits.open(path) as hdul:
+            if "mask" in hdul:
+                hdul.pop("mask")
+                hdul.writeto(path, overwrite=True)
+                logger.debug(f"Removed the mask extension from {path.name}.")
+            else:
+                logger.debug(f"No mask extension found in {path.name}.")
     # apply the solutions to the images
+    logger.info("Applying the corrections to the images...")
     for idx_sol, idx in enumerate(solution_map):
         path = paths[idx]
         solution = solutions[
