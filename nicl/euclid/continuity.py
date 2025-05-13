@@ -196,8 +196,6 @@ def bkg_match_corr(
                             hdul[0].header["FLXSCALE"] = 1.0
                             hdul_weight[0].data = hdul_weight[0].data / flxscale**2
                             hdul_weight[0].header["FLXSCALE"] = 1.0
-                            hdul.flush()
-                            hdul_weight.flush()
                         # apply flux scaling to the other image
                         other_sci_hdr = other_hdul[0].header
                         other_flxscale = other_sci_hdr.get("FLXSCALE", 1.0)
@@ -208,9 +206,6 @@ def bkg_match_corr(
                                 other_hdul_weight[0].data / other_flxscale**2
                             )
                             other_hdul_weight[0].header["FLXSCALE"] = 1.0
-                            other_hdul.flush()
-                            other_hdul_weight.flush()
-                        diff_img = other_hdul[0].data[slice2] - hdul[0].data[slice1]
                         with np.errstate(divide="ignore"):
                             diff_img_rms = np.sqrt(
                                 1 / hdul_weight[0].data[slice1]
@@ -223,29 +218,56 @@ def bkg_match_corr(
                                 "No valid pixels in the overlapping region, skipping."
                             )
                             continue
-                        # set source pixels to rms Inf
-                        coverage_mask = (hdul[0].data == 0) & (hdul_weight[0].data == 0)
-                        other_coverage_mask = (other_hdul[0].data == 0) & (
-                            other_hdul_weight[0].data == 0
-                        )
-                        obj_mask = fast_mask(
-                            hdul[0].data,
-                            coverage_mask=coverage_mask,
-                            estimate_background=True,
-                            return_threshold=False,
-                        )
-                        other_obj_mask = fast_mask(
-                            other_hdul[0].data,
-                            coverage_mask=other_coverage_mask,
-                            estimate_background=True,
-                            return_threshold=False,
-                        )
+                        diff_img = other_hdul[0].data[slice2] - hdul[0].data[slice1]
+                        # mask source pixels
+                        if "mask" not in hdul:
+                            logger.debug(
+                                f"Object mask not found, building one for {path.name}..."
+                            )
+                            coverage_mask = (hdul[0].data == 0) & (
+                                hdul_weight[0].data == 0
+                            )
+                            obj_mask = fast_mask(
+                                hdul[0].data,
+                                coverage_mask=coverage_mask,
+                                estimate_background=True,
+                                return_threshold=False,
+                            )
+                            # append the mask to the HDU list
+                            hdul.append(fits.ImageHDU(obj_mask, name="mask"))
+                        else:
+                            logger.debug(f"Object mask for {path.name} already built.")
+                            obj_mask = hdul["mask"].data.astype(bool)
+                        if "mask" not in other_hdul:
+                            logger.debug(
+                                f"Object mask not found, building one for {other_path.name}..."
+                            )
+                            other_coverage_mask = (other_hdul[0].data == 0) & (
+                                other_hdul_weight[0].data == 0
+                            )
+                            other_obj_mask = fast_mask(
+                                other_hdul[0].data,
+                                coverage_mask=other_coverage_mask,
+                                estimate_background=True,
+                                return_threshold=False,
+                            )
+                            # append the mask to the HDU list
+                            other_hdul.append(
+                                fits.ImageHDU(other_obj_mask, name="mask")
+                            )
+                        else:
+                            logger.debug(
+                                f"Object mask for {other_path.name} already built."
+                            )
+                            other_obj_mask = other_hdul["mask"].data.astype(bool)
+                        # set source pixels to rms Inf (weight=0)
                         idx_source_combined = obj_mask[slice1] | other_obj_mask[slice2]
                         diff_img_rms[idx_source_combined] = np.inf
+                        # check again if there are still any useful pixels
                         npix_valid = np.sum(np.isfinite(diff_img_rms))
                         if npix_valid == 0:
                             logger.debug(
-                                "No valid pixels in the overlapping region after masking sources, skipping."
+                                "No useful pixels in the overlapping region after masking sources, skipping."
                             )
                             continue
                         # set up solution map
