@@ -163,6 +163,7 @@ def bkg_match_corr(
         case 2:
             n_unknowns_per_img = 5
     logger.info("Start building equations...")
+    n_overlap_pairs = 0
     for i, path in enumerate(paths[:-1]):
         obs_id, dither_id = ids[i]
         # find out all images that belong to the other exposures and overlap with the current one
@@ -178,6 +179,7 @@ def bkg_match_corr(
                 slice1, slice2 = get_overlap_slices(hdr, other_hdr)
                 # if they do overlap
                 if slice1 is not None and slice2 is not None:
+                    other_paths.append(other_path)
                     with (
                         fits.open(path, mode="update") as hdul,
                         fits.open(
@@ -381,7 +383,6 @@ def bkg_match_corr(
                         logger.debug(
                             f"Formed {len(offset)} equations from {path.name} vs. {other_path.name}"
                         )
-                        other_paths.append(other_path)
                         a.append(coeff_array)
                         b.append(offset)
                 else:
@@ -389,13 +390,14 @@ def bkg_match_corr(
                         f"{path.name} and {other_path.name} do not overlap, skipping."
                     )
 
-        logger.debug(
-            f"Found {len(other_paths)} overlapping images for {path.name}: {[other.name for other in other_paths]}"
-        )
+        n_overlap_pairs += len(other_paths)
+    logger.debug(
+        f"Number of overlapping pairs: {n_overlap_pairs} out of {len(paths)} images."
+    )
     n_imgs_in_eqs = len(solution_map)
     n_imgs = len(paths)
     if n_imgs > n_imgs_in_eqs:
-        logger.warning("Some images have no useful overlap with others.")
+        logger.warning("Some images have no useful overlap with any others.")
     # padd zeros to coeff_array to match the longest one
     max_len = max([coeff.shape[1] for coeff in a])
     for i in range(len(a)):
@@ -410,11 +412,19 @@ def bkg_match_corr(
     # stack all offset
     b = np.hstack(b, dtype=np.float32)
     # solve the system of equations
-    logger.info("Obtain least-squares solution for the equations.")
+    logger.info("Obtaining least-square solutions to the equations...")
     num_solutions = a.shape[1]
     logger.debug(f"number of equations: {len(a)}")
     logger.debug(f"number of unknowns: {num_solutions}")
     solutions, chi2, rank, _ = lstsq(a, b, rcond=None)
+    if rank < num_solutions - 1:
+        logger.warning(
+            f"Rank deficiency more than 1: {rank=} < {num_solutions-1=}, which suggests that at least one group of images do not overlap with any other groups."
+        )
+    elif rank == num_solutions:
+        logger.warning(
+            f"{rank=} == {num_solutions=} by construction should never happen."
+        )
     if rank < num_solutions or len(a) < num_solutions:
         chi2 = np.sum((b - a @ solutions) ** 2)
     chi2_reduced = chi2 / (len(b) - num_solutions)
