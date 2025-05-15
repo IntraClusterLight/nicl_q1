@@ -4,10 +4,11 @@
 
 # %% auto 0
 __all__ = ['TEST_IMAGES_OUTPATH', 'CLUSTER_REDSHIFT', 'PIXEL_SCALE', 'BACKGROUND_RMS_LEVEL', 'BACKGROUND_SCALE', 'SKY_PATCH_SIZE',
-           'SKY_PATCH_RA', 'SKY_PATCH_DEC', 'SKY_PATCH_SIZE_PIXELS', 'SKY_PATCH_SHAPE', 'get_bcg_icl_mags',
-           'create_test_images', 'create_basic_cluster_test_images', 'create_basic_sky_test_images',
-           'create_varying_background_cluster_test_images', 'create_varying_background_sky_test_images',
-           'create_sky_patch', 'create_real_background_cluster_test_images']
+           'SKY_PATCH_RA', 'SKY_PATCH_DEC', 'SKY_PATCH_SIZE_PIXELS', 'SKY_PATCH_SHAPE', 'TEMPLATE_IMAGE_PATH',
+           'get_bcg_icl_mags', 'create_test_images', 'create_basic_cluster_test_images', 'create_basic_sky_test_images',
+           'create_basic_cluster_test_images_with_offset', 'create_varying_background_cluster_test_images',
+           'create_varying_background_sky_test_images', 'create_sky_patch',
+           'create_real_background_cluster_test_images']
 
 # %% ../../nbs/euclid/testing.ipynb 3
 from functools import partial
@@ -37,12 +38,18 @@ SKY_PATCH_DEC = -50.1 * u.deg
 SKY_PATCH_SIZE_PIXELS = (SKY_PATCH_SIZE / PIXEL_SCALE).to_value(u.pix).astype(int)
 SKY_PATCH_SHAPE = (SKY_PATCH_SIZE_PIXELS, SKY_PATCH_SIZE_PIXELS)
 
+# This images needs to already exist. It is used as a template (header and shape) for the test images.
+TEMPLATE_IMAGE_PATH = default_data_path("Q1_R1_clusters_v0.7", "tutku")
+TEMPLATE_IMAGE_PATH /= "EUC_NIR_W-STK_Y-1eRASS J035423.6-475145.fits"
+
 # %% ../../nbs/euclid/testing.ipynb 6
-def get_bcg_icl_mags(z=0.1):
-    bcg_I_absmag = -25.0
-    icl_I_absmag = -25.5
-    bcg_zf = 3.0
-    icl_zf = 1.0
+def get_bcg_icl_mags(
+    z=0.1,
+    bcg_I_absmag=-25.0,
+    icl_I_absmag=-25.5,
+    bcg_zf=3.0,
+    icl_zf=1.0,
+):
     model = ezgal.model("bc03_ssp_z_0.02_chab.model")
     model.set_cosmology(Om=0.3, Ol=0.7, h=0.70, w=-1)
     distmod = model.get_distance_moduli(z, 1)
@@ -75,9 +82,23 @@ def create_test_images(
     background_scale=None,
     background_filenames=None,
     background_seed=0,
+    bcg_n=4.6,
+    bcg_re=22.6,
+    bcg_q=0.6,
+    bcg_theta=30,
+    icl_n=0.76,
+    icl_re=189.5,
+    icl_q=0.6,
+    icl_theta=60,
+    icl_offset=(0, 0),  # offset in pixels (dx, dy)
+    bcg_I_absmag=-24.5,
+    icl_I_absmag=-24.5,
+    bcg_zf=3.0,
+    icl_zf=1.0,
+    template_image_path=TEMPLATE_IMAGE_PATH,
+    name=None,
 ):
-    path = default_data_path("Q1_R1_clusters_test", "MCXCJ1754.6+6803")
-    hdul = fits.open(path / "EUC_NIR_W-STK_H-MCXCJ1754.6+6803.fits")
+    hdul = fits.open(template_image_path)
     if shape is None:
         shape = hdul["SCI"].shape
     else:
@@ -89,22 +110,18 @@ def create_test_images(
     pixscale = 0.3 * u.arcsec / u.pix
 
     if cluster_redshift:
-        bcg_appmags, icl_appmags = get_bcg_icl_mags(cluster_redshift)
+        bcg_appmags, icl_appmags = get_bcg_icl_mags(
+            cluster_redshift, bcg_I_absmag, icl_I_absmag, bcg_zf, icl_zf
+        )
         bcg_re = (
-            physical_to_angular(22.6 * u.kpc, cluster_redshift) / pixscale
+            physical_to_angular(bcg_re * u.kpc, cluster_redshift) / pixscale
         ).to_value(u.pix)
-        bcg_n = 4.6
-        bcg_q = 0.6
-        bcg_theta = 30
         bcg = galsim.Sersic(n=bcg_n, half_light_radius=bcg_re, flux=1)
         bcg_shape = galsim.Shear(q=bcg_q, beta=bcg_theta * galsim.degrees)
         bcg = bcg.shear(bcg_shape)
         icl_re = (
-            physical_to_angular(189.5 * u.kpc, cluster_redshift) / pixscale
+            physical_to_angular(icl_re * u.kpc, cluster_redshift) / pixscale
         ).to_value(u.pix)
-        icl_n = 0.76
-        icl_q = 0.6
-        icl_theta = 60
         icl = galsim.Sersic(n=icl_n, half_light_radius=icl_re, flux=1)
         icl_shape = galsim.Shear(q=icl_q, beta=icl_theta * galsim.degrees)
         icl = icl.shear(icl_shape)
@@ -112,10 +129,13 @@ def create_test_images(
         print(f"icl_appmags: {icl_appmags}")
         print(f"bcg_re: {bcg_re:.2f} pixels")
         print(f"icl_re: {icl_re:.2f} pixels")
+        print(f"icl_offset: {icl_offset}")
 
     outpath.mkdir(parents=True, exist_ok=True)
     image = galsim.ImageF(*shape)
     label = "cluster" if cluster_redshift else "sky"
+    if name is not None:
+        label = f"{label}_{name}"
 
     for band in ["H", "J", "Y", "VIS"]:
         hdul["RMS"].data[:] = rms[band]
@@ -125,8 +145,12 @@ def create_test_images(
             print(f"{band} bcg_flux: {bcg_flux:.2f}")
             print(f"{band} icl_flux: {icl_flux:.2f}")
             print(f"{band} bcg_flux + icl_flux: {bcg_flux + icl_flux:.2f}")
-            cluster = bcg * bcg_flux + icl * icl_flux
-            cluster.drawImage(image, method="no_pixel")
+            bcg = bcg.withFlux(bcg_flux)
+            icl = icl.withFlux(icl_flux)
+            bcg.drawImage(image, method="no_pixel", add_to_image=True)
+            icl.drawImage(
+                image, method="no_pixel", add_to_image=True, offset=icl_offset
+            )
             hdul["SCI"].data[:] = image.array
             hdul.writeto(outpath / f"{label}_{band}_no_noise.fits", overwrite=True)
             source_noise = np.random.normal(
@@ -174,6 +198,19 @@ def create_basic_sky_test_images():
     create_test_images(outpath, cluster_redshift=None, shape=SKY_PATCH_SHAPE)
 
 # %% ../../nbs/euclid/testing.ipynb 12
+def create_basic_cluster_test_images_with_offset(
+    icl_offset=(50, 100), icl_n=3.0, icl_re=25.0
+):
+    outpath = default_data_path(TEST_IMAGES_OUTPATH) / "basic_test_offset"
+    create_test_images(
+        outpath,
+        cluster_redshift=CLUSTER_REDSHIFT,
+        icl_offset=icl_offset,
+        icl_n=icl_n,
+        icl_re=icl_re,
+    )
+
+# %% ../../nbs/euclid/testing.ipynb 15
 def create_varying_background_cluster_test_images():
     outpath = default_data_path(TEST_IMAGES_OUTPATH) / "varying_background"
     create_test_images(
@@ -194,7 +231,7 @@ def create_varying_background_sky_test_images():
         background_scale=BACKGROUND_SCALE,
     )
 
-# %% ../../nbs/euclid/testing.ipynb 16
+# %% ../../nbs/euclid/testing.ipynb 19
 def create_sky_patch(outpath, ra, dec, size):
     inpath = default_data_path("Q1_R1")
 
@@ -223,7 +260,7 @@ def create_sky_patch(outpath, ra, dec, size):
         bkg_sub=False,
     )
 
-# %% ../../nbs/euclid/testing.ipynb 18
+# %% ../../nbs/euclid/testing.ipynb 21
 def create_real_background_cluster_test_images(background_filenames):
     outpath = default_data_path(TEST_IMAGES_OUTPATH) / "real_background"
     create_test_images(

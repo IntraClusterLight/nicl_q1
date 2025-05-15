@@ -154,4 +154,4 @@ checklink/cookies.txt
 *.pptx
 
 # script output
-scripts/*.out
+scripts/**/*.out

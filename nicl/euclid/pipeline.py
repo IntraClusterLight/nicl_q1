@@ -5,7 +5,8 @@
 # %% auto 0
 __all__ = ['RELEASE_NAME', 'ESAC_SERVER_URL', 'PROCESSING_VERSION', 'SKYFLAT_N_PIX_NIR', 'SKYFLAT_FILTER_SIZE_NIR',
            'SKYFLAT_N_PIX_VIS', 'SKYFLAT_FILTER_SIZE_VIS', 'SKYFLAT_HALF_WINDOW_NIR', 'SKYFLAT_HALF_WINDOW_VIS',
-           'MAX_WORKERS', 'NIR_FILTERS', 'FILTERS', 'possibly_concurrent', 'get_required_obs_ids', 'Pipeline']
+           'PIXEL_SCALE', 'MAX_WORKERS', 'NIR_FILTERS', 'FILTERS', 'possibly_concurrent', 'get_required_obs_ids',
+           'Pipeline']
 
 # %% ../../nbs/euclid/pipeline.ipynb 2
 import concurrent.futures
@@ -41,6 +42,7 @@ SKYFLAT_FILTER_SIZE_VIS = None
 SKYFLAT_HALF_WINDOW_NIR = 3
 SKYFLAT_HALF_WINDOW_VIS = 5
 
+PIXEL_SCALE = 0.3
 MAX_WORKERS = 8
 NIR_FILTERS = ["H", "J", "Y"]
 FILTERS = NIR_FILTERS + ["I"]
@@ -127,10 +129,13 @@ class Pipeline:
         skyflat_filter_size_vis=SKYFLAT_FILTER_SIZE_VIS,
         skyflat_half_window_nir=SKYFLAT_HALF_WINDOW_NIR,
         skyflat_half_window_vis=SKYFLAT_HALF_WINDOW_VIS,
+        pixel_scale=PIXEL_SCALE,
         max_workers=MAX_WORKERS,
         filters=FILTERS,
     ):
-        self.target_obs_ids = target_obs_ids
+        self.target_obs_ids = list(
+            dict.fromkeys(target_obs_ids)
+        )  # remove duplicates, preserving order
         self.release_name = release_name
         self.esac_server_url = esac_server_url
         self.processing_version = processing_version
@@ -140,6 +145,7 @@ class Pipeline:
         self.skyflat_filter_size_vis = skyflat_filter_size_vis
         self.skyflat_half_window_nir = skyflat_half_window_nir
         self.skyflat_half_window_vis = skyflat_half_window_vis
+        self.pixel_scale = pixel_scale
         self.filters = filters
         self.executor = None
         if max_workers > 1:
@@ -157,6 +163,11 @@ class Pipeline:
     def __del__(self):
         pass
 
+    def _create_data_access(self):
+        return DataAccess(
+            esac_server_url=self.esac_server_url, release_name=self.release_name
+        )
+
     def get_nir_data(self):
         """Download NIR data files."""
         self.logger.info("=== Downloading NIR Data ===")
@@ -164,7 +175,7 @@ class Pipeline:
         outpath = default_data_path(self.release_name)
         self.logger.info(f"Saving data to {outpath}")
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         nir_obs_ids = get_required_obs_ids(
@@ -186,7 +197,7 @@ class Pipeline:
         outpath = default_data_path(self.release_name)
         self.logger.info(f"Saving data to {outpath}")
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         vis_obs_ids = get_required_obs_ids(
@@ -263,7 +274,7 @@ class Pipeline:
             instrument,
         )
 
-        da = DataAccess(esac_server_url=self.esac_server_url, release_name=None)
+        da = self._create_data_access()
         available_obs_ids = da.find_all_observations()
 
         if instrument == "VIS":
@@ -279,9 +290,13 @@ class Pipeline:
 
         # Create zarr references and coarse data for all required observations
         obs_ids = get_required_obs_ids(self.target_obs_ids, available_obs_ids, hw)
-        self.logger.info(f"Creating zarr refs for {len(obs_ids)} {instrument} observations")
+        self.logger.info(
+            f"Creating zarr refs for {len(obs_ids)} {instrument} observations"
+        )
         self.create_zarr_refs(obs_ids, instrument)
-        self.logger.info(f"Creating coarse data for {len(obs_ids)} {instrument} observations")
+        self.logger.info(
+            f"Creating coarse data for {len(obs_ids)} {instrument} observations"
+        )
         self.create_coarse_data(obs_ids, instrument)
 
         ds, wcs, _ = read_all_zarr_refs(zarr_path, obs_id_glob="*")
@@ -322,7 +337,9 @@ class Pipeline:
         self.logger.info(f"Processing {obs_id}...")
         outpath = processed_path / f"persistence/NIR/{obs_id}/"
         skyflat_path = processed_path / "skyflat/NIR/"
-        correct_persistence(obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs)
+        correct_persistence(
+            obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs
+        )
         self.logger.info(f"Completed {obs_id}...")
 
     def do_persistence_correction(self, **kwargs):
@@ -343,7 +360,9 @@ class Pipeline:
             executor=self.executor,
         )
 
-    def _try_combine(self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True):
+    def _try_combine(
+        self, obs_id, in_dir, out_dir_parent, vis_skyflat_dir, filters, bkg_sub=True
+    ):
         """Create stacks for obs_id if the output foler does not already exist."""
         out_dir = out_dir_parent / f"{obs_id}"
         if out_dir.exists():
@@ -351,7 +370,7 @@ class Pipeline:
         else:
             self.logger.info(f"Creating stacks for obs_id: {obs_id}")
             try:
-                combine(
+                kwargs = dict(
                     in_dir=in_dir,
                     out_dir=out_dir,
                     obs_ids=obs_id,
@@ -360,6 +379,9 @@ class Pipeline:
                     autodark_corr=True,
                     autodark_dir=vis_skyflat_dir,
                 )
+                if self.pixel_scale is not None:
+                    kwargs["pixel_scale"] = self.pixel_scale
+                combine(**kwargs)
             except Exception as e:
                 self.logger.error(f"Error combining {obs_id}: {e}")
                 raise
@@ -440,6 +462,7 @@ class Pipeline:
         possibly_concurrent(
             self._try_background_stats,
             obs_ids_and_filters,
+            zp_mag="ZPAB",
             path=path,
             overwrite=overwrite,
             executor=self.executor,

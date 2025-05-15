@@ -16,6 +16,7 @@ import numpy as np
 from astropy import table
 from astropy.io import fits
 from astropy.nddata import block_reduce
+from astropy.wcs import WCS
 from matplotlib import patheffects as pe
 from matplotlib.ticker import FuncFormatter, NullLocator
 from photutils.aperture import (
@@ -31,6 +32,10 @@ from tqdm import tqdm
 
 from ..mask import fast_mask
 from ..utilities import adu_to_sb
+from ..utilities import get_pixel_scale
+
+# %% ../../nbs/euclid/background_stats.ipynb 4
+plt.style.use("nicl.euclid.v1nicl")
 
 # %% ../../nbs/euclid/background_stats.ipynb 5
 def measure_aperture_stats(
@@ -176,11 +181,13 @@ def stats_versus_size(
     n_steps=20,
     rms=None,
     verbose=False,
+    progress=False,
 ):
     sqrt_n_pix_list = np.logspace(0, np.log10(max_sqrt_n_pix), n_steps)
     sqrt_n_pix_list = np.unique(sqrt_n_pix_list.astype(int))
     results = []
-    for sqrt_n_pix in tqdm(sqrt_n_pix_list):
+    pbar = tqdm(sqrt_n_pix_list) if progress else sqrt_n_pix_list
+    for sqrt_n_pix in pbar:
         results.append(
             aperture_stats(
                 data,
@@ -428,6 +435,12 @@ def measure(
                 out_fn_stem = f"{fn.stem}_{ext}"
             else:
                 out_fn_stem = f"{fn.stem}"
+            if isinstance(zp_mag, str):
+                hdr = hdul[ext].header
+                zp_mag = hdr[zp_mag]
+                wcs = WCS(hdr)
+                pixel_scale = get_pixel_scale(wcs=wcs)
+                zp_mag += 2.5 * np.log10(pixel_scale.to_value("arcsec") ** 2)
             data = hdul[ext].data
             rms = hdul[ext.replace("SCI", "RMS")].data
             data_mask = (rms > 1e6) | np.isnan(rms) | np.isnan(data)
