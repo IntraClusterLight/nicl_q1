@@ -31,7 +31,6 @@ def calc_kcorr(z, filter):
     To convert the conventional B-band surface brightness limit to the observed band we
     use [ezgal](https://github.com/cmancone/easyGalaxy). As ezgal does not work correctly
     when installed via pip, and needs some data files and tweaks, we include a copy with nicl.
-
     """
     model = ezgal.model("bc03_ssp_z_0.02_chab.model")
     model.set_cosmology(Om=0.3, Ol=0.7, h=0.70, w=-1)
@@ -303,7 +302,7 @@ def create_sky_rectangle(center, width, height, angle=0 * u.deg):
     return SphericalPolygon.from_radec(ras, decs, center=(ra0, dec0), degrees=False)
 
 
-def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
+def does_image_overlap_with_skyregion(hdr, sky_reg):
     """Check if an image overlaps with a sky region.
 
     Parameters
@@ -341,30 +340,31 @@ def does_image_overlap_with_skyregion(hdr, sky_reg, threshold=0.0):
     if not isinstance(sky_reg, SphericalPolygon):
         raise ValueError("sky_reg must be a SphericalPolygon object.")
 
-    sky_reg_from_img = SphericalPolygon.from_wcs(hdr)
-    if not sky_reg.intersects_poly(sky_reg_from_img):
-        return False
-    overlap = sky_reg.intersection(sky_reg_from_img)
-    area_overlap = overlap.area()
-    area_sky_reg = sky_reg.area()
-    area_img = sky_reg_from_img.area()
-    frac1 = area_overlap / area_img
-    frac2 = area_overlap / area_sky_reg
-    return frac1 > threshold or frac2 > threshold
+    sky_reg_from_img = SphericalPolygon.from_wcs(hdr, steps=2)
+    return sky_reg.intersects_poly(sky_reg_from_img)
+
 
 def compute_pixel_scales(hdr, accuracy=1e-4, initial_grid_step=None):
-    """
-    Compute local pixel scales for each pixel in a FITS image using interpolation for speed.
+    """Compute effective pixel-scale map from FITS WCS.
 
-    Parameters:
-      hdr : FITS header (with valid WCS)
-      accuracy : Required accuracy as a fraction of the local pixel scale (default: 1e-4)
-      initial_grid_step : Initial grid spacing for interpolation
-                          (default: half the image size)
+    Compute the geometric mean of the local x- and y-direction pixel scales
+    (in arcsec/pixel) at each image pixel by interpolating scales on a sparse grid
+    until the specified fractional accuracy is reached.
 
-    Returns:
-      pixel_scale_eff : 2D array of effective pixel scale (geometric mean of
-                        pixel scales on both dimension in arcsec/pix)
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header or dict-like
+        FITS header with valid 2D WCS (NAXIS1, NAXIS2).
+    accuracy : float, optional
+        Target fractional accuracy for pixel-scale interpolation (default=1e-4).
+    initial_grid_step : int, optional
+        Initial grid spacing for scale computation; default is half the smaller image dimension.
+
+    Returns
+    -------
+    numpy.ndarray
+        2D array of effective pixel scales (arcsec per pixel) for the full image.
+
     """
     wcs = WCS(hdr)
     ny, nx = hdr["NAXIS2"], hdr["NAXIS1"]
@@ -510,14 +510,12 @@ def compute_pixel_scales(hdr, accuracy=1e-4, initial_grid_step=None):
 def sigma_clip_stats(
     x, sigma=3, sigma_lower=None, sigma_upper=None, axis=None, maxiters=10, ngood_min=1
 ):
-    """
-    Calculate statistics on sigma-clipped data. Replacement for 
-    astropy.stats.sigma_clipped_stats.
-    
-    This function is a wrapper around astropy.stats.sigma_clip that performs
-    sigma clipping on the input data and returns common statistics calculated
-    on the clipped data.
-    
+    """Calculate statistics on sigma-clipped data.
+
+    Replacement for astropy.stats.sigma_clipped_stats. This function is a wrapper
+    around astropy.stats.sigma_clip that performs sigma clipping on the input data and
+    returns common statistics calculated on the clipped data.
+
     Parameters
     ----------
     x : array-like
@@ -539,7 +537,7 @@ def sigma_clip_stats(
     ngood_min : int, optional
         The minimum number of good (non-clipped) data points required to return
         valid statistics. If fewer points remain, NaN values are returned. Default is 1.
-    
+
     Returns
     -------
     mean : float or ndarray
@@ -550,8 +548,8 @@ def sigma_clip_stats(
         The standard deviation of the sigma-clipped data.
     mean_err : float or ndarray
         The standard error of the mean (std/sqrt(n)) of the sigma-clipped data.
-    """
 
+    """
     clipped = sigma_clip(
         x,
         sigma=sigma,
@@ -578,6 +576,7 @@ def sigma_clip_stats(
     mean_err[idx] = np.nan
     return mean, median, std, mean_err
 
+
 def weighted_median(values, weights):
     sorter = np.argsort(values)
     values_sorted = values[sorter]
@@ -587,19 +586,37 @@ def weighted_median(values, weights):
     median_idx = np.searchsorted(cum_weights, midpoint)
     return values_sorted[median_idx]
 
+
 def bootstrap_median_error(data, errors, nboot=1000, axis=None):
-    """
-    Estimate the error of the median along a given axis using bootstrapping.
+    """Compute the bootstrap estimate of the median's standard error.
 
-    Parameters:
-        data (np.ndarray): Array of measured values.
-        errors (np.ndarray): Corresponding 1-sigma uncertainties (same shape as data).
-        nboot (int): Number of bootstrap iterations.
-        axis (int or None): Axis along which to compute the median.
-                            If None, the array is flattened.
+    Generates `nboot` synthetic datasets by sampling each element of `data` from a normal
+    distribution defined by the corresponding `errors`, computes the median over each
+    bootstrap realization along `axis`, and returns the standard deviation of those medians
+    as the uncertainty.
 
-    Returns:
-        np.ndarray or float: Estimated standard error of the median along the specified axis.
+    Parameters
+    ----------
+    data : array-like
+        Input values for median computation. Scalar or array.
+    errors : array-like
+        1-sigma uncertainties for each element in `data`; same shape as `data`.
+    nboot : int, optional
+        Number of bootstrap realizations (default=1000).
+    axis : int or None, optional
+        Axis along which to compute medians. If None, data is flattened (default).
+
+    Returns
+    -------
+    float or ndarray
+        Bootstrap-derived standard error of the median. Scalar if `axis` is None,
+        or array with `axis` dimension removed.
+
+    Notes
+    -----
+    - If the specified `axis` has length 1, the original `errors` value is returned.
+    - If `axis` is None and `data.size <= 1`, returns the single `errors` value.
+
     """
     data = np.asarray(data)
     errors = np.asarray(errors)
@@ -628,16 +645,29 @@ def bootstrap_median_error(data, errors, nboot=1000, axis=None):
 
 
 def fast_median_error(data, axis=None):
-    """
-    Estimate the error of the median along a given axis using an analytical approach.
+    """Compute analytical median error using a normal approximation.
 
-    Parameters:
-        data (np.ndarray): Array of measured values.
-        axis (int or None): Axis along which to compute the median.
-                            If None, the array is flattened.
+    The median error is estimated as 1.253 * MAD / sqrt(n), where MAD is
+    the median absolute deviation and n is the number of finite samples.
 
-    Returns:
-        np.ndarray or float: Estimated standard error of the median along the specified axis.
+    Parameters
+    ----------
+    data : array-like
+        Input values for median error estimation.
+    axis : int or None, optional
+        Axis along which to compute the median error. If None, data is flattened.
+
+    Returns
+    -------
+    float or ndarray
+        Estimated standard error of the median. Scalar if `axis` is None or the
+        selected axis has length 1, otherwise an array with that axis removed.
+
+    Raises
+    ------
+    ValueError
+        If the specified axis has length 1 or data size <= 1.
+
     """
     data = np.asarray(data)
 
@@ -654,6 +684,7 @@ def fast_median_error(data, axis=None):
 
     # Compute the standard error of the median using a normal approximation 1.253*sigma/sqrt(n)
     return (
-        1.253 * mad_std(data, axis=axis, ignore_nan=True) / np.sqrt(np.isfinite(data).sum(axis=axis))
+        1.253
+        * mad_std(data, axis=axis, ignore_nan=True)
+        / np.sqrt(np.isfinite(data).sum(axis=axis))
     )
-
