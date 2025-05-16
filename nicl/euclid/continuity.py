@@ -397,7 +397,10 @@ def bkg_match_corr(
     n_imgs_in_eqs = len(solution_map)
     n_imgs = len(paths)
     if n_imgs > n_imgs_in_eqs:
-        logger.warning("Some images have no useful overlap with any others.")
+        logger.warning("The following images have no overlap with others:")
+        for i in range(n_imgs):
+            if i not in solution_map:
+                logger.warning(f"{paths[i].name}")
     # padd zeros to coeff_array to match the longest one
     max_len = max([coeff.shape[1] for coeff in a])
     for i in range(len(a)):
