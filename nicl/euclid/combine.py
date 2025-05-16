@@ -178,6 +178,14 @@ class Combiner(ABC):
                 )
             else:
                 swarp_args.extend([f"-{key}", str(value)])
+        # specify pixel scale
+        if self.pixel_scale is not None:
+            swarp_args.extend(
+                [
+                    "-PIXEL_SCALE",
+                    f"{self.pixel_scale:.2f}",
+                ]
+            )
         # specify cutout center, cutout size will be inferred later depending on resampling or stacking
         if self.cutout_cen is not None:
             swarp_args.extend(
@@ -186,14 +194,6 @@ class Combiner(ABC):
                     f"{self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}",
                     "-CENTER_TYPE",
                     "MANUAL",
-                ]
-            )
-        # specify pixel scale
-        if self.pixel_scale is not None:
-            swarp_args.extend(
-                [
-                    "-PIXEL_SCALE",
-                    f"{self.pixel_scale:.2f}",
                 ]
             )
         return swarp_args
