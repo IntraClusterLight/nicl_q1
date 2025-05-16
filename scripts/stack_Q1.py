@@ -24,6 +24,7 @@ def combine_vis(ra, dec, name, out_dir):
         autodark_dir=default_data_path("Q1_R1_processed_v0.7", "skyflat", "VIS"),
         name=name,
         pixel_scale=0.3,
+        overwrite=True,
     )
 
 
@@ -39,6 +40,7 @@ def combine_nir(ra, dec, name, out_dir):
         cutout_cen=cutout_cen,
         cutout_size=cutout_size,
         name=name,
+        overwrite=True,
     )
 
 
