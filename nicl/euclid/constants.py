@@ -20,7 +20,8 @@ class Camera:
     chips: tuple[str, ...]
     filters: tuple[str, ...]
     pix_scale: float
-    gaps: tuple[float, float] = None  # X, Y gaps in arcsec; more than one value in one dimension repsents different gaps in rotation
+    # X, Y gaps in arcsec; more than one value in one dimension repsents different gaps in rotation
+    gaps: tuple[float, float] = None
     chip_subdivisions: tuple[str, ...] = None
     readout_unit_size: tuple[int, int] = None
     bad_pix_bits: tuple[int, ...] = None
@@ -233,7 +234,7 @@ NISP = Camera(
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.3,
     n_dithers_per_obs=4,
-    gaps=(50.6, (101.4, 86.1)),   # extracted from Table 1 of 2022A&A...662A.112E
+    gaps=(50.6, (101.4, 86.1)),  # extracted from Table 1 of 2022A&A...662A.112E
     chip_layout=np.array([[f"DET{y}{x}" for x in range(1, 5)] for y in range(1, 5)]),
     chip_rotations=np.array([[y > 2 for x in range(1, 5)] for y in range(1, 5)]),
     nominal_zeropoint=dict(H=29.94, J=30.03, Y=29.76),
@@ -271,19 +272,19 @@ WEIGHT_THRESH                          # Bad pixel weight-threshold
 #------------------------------- Co-addition ----------------------------------
  
 COMBINE                Y               # Combine resampled images (Y/N)?
-COMBINE_TYPE           WEIGHTED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
+COMBINE_TYPE           CLIPPED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
                                        # CHI-OLD,CHI-MODE,CHI-MEAN,SUM,
                                        # WEIGHTED_WEIGHT,MEDIAN_WEIGHT,
                                        # AND,NAND,OR or NOR
-#CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
+CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
                                        # with clipping
-#CLIP_SIGMA             4.0             # RMS error multiple variation allowed
+CLIP_SIGMA             4.0             # RMS error multiple variation allowed
                                        # with clipping
-#CLIP_WRITELOG          N               # Write output file with coordinates of
+CLIP_WRITELOG          N               # Write output file with coordinates of
                                        # clipped pixels (Y/N)
-#CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
+CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
                                        # of clipped pixels
-#BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
+BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
  
 #-------------------------------- Astrometry ----------------------------------
  
@@ -382,19 +383,19 @@ WEIGHT_THRESH                          # Bad pixel weight-threshold
 #------------------------------- Co-addition ----------------------------------
  
 COMBINE                Y               # Combine resampled images (Y/N)?
-COMBINE_TYPE           WEIGHTED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
+COMBINE_TYPE           CLIPPED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
                                        # CHI-OLD,CHI-MODE,CHI-MEAN,SUM,
                                        # WEIGHTED_WEIGHT,MEDIAN_WEIGHT,
                                        # AND,NAND,OR or NOR
-#CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
+CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
                                        # with clipping
-#CLIP_SIGMA             4.0             # RMS error multiple variation allowed
+CLIP_SIGMA             4.0             # RMS error multiple variation allowed
                                        # with clipping
-#CLIP_WRITELOG          N               # Write output file with coordinates of
+CLIP_WRITELOG          N               # Write output file with coordinates of
                                        # clipped pixels (Y/N)
-#CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
+CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
                                        # of clipped pixels
-#BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
+BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
  
 #-------------------------------- Astrometry ----------------------------------
  
