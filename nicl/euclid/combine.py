@@ -6,8 +6,6 @@
 __all__ = ['combine']
 
 # %% ../../nbs/euclid/combine.ipynb 2
-import getpass
-import socket
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -798,18 +796,8 @@ class VISCombiner(DithersMixin, Combiner):
             )
             return
         # the default temporary directory may not have enough space for VIS
-        # determine the parent directory for the temporary directory based on the host
-        hostname = socket.gethostname()
-        username = getpass.getuser()
-        match hostname:
-            case "odhar":
-                tmp_dir_parent = Path(f"/data/{username}")
-            case "captain":
-                tmp_dir_parent = Path("~").expanduser()
-            case _:
-                tmp_dir_parent = None
         with tempfile.TemporaryDirectory(
-            dir=tmp_dir_parent, delete=(not self.debug)
+            dir=Path("~").expanduser(), delete=(not self.debug)
         ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
