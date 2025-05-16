@@ -134,6 +134,8 @@ class Combiner(ABC):
                 self.filters = filters
         if pixel_scale is None:
             self.pixel_scale = self.instrument.pix_scale
+        else:
+            self.pixel_scale = pixel_scale
         # determine if multiple chips need to be combined first for bkg subtraction
         # override user input if the mesh size is larger than the chip/quad size
         self.multi_chip_bkg = multi_chip_bkg
