@@ -70,6 +70,7 @@ class Combiner(ABC):
         autodark_dir=None,  # directory to find autodarks for VIS dithers
         release_name=None,  # the data release to use to find obs_ids if required, e.g., 'Q1_R1', 'DR1'
         instrument=None,  # Euclid instrument,e.g., VIS or NISP in nicl.euclid.constants
+        pixel_scale=None,  # pixel scale in arcsec/pixel
         swarp_config=None,  # default SWarp configuration file content
         overwrite=False,  # overwrite existing combined image files
         debug=False,  # retain intermediate files for checking
@@ -79,6 +80,7 @@ class Combiner(ABC):
         self.out_dir = out_dir
         self.cutout_cen = cutout_cen
         self.cutout_size = cutout_size
+        self.cutout_size_broad = None
         self.bkg_mesh_size = bkg_mesh_size
         self.instrument = instrument
         self.swarp_config = swarp_config
@@ -130,6 +132,8 @@ class Combiner(ABC):
                     )
             else:
                 self.filters = filters
+        if pixel_scale is None:
+            self.pixel_scale = self.instrument.pix_scale
         # determine if multiple chips need to be combined first for bkg subtraction
         # override user input if the mesh size is larger than the chip/quad size
         self.multi_chip_bkg = multi_chip_bkg
@@ -167,27 +171,14 @@ class Combiner(ABC):
     def _parse_swarp_args(self, kwargs):
         kwargs = {k.upper(): v for k, v in kwargs.items()}
         swarp_args = []
-        # check if CENTER and IMAGE_SIZE are provided as extra arguments
-        # assemble the rest of the arguments
         for key, value in kwargs.items():
             if key in ["CENTER", "IMAGE_SIZE"]:
                 raise ValueError(
                     f"{key} should be supplied as arguments to {self.__class__.__name__}"
                 )
-            swarp_args.extend([f"-{key}", str(value)])
-        # infer cutour size in pixels, use native pixel scale if a different one is not requested
-        if self.cutout_size is not None:
-            if "PIXEL_SCALE" in kwargs:
-                pixel_scale = kwargs["PIXEL_SCALE"]
             else:
-                pixel_scale = self.instrument.pix_scale
-            cutout_size_pix = [
-                round(cutsize.to(u.arcsec).value / pixel_scale)
-                for cutsize in self.cutout_size
-            ]
-            swarp_args.extend(
-                ["-IMAGE_SIZE", f"{cutout_size_pix[0]},{cutout_size_pix[1]}"]
-            )
+                swarp_args.extend([f"-{key}", str(value)])
+        # specify cutout center, cutout size will be inferred later depending on resampling or stacking
         if self.cutout_cen is not None:
             swarp_args.extend(
                 [
@@ -195,6 +186,14 @@ class Combiner(ABC):
                     f"{self.cutout_cen.to_string('hmsdms', sep=':', precision=2)}",
                     "-CENTER_TYPE",
                     "MANUAL",
+                ]
+            )
+        # specify pixel scale
+        if self.pixel_scale is not None:
+            swarp_args.extend(
+                [
+                    "-PIXEL_SCALE",
+                    f"{self.pixel_scale:.2f}",
                 ]
             )
         return swarp_args
@@ -220,6 +219,21 @@ class Combiner(ABC):
             input = "resamp_images.list"
         swarp_cmd = ["swarp", f"@{input}", "-c", "config.swarp"]
         swarp_cmd.extend(self._swarp_extra_args)
+        # infer cutout size in pixels
+        if self.cutout_size is not None:
+            # broaden cutout size for the resample run if bkg_match is True
+            cutout_size_ = (
+                self.cutout_size_broad
+                if self.bkg_match and resample and not stack
+                else self.cutout_size
+            )
+            cutout_size_pix = [
+                round(cutsize.to(u.arcsec).value / self.pixel_scale)
+                for cutsize in cutout_size_
+            ]
+            swarp_cmd.extend(
+                ["-IMAGE_SIZE", f"{cutout_size_pix[0]},{cutout_size_pix[1]}"]
+            )
         if resample:
             swarp_cmd.extend(["-RESAMPLE", "Y"])
         else:
@@ -228,7 +242,6 @@ class Combiner(ABC):
             swarp_cmd.extend(["-COMBINE", "Y"])
         else:
             swarp_cmd.extend(["-COMBINE", "N"])
-
         print(f"Running SWarp: {' '.join(swarp_cmd)}")
         start_time = datetime.now()
         try:
@@ -279,13 +292,7 @@ class DithersMixin:
             )
         else:
             cutout_size_str = "AUTO"
-        if "-PIXEL_SCALE" in self._swarp_extra_args:
-            pixel_scale = float(
-                self._swarp_extra_args[self._swarp_extra_args.index("-PIXEL_SCALE") + 1]
-            )
-        else:
-            pixel_scale = self.instrument.pix_scale
-        pixel_scale_str = f"{pixel_scale:.2f} arcsec/pix"
+        pixel_scale_str = f"{self.pixel_scale:.2f}"
         obj_str = f"{self.__class__.__name__}(obsids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}"
         if self.individual_dithers:
             obj_str += ", individual_dithers=True"
@@ -368,12 +375,19 @@ class DithersMixin:
                         sci_ext_hdr = hdul[f"{ext}.SCI"].header
                         # check if the cutout region overlaps with the chip/quad
                         if self.cutout_cen is not None and self.cutout_size is not None:
-                            cutout_reg = create_sky_rectangle(
-                                center=self.cutout_cen,
-                                width=self.cutout_size[0],
-                                height=self.cutout_size[1],
-                            )
-                            # a threshold of 0.01 (0.1 in length) is used to exclude negligible overlaps
+                            if self.bkg_match:
+                                # broaden the cutout size for background matching
+                                cutout_reg = create_sky_rectangle(
+                                    center=self.cutout_cen,
+                                    width=self.cutout_size_broad[0],
+                                    height=self.cutout_size_broad[1],
+                                )
+                            else:
+                                cutout_reg = create_sky_rectangle(
+                                    center=self.cutout_cen,
+                                    width=self.cutout_size[0],
+                                    height=self.cutout_size[1],
+                                )
                             if not does_image_overlap_with_skyregion(
                                 sci_ext_hdr, cutout_reg
                             ):
@@ -641,6 +655,17 @@ class NISPCombiner(DithersMixin, Combiner):
             autodark_corr=False,
             **kwargs,
         )
+        # construct a broader cutout region when bkg_match is requested
+        if self.bkg_match:
+            delta_cutout_size = (
+                2
+                * (max(self.instrument.readout_unit_size) * self.instrument.pix_scale)
+                * u.arcsec
+            )
+            self.cutout_size_broad = (
+                self.cutout_size[0] + delta_cutout_size,
+                self.cutout_size[1] + delta_cutout_size,
+            )
 
     def combine_per_filter(self, filter):
         if self.multi_chip_bkg:
@@ -733,6 +758,17 @@ class VISCombiner(DithersMixin, Combiner):
 
     def __init__(self, **kwargs):
         super().__init__(instrument=VIS, swarp_config=SWARP_CONFIG_VIS, **kwargs)
+        # construct a broader cutout region when bkg_match is requested
+        if self.bkg_match:
+            delta_cutout_size = (
+                4
+                * (max(self.instrument.readout_unit_size) * self.instrument.pix_scale)
+                * u.arcsec
+            )
+            self.cutout_size_broad = (
+                self.cutout_size[0] + delta_cutout_size,
+                self.cutout_size[1] + delta_cutout_size,
+            )
 
     def _get_ids(self):
         return super()._get_obsids()
@@ -860,13 +896,7 @@ class MerCombiner(Combiner):
             )
         else:
             cutout_size_str = "AUTO"
-        if "-PIXEL_SCALE" in self._swarp_extra_args:
-            pixel_scale = float(
-                self._swarp_extra_args[self._swarp_extra_args.index("-PIXEL_SCALE") + 1]
-            )
-        else:
-            pixel_scale = self.instrument.pix_scale
-        pixel_scale_str = f"{pixel_scale:.2f} arcsec/pix"
+        pixel_scale_str = f"{self.pixel_scale:.2f}"
         return f"{self.__class__.__name__}(tileids={self.ids}, filters={self.filters}, cutout_cen={cutout_cen_str}, cutout_size={cutout_size_str}, pixel_scale={pixel_scale_str}, add_bkg_mod={self.add_bkg_mod})"
 
     def __repr__(self):
@@ -1014,6 +1044,7 @@ def combine(
     cutout_cen=None,  # central coordinates of the cutout
     cutout_size=None,  # size of the cutout in angular units
     name=None,  # suffix for the output file basename.
+    pixel_scale=None,  # pixel scale of the output image in arcsec/pix
     bkg_sub=True,  # to subtract background or not; not applicable to MER
     bkg_match=False,  # to match background or not; not applicable to MER
     bkg_mesh_size=None,  # size of the background mesh boxes in angular units
@@ -1068,6 +1099,9 @@ def combine(
     name : str, optional
         Suffix for the output file basename. Overriden by obsid if
         individual_dithers=True.
+    pixel_scale : float, optional
+        Pixel scale of the output image in arcsec/pix. If not specified, uses the
+        default pixel scale of the instrument.
     bkg_sub : bool, optional
         If True, subtract background from the dithers (only for VIS/NISP data).
     bkg_match: bool, optional
@@ -1187,6 +1221,7 @@ def combine(
                     cutout_cen=cutout_cen,
                     cutout_size=cutout_size,
                     name=name,
+                    pixel_scale=pixel_scale,
                     bkg_sub=bkg_sub,
                     bkg_match=False,
                     bkg_mesh_size=bkg_mesh_size,
@@ -1214,6 +1249,7 @@ def combine(
                 cutout_cen=cutout_cen,
                 cutout_size=cutout_size,
                 name=name,
+                pixel_scale=pixel_scale,
                 bkg_sub=bkg_sub,
                 bkg_match=bkg_match,
                 bkg_mesh_size=bkg_mesh_size,
@@ -1243,6 +1279,7 @@ def combine(
                     cutout_cen=cutout_cen,
                     cutout_size=cutout_size,
                     name=name,
+                    pixel_scale=pixel_scale,
                     bkg_sub=bkg_sub,
                     bkg_match=False,
                     bkg_mesh_size=bkg_mesh_size,
@@ -1267,6 +1304,7 @@ def combine(
                 individual_dithers=individual_dithers,
                 cutout_cen=cutout_cen,
                 cutout_size=cutout_size,
+                pixel_scale=pixel_scale,
                 name=name,
                 bkg_sub=bkg_sub,
                 bkg_match=bkg_match,
@@ -1293,6 +1331,7 @@ def combine(
             cutout_size=cutout_size,
             add_bkg_mod=add_bkg_mod,
             name=name,
+            pixel_scale=pixel_scale,
             release_name=release_name,
             overwrite=overwrite,
             debug=debug,
