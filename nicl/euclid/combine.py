@@ -377,7 +377,7 @@ class DithersMixin:
                             )
                             # a threshold of 0.01 (0.1 in length) is used to exclude negligible overlaps
                             if not does_image_overlap_with_skyregion(
-                                sci_ext_hdr, cutout_reg, threshold=0.01
+                                sci_ext_hdr, cutout_reg
                             ):
                                 continue
                         sci_data = hdul[f"{ext}.SCI"].data
