@@ -8,6 +8,9 @@ from nicl.euclid.combine import combine
 from nicl.euclid.utilities import default_data_path
 
 cutout_size = 30 * u.arcmin
+# Number of threads/cores to use for swarp, if not specified swarp will spawn 96 threads! (cores in a compute node)
+# maintain consistency with number of cores in the stack_Q1.sh slurm script
+nthreads = 1
 
 
 def combine_vis(ra, dec, name, out_dir):
@@ -25,6 +28,7 @@ def combine_vis(ra, dec, name, out_dir):
         name=name,
         pixel_scale=0.3,
         overwrite=True,
+        nthreads=nthreads,
     )
 
 
@@ -40,6 +44,7 @@ def combine_nir(ra, dec, name, out_dir):
         cutout_cen=cutout_cen,
         cutout_size=cutout_size,
         name=name,
+        nthreads=nthreads,
         overwrite=True,
     )
 
