@@ -501,7 +501,7 @@ class DithersMixin:
                 )
                 for path in resamp_imgs_not_corrected:
                     hdr = fits.getheader(
-                        path.with_suffix("").with_suffix("").with_suffix(path.suffix)
+                        path.with_suffix("").with_suffix("").with_suffix(path.suffix), 1
                     )
                     if does_image_overlap_with_skyregion(hdr, cutout_reg):
                         print(f"{path} is not corrected for background matching.")
