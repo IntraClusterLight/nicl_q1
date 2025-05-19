@@ -492,7 +492,19 @@ class DithersMixin:
         resamp_sci_images = list(tmpdir.glob("*resamp.fits"))
         if self.bkg_match:
             start_time = datetime.now()
-            bkg_match_corr(resamp_sci_images)
+            resamp_imgs_not_corrected = bkg_match_corr(resamp_sci_images)
+            if resamp_imgs_not_corrected:
+                cutout_reg = create_sky_rectangle(
+                    center=self.cutout_cen,
+                    width=self.cutout_size[0],
+                    height=self.cutout_size[1],
+                )
+                for path in resamp_imgs_not_corrected:
+                    hdr = fits.getheader(
+                        path.with_suffix("").with_suffix("").with_suffix(path.suffix)
+                    )
+                    if does_image_overlap_with_skyregion(hdr, cutout_reg):
+                        print(f"{path} is not corrected for background matching.")
             end_time = datetime.now()
             elapsed_mins = (end_time - start_time).total_seconds() / 60
             print(f"Background matching took {elapsed_mins:.1f} mins.")

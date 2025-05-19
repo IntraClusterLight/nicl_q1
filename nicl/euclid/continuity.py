@@ -391,16 +391,18 @@ def bkg_match_corr(
                     )
 
         n_overlap_pairs += len(other_paths)
-    logger.debug(
-        f"Number of overlapping pairs: {n_overlap_pairs} out of {len(paths)} images."
-    )
     n_imgs_in_eqs = len(solution_map)
     n_imgs = len(paths)
+    logger.debug(
+        f"Number of overlapping pairs: {n_overlap_pairs} out of {n_imgs} images."
+    )
+    imgs_not_in_eqs = []
     if n_imgs > n_imgs_in_eqs:
-        logger.warning("The following images have no overlap with others:")
-        for i in range(n_imgs):
-            if i not in solution_map:
-                logger.warning(f"{paths[i].name}")
+        idx_imgs_not_in_eqs = set(range(n_imgs)) - set(solution_map)
+        logger.warning("The following images have no useful overlap with others:")
+        for idx in idx_imgs_not_in_eqs:
+            imgs_not_in_eqs.append(paths[idx])
+            logger.warning(f"{paths[idx].name}")
     # padd zeros to coeff_array to match the longest one
     max_len = max([coeff.shape[1] for coeff in a])
     for i in range(len(a)):
@@ -480,3 +482,4 @@ def bkg_match_corr(
                 )
                 hdul[0].data[idx_not_blank] += correction[idx_not_blank]
             hdul.flush()
+    return imgs_not_in_eqs
