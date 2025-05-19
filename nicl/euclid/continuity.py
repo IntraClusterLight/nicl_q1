@@ -218,7 +218,7 @@ def bkg_match_corr(
                         npix_valid = np.sum(idx_valid)
                         if npix_valid == 0:
                             logger.debug(
-                                "No valid pixels in the overlapping region, skipping."
+                                f"No valid pixels in the overlapping region between {path.name} and {other_path.name}, skipping."
                             )
                             continue
                         diff_img = other_hdul[0].data[slice2] - hdul[0].data[slice1]
@@ -274,7 +274,7 @@ def bkg_match_corr(
                         npix_valid = np.sum(np.isfinite(diff_img_rms))
                         if npix_valid == 0:
                             logger.debug(
-                                "No useful pixels in the overlapping region after masking sources, skipping."
+                                f"No useful pixels in the overlapping region between {path.name} and {other_path.name} after masking sources, skipping."
                             )
                             continue
                         # set up solution map
