@@ -741,7 +741,9 @@ class NISPCombiner(DithersMixin, Combiner):
                 f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
             )
             return
-        with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
+        with tempfile.TemporaryDirectory(
+            dir=Path("~").expanduser(), delete=(not self.debug)
+        ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
