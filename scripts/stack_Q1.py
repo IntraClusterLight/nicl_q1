@@ -32,12 +32,12 @@ def combine_vis(ra, dec, name, out_dir):
     )
 
 
-def combine_nir(ra, dec, name, out_dir):
+def combine_nir(ra, dec, name, out_dir, filter):
     cutout_cen = SkyCoord(ra, dec, unit=u.deg)
     combine(
         in_dir=default_data_path("Q1_R1_processed_v0.7", "persistence"),
         out_dir=out_dir,
-        filters=["Y", "J", "H"],
+        filters=filter,
         bkg_sub=False,
         bkg_match=True,
         pixel_scale=0.3,
@@ -60,10 +60,10 @@ if __name__ == "__main__":
         "subfolder", type=str, help="Subfolder to save the output stacks in."
     )
     parser.add_argument(
-        "instrument",
+        "filter",
         type=str,
-        choices=["VIS", "NISP"],
-        help="VIS or NISP stacks to be processed.",
+        choices=["I", "Y", "J", "H"],
+        help="Filter of the stacks to be processed.",
     )
     parser.add_argument(
         "task_id",
@@ -81,9 +81,9 @@ if __name__ == "__main__":
         name = str(row[0])
         ra = row[1]
         dec = row[2]
-        if args.instrument == "NISP":
-            combine_nir(ra, dec, name, out_dir)
-        elif args.instrument == "VIS":
+        if args.filter in ["Y", "J", "H"]:
+            combine_nir(ra, dec, name, out_dir, args.filter)
+        elif args.filter == "I":
             combine_vis(ra, dec, name, out_dir)
     else:
         print(f"Task ID {task_id} exceeds the number of rows in the table.")

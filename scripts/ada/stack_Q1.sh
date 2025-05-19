@@ -11,9 +11,9 @@
 # Positional parameters:
 # $1 - path to the catalog
 # $2 - output subfolder
-# $3 - instrument (VIS or NISP)
+# $3 - filter
 # run this script with the following command:
-# sbatch --mem=40g --cpus-per-task=3 --array=1-nrows stack_Q1.sh path/to/catalog subfolder VIS|NISP
+# sbatch --mem=40g --cpus-per-task=3 --array=1-nrows stack_Q1.sh path/to/catalog subfolder I/Y/J/H
 
 ## setup conda environment
 module load anaconda-uoneasy/2023.09-0
