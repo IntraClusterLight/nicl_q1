@@ -4,6 +4,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
+from nicl import configure_logging
 from nicl.euclid.combine import combine
 from nicl.euclid.utilities import default_data_path
 
@@ -50,6 +51,8 @@ def combine_nir(ra, dec, name, out_dir, filter):
 
 
 if __name__ == "__main__":
+    configure_logging(level="DEBUG")
+    configure_logging(name="nicl.mask", level="WARNING")
     parser = argparse.ArgumentParser(
         description="Process Q1 cluster stacks for row TASK_ID from PARAM_TABLE."
     )
