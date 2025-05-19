@@ -80,7 +80,6 @@ class Combiner(ABC):
         self.out_dir = out_dir
         self.cutout_cen = cutout_cen
         self.cutout_size = cutout_size
-        self.cutout_size_broad = None
         self.bkg_mesh_size = bkg_mesh_size
         self.instrument = instrument
         self.swarp_config = swarp_config
@@ -91,6 +90,20 @@ class Combiner(ABC):
         self.individual_dithers = individual_dithers
         self.overwrite = overwrite
         self.debug = debug
+        # broaden cutout size for bkg_match
+        if self.bkg_match and self.cutout_size is not None:
+            delta_cutout_size = (
+                2
+                * max(self.instrument.n_detector_per_chip)
+                * (max(self.instrument.detector_dimensions) * self.instrument.pix_scale)
+                * u.arcsec
+            )
+            self.cutout_size_broad = (
+                self.cutout_size[0] + delta_cutout_size,
+                self.cutout_size[1] + delta_cutout_size,
+            )
+        else:
+            self.cutout_size_broad = None
         # check ids
         if ids is None:
             # try getting ids from cutout_cen and cutout_size
@@ -141,7 +154,8 @@ class Combiner(ABC):
         self.multi_chip_bkg = multi_chip_bkg
         if self.bkg_sub and self.bkg_mesh_size is not None:
             rd_size = (
-                np.array(self.instrument.readout_unit_size) * self.instrument.pix_scale
+                np.array(self.instrument.detector_dimensions)
+                * self.instrument.pix_scale
             )
             mesh_size = np.array(
                 [mesh.to_value("arcsec") for mesh in self.bkg_mesh_size]
@@ -312,7 +326,10 @@ class DithersMixin:
 
     def _get_obsids(self):
         da = DataAccess(release_name=self.release_name)
-        radius = 0.5 * max(*self.cutout_size)
+        if self.bkg_match:
+            radius = 0.5 * max(*self.cutout_size_broad)
+        else:
+            radius = 0.5 * max(*self.cutout_size)
         ids = da.find_observations_for_target(
             self.cutout_cen.ra, self.cutout_cen.dec, radius, fully_contained=False
         )
@@ -657,17 +674,6 @@ class NISPCombiner(DithersMixin, Combiner):
             autodark_corr=False,
             **kwargs,
         )
-        # construct a broader cutout region when bkg_match is requested
-        if self.bkg_match:
-            delta_cutout_size = (
-                2
-                * (max(self.instrument.readout_unit_size) * self.instrument.pix_scale)
-                * u.arcsec
-            )
-            self.cutout_size_broad = (
-                self.cutout_size[0] + delta_cutout_size,
-                self.cutout_size[1] + delta_cutout_size,
-            )
 
     def combine_per_filter(self, filter):
         if self.multi_chip_bkg:
@@ -760,17 +766,6 @@ class VISCombiner(DithersMixin, Combiner):
 
     def __init__(self, **kwargs):
         super().__init__(instrument=VIS, swarp_config=SWARP_CONFIG_VIS, **kwargs)
-        # construct a broader cutout region when bkg_match is requested
-        if self.bkg_match:
-            delta_cutout_size = (
-                4
-                * (max(self.instrument.readout_unit_size) * self.instrument.pix_scale)
-                * u.arcsec
-            )
-            self.cutout_size_broad = (
-                self.cutout_size[0] + delta_cutout_size,
-                self.cutout_size[1] + delta_cutout_size,
-            )
 
     def _get_ids(self):
         return super()._get_obsids()
