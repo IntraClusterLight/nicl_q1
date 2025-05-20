@@ -399,10 +399,10 @@ def bkg_match_corr(
     imgs_not_in_eqs = []
     if n_imgs > n_imgs_in_eqs:
         idx_imgs_not_in_eqs = set(range(n_imgs)) - set(solution_map)
-        logger.warning("The following images have no useful overlap with others:")
+        logger.info("The following images have no useful overlap with others:")
         for idx in idx_imgs_not_in_eqs:
             imgs_not_in_eqs.append(paths[idx])
-            logger.warning(f"{paths[idx].name}")
+            logger.info(f"{paths[idx].name}")
     # padd zeros to coeff_array to match the longest one
     max_len = max([coeff.shape[1] for coeff in a])
     for i in range(len(a)):
