@@ -236,19 +236,17 @@ class Combiner(ABC):
         swarp_cmd.extend(self._swarp_extra_args)
         # infer cutout size in pixels
         if self.cutout_size is not None:
-            # broaden cutout size for the resample run if bkg_match is True
-            cutout_size_ = (
-                self.cutout_size_broad
-                if self.bkg_match and resample and not stack
-                else self.cutout_size
-            )
-            cutout_size_pix = [
-                round(cutsize.to(u.arcsec).value / self.pixel_scale)
-                for cutsize in cutout_size_
-            ]
-            swarp_cmd.extend(
-                ["-IMAGE_SIZE", f"{cutout_size_pix[0]},{cutout_size_pix[1]}"]
-            )
+            # do not allow cropping in resampling if bkg_match is True
+            if self.bkg_match and resample and not stack:
+                swarp_cmd.extend(["-IMAGE_SIZE", "0"])
+            else:
+                cutout_size_pix = [
+                    round(cutsize.to(u.arcsec).value / self.pixel_scale)
+                    for cutsize in self.cutout_size
+                ]
+                swarp_cmd.extend(
+                    ["-IMAGE_SIZE", f"{cutout_size_pix[0]},{cutout_size_pix[1]}"]
+                )
         if resample:
             swarp_cmd.extend(["-RESAMPLE", "Y"])
         else:
