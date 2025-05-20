@@ -90,13 +90,12 @@ class Combiner(ABC):
         self.individual_dithers = individual_dithers
         self.overwrite = overwrite
         self.debug = debug
-        # broaden cutout size for bkg_match
+        # broaden cutout size for bkg match correction
         if self.bkg_match and self.cutout_size is not None:
+            # broaden the cutout size by the maximum dither offset
+            dither_offsets = np.array(self.instrument.dither_offsets)
             delta_cutout_size = (
-                2
-                * max(self.instrument.n_detector_per_chip)
-                * (max(self.instrument.detector_dimensions) * self.instrument.pix_scale)
-                * u.arcsec
+                2.1 * np.max(np.linalg.norm(dither_offsets, axis=1)) * u.arcsec
             )
             self.cutout_size_broad = (
                 self.cutout_size[0] + delta_cutout_size,
