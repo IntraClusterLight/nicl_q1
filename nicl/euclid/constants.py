@@ -23,8 +23,15 @@ class Camera:
     # X, Y gaps in arcsec; more than one value in one dimension repsents different gaps in rotation
     gaps: tuple[float, float] = None
     chip_subdivisions: tuple[str, ...] = None
+    # in (y, x) order
     detector_dimensions: tuple[int, int] = None
     n_detector_per_chip: tuple[int, int] = None
+    # arcsecs in ecliptic coordinates
+    dither_offsets: tuple[tuple[float, float], ...] = (
+        (61, 111),
+        (0, 111),
+        (61, 111),
+    )
     bad_pix_bits: tuple[int, ...] = None
     n_dithers_per_obs: int = None
     chip_layout: np.ndarray = None  # 2D array of strings
