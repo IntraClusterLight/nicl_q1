@@ -61,7 +61,7 @@ class Combiner(ABC):
         cutout_size=None,  # size of the cutout in angular units
         name=None,  # suffix for the output file basename
         individual_dithers=False,  # if True, dithers are combined separately
-        bkg_sub=True,  # to subtract background or not
+        bkg_sub=False,  # to subtract background or not
         bkg_match=False,  # match background between different exposures
         bkg_mesh_size=None,  # size of the background mesh boxes in angular units
         bkg_filter_size=None,  # median filter background over `bkg_filter_size` x `bkg_filter_size` boxes
@@ -1053,7 +1053,7 @@ def combine(
     cutout_size=None,  # size of the cutout in angular units
     name=None,  # suffix for the output file basename.
     pixel_scale=None,  # pixel scale of the output image in arcsec/pix
-    bkg_sub=True,  # to subtract background or not; not applicable to MER
+    bkg_sub=False,  # to subtract background or not; not applicable to MER
     bkg_match=False,  # to match background or not; not applicable to MER
     bkg_mesh_size=None,  # size of the background mesh boxes in angular units
     add_bkg_mod=False,  # add back background model for MER stacks
