@@ -357,41 +357,26 @@ def bkg_match_corr(
                                     binsize_ = diff_img.shape
                                 else:
                                     binsize_ = (binsize, binsize)
-                                # pad the image to be divisible by bin, don't wanna miss any pixels
-                                diff_img = np.pad(
-                                    diff_img,
-                                    (
-                                        (
-                                            0,
-                                            binsize_[0]
-                                            - diff_img.shape[0] % binsize_[0],
-                                        ),
-                                        (
-                                            0,
-                                            binsize_[1]
-                                            - diff_img.shape[1] % binsize_[1],
-                                        ),
-                                    ),
-                                    mode="constant",
-                                    constant_values=0,
-                                )
-                                diff_img_rms = np.pad(
-                                    diff_img_rms,
-                                    (
-                                        (
-                                            0,
-                                            binsize_[0]
-                                            - diff_img_rms.shape[0] % binsize_[0],
-                                        ),
-                                        (
-                                            0,
-                                            binsize_[1]
-                                            - diff_img_rms.shape[1] % binsize_[1],
-                                        ),
-                                    ),
-                                    mode="constant",
-                                    constant_values=np.inf,
-                                )
+                                # compute minimal pad needed (0 if already divisible)
+                                pad_y = (
+                                    binsize_[0] - diff_img.shape[0] % binsize_[0]
+                                ) % binsize_[0]
+                                pad_x = (
+                                    binsize_[1] - diff_img.shape[1] % binsize_[1]
+                                ) % binsize_[1]
+                                if pad_y or pad_x:
+                                    diff_img = np.pad(
+                                        diff_img,
+                                        ((0, pad_y), (0, pad_x)),
+                                        mode="constant",
+                                        constant_values=0,
+                                    )
+                                    diff_img_rms = np.pad(
+                                        diff_img_rms,
+                                        ((0, pad_y), (0, pad_x)),
+                                        mode="constant",
+                                        constant_values=np.inf,
+                                    )
                                 diff_img_blocks = reshape_as_blocks(diff_img, binsize_)
                                 diff_img_rms_blocks = reshape_as_blocks(
                                     diff_img_rms, binsize_
