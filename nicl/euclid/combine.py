@@ -489,7 +489,9 @@ class DithersMixin:
         resamp_sci_images = list(tmpdir.glob("*resamp.fits"))
         if self.bkg_match:
             start_time = datetime.now()
-            resamp_imgs_not_corrected = bkg_match_corr(resamp_sci_images)
+            resamp_imgs_not_corrected = bkg_match_corr(
+                resamp_sci_images, debug=self.debug
+            )
             if resamp_imgs_not_corrected:
                 cutout_reg = create_sky_rectangle(
                     center=self.cutout_cen,
