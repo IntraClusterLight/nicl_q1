@@ -316,7 +316,7 @@ def bkg_match_corr(
                             continue
                         # write diff image to disk for debugging
                         if debug:
-                            diff_img_fn = f"{other_path.name}-{path.name}.diff.fits"
+                            diff_img_fn = f"{other_path.stem}-{path.stem}.diff.fits"
                             logger.debug(f"Writing diff image {diff_img_fn} to disk...")
                             x0, x1 = slice1[1].start, slice1[1].stop
                             y0, y1 = slice1[0].start, slice1[0].stop
@@ -334,7 +334,9 @@ def bkg_match_corr(
                             diff_img_rms_hdu = fits.ImageHDU(
                                 data=diff_img_rms, header=cutout_hdr, name="rms"
                             )
-                            hdul_diff = fits.HDUList([diff_img_hdu, diff_img_rms_hdu])
+                            hdul_diff = fits.HDUList(
+                                [fits.PrimaryHDU(), diff_img_hdu, diff_img_rms_hdu]
+                            )
                             hdul_diff.writeto(
                                 path.parent / diff_img_fn,
                             )
