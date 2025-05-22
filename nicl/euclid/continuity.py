@@ -10,7 +10,7 @@ import logging
 
 import numpy as np
 from astropy.io import fits
-from astropy.nddata import reshape_as_blocks
+from astropy.nddata import Cutout2D, reshape_as_blocks
 from astropy.wcs import WCS
 from numpy.linalg import lstsq
 
@@ -142,6 +142,7 @@ def bkg_match_corr(
     paths,  # list of paths to the images to be corrected
     corr_order=0,  # order of the correction (0, 1 or 2)
     binsize=None,  # bin size in pixels to form the equations
+    debug=False,  # debug flag
 ):
     """Perform background matching correction for a set of SWarp resampled images.
 
@@ -163,6 +164,8 @@ def bkg_match_corr(
     binsize : int or tuple, optional
         Bin size in pixels to aggregate equations in overlapping regions. If None,
         use the full overlap region as a single bin for zero-order correction.
+    debug : bool, optional
+        If True, write difference images to disk. Default is False.
 
     Returns
     -------
@@ -311,6 +314,30 @@ def bkg_match_corr(
                                 f"No useful pixels in the overlapping region {diff_img.shape} between {path.name} and {other_path.name} after masking sources, skipping."
                             )
                             continue
+                        # write diff image to disk for debugging
+                        if debug:
+                            diff_img_fn = f"{other_path.name}-{path.name}.diff.fits"
+                            logger.debug(f"Writing diff image {diff_img_fn} to disk...")
+                            x0, x1 = slice1[1].start, slice1[1].stop
+                            y0, y1 = slice1[0].start, slice1[0].stop
+                            cutout = Cutout2D(
+                                hdul[0].data,
+                                ((x0 + x1 - 1) / 2, (y0 + y1 - 1) / 2),
+                                (y1 - y0, x1 - x0),
+                                wcs=WCS(sci_hdr),
+                                mode="strict",
+                            )
+                            cutout_hdr = cutout.wcs.to_header()
+                            diff_img_hdu = fits.ImageHDU(
+                                data=diff_img, header=cutout_hdr, name="sci"
+                            )
+                            diff_img_rms_hdu = fits.ImageHDU(
+                                data=diff_img_rms, header=cutout_hdr, name="rms"
+                            )
+                            hdul_diff = fits.HDUList([diff_img_hdu, diff_img_rms_hdu])
+                            hdul_diff.writeto(
+                                path.parent / diff_img_fn,
+                            )
                         # set up solution map
                         idx = paths.index(path)
                         idx_other = paths.index(other_path)
