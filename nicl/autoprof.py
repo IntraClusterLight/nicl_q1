@@ -174,11 +174,10 @@ ap_extractfull = True
 ap_fluxunits = "{unit_type}"
 ap_isoclip = True
 ap_isoclip_nsigma = 5
+ap_fit_limit = 1
 ap_ellipsefit = True
 ap_fix_pa = False
-ap_initial_pa = 45.0 
 ap_fix_ellipticity = False
-ap_initial_ellipticity = 0.3
 """)
         )
 

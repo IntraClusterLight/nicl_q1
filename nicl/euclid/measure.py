@@ -23,7 +23,6 @@ from nicl.euclid.mask import (
     create_combined_nir_mask,
     create_vis_mask,
 )
-from nicl.euclid.utilities import default_data_path
 from nicl.main import configure_logging
 
 # %% ../../nbs/euclid/measure.ipynb 3
@@ -80,12 +79,12 @@ def process_cluster_pipeline(
                     cluster_info.DEC_BCG[0] * u.deg,
                     frame="icrs",
                 )
-            else:
-                cluster_z = cluster_z
-                bcg_pos = bcg_pos
+
+        if cluster_z is not None:
+            cluster_z = cluster_z
+            bcg_pos = bcg_pos
         else:
-            cluster_z = 0.1
-            bcg_pos = None
+            raise ValueError("Cluster redshift must be provided...")
 
         logger.info(
             f"Cluster id: {cluster_id}, redshift: {cluster_z}, BCG coords: {bcg_pos}"
