@@ -93,9 +93,13 @@ def remove_segment_at_position(
     The `position` can be provided as (x, y) pixels or a SkyCoord, in which case the `wcs` must be supplied.
     If no `position` is provided, the image centre is assumed, in which case the `image` must be supplied.
     """
+    logger = logging.getLogger(__name__)
     label = get_label_at_position(segm, image, position, wcs)
     segm = segm.copy()
-    segm.remove_label(label, relabel=True)
+    if label <= 0:
+        logger.warning("No segment found at specified position")
+    else:
+        segm.remove_label(label, relabel=True)
     return segm
 
 # %% ../nbs/13_mask.ipynb 4
@@ -432,6 +436,7 @@ def create_object_mask(
         logger.info(f"Supplied exclude mask contains {exclude_mask.sum()} pixels")
         segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=True)
     elif exclude_position is not False:
+        logger.info("Removing segment at exclude_position")
         segm_deblend = remove_segment_at_position(
             segm_deblend, image, exclude_position, wcs
         )
