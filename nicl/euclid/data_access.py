@@ -20,7 +20,11 @@ from astropy.io import fits
 from astropy.table import Table
 from astroquery.utils.tap.core import TapPlus
 
-from .utilities import default_data_path, euclid_credentials, get_dither_id_from_filename
+from nicl.euclid.utilities import (
+    default_data_path,
+    euclid_credentials,
+    get_dither_id_from_filename,
+)
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb 4
@@ -34,7 +38,7 @@ class DataAccess:
         self,
         esa_username=None,  # ESA account username (prompts if not supplied)
         esa_password=None,  # ESA account password (prompts if not supplied)
-        esac_server_url="https://easidr.esac.esa.int",  # ESA server (default is Q1)
+        esac_server_url="https://eas.esac.esa.int",  # ESA server (default is public Q1)
         release_name="Q1_R1",  # the Euclid release name
         dry_run=False,  # if True, do not actually download files
         overwrite=False,  # should existing files be overwritten?
@@ -137,7 +141,9 @@ class DataAccess:
         if self.release_name:
             conditions.append(f"(release_name='{self.release_name}')")
         criterion = "CONTAINS" if fully_contained else "INTERSECTS"
-        conditions.append(f"(fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)")
+        conditions.append(
+            f"(fov IS NOT NULL AND {criterion}(CIRCLE('ICRS',{ra},{dec},{radius}),fov)=1)"
+        )
         return " AND ".join(conditions)
 
     def find_all_observations(
@@ -561,7 +567,9 @@ class DataAccess:
                             if hdu.name == "LDAC_OBJECTS":
                                 tab = Table.read(hdu)
                                 if this_filter == "VIS":
-                                    tab["DETECTOR"] = f"{tab.meta['CCDID']}.{tab.meta['QUADID']}"
+                                    tab["DETECTOR"] = (
+                                        f"{tab.meta['CCDID']}.{tab.meta['QUADID']}"
+                                    )
                                 else:
                                     tab["DETECTOR"] = tab.meta["DET_ID"]
                                 tab.meta = None
@@ -575,4 +583,3 @@ class DataAccess:
         if filter:
             catalogues = catalogues[filter]
         return catalogues
-

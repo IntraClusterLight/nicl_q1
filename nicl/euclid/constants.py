@@ -20,15 +20,24 @@ class Camera:
     chips: tuple[str, ...]
     filters: tuple[str, ...]
     pix_scale: float
+    # X, Y gaps in arcsec; more than one value in one dimension repsents different gaps in rotation
+    gaps: tuple[float, float] = None
     chip_subdivisions: tuple[str, ...] = None
-    readout_unit_size: tuple[int, int] = None
+    # in (y, x) order
+    detector_dimensions: tuple[int, int] = None
+    n_detector_per_chip: tuple[int, int] = None
+    # arcsecs in ecliptic coordinates
+    dither_offsets: tuple[tuple[float, float], ...] = (
+        (61, 111),
+        (0, 111),
+        (61, 111),
+    )
     bad_pix_bits: tuple[int, ...] = None
     n_dithers_per_obs: int = None
     chip_layout: np.ndarray = None  # 2D array of strings
     # chip_rotations is True if a half-turn rotation is required to align the orientations
-    chip_rotations: np.ndarray = None  # 2D array of booleans, 
+    chip_rotations: np.ndarray = None  # 2D array of booleans,
     nominal_zeropoint: float = None
-
 
     @property
     def extnames(self):
@@ -44,24 +53,184 @@ VIS = Camera(
     name="VIS",
     chips=tuple(f"{x}-{y}" for x in range(1, 7) for y in range(1, 7)),
     chip_subdivisions=("E", "F", "G", "H"),
-    readout_unit_size=(2066, 2048),
+    detector_dimensions=(2066, 2048),
+    n_detector_per_chip=(2, 2),
     filters=("I",),
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.1,
     n_dithers_per_obs=6,
+    gaps=((0, 12.7), (0.4, 64.4)),  # extracted from Table 1 of 2022A&A...662A.112E
     chip_layout=np.array(
-        (("1-1.E", "1-1.F", "1-2.E", "1-2.F", "1-3.E", "1-3.F", "1-4.G", "1-4.H", "1-5.G", "1-5.H", "1-6.G", "1-6.H"),
-         ("1-1.H", "1-1.G", "1-2.H", "1-2.G", "1-3.H", "1-3.G", "1-4.F", "1-4.E", "1-5.F", "1-5.E", "1-6.F", "1-6.E"),
-         ("2-1.E", "2-1.F", "2-2.E", "2-2.F", "2-3.E", "2-3.F", "2-4.G", "2-4.H", "2-5.G", "2-5.H", "2-6.G", "2-6.H"),
-         ("2-1.H", "2-1.G", "2-2.H", "2-2.G", "2-3.H", "2-3.G", "2-4.F", "2-4.E", "2-5.F", "2-5.E", "2-6.F", "2-6.E"),
-         ("3-1.E", "3-1.F", "3-2.E", "3-2.F", "3-3.E", "3-3.F", "3-4.G", "3-4.H", "3-5.G", "3-5.H", "3-6.G", "3-6.H"),
-         ("3-1.H", "3-1.G", "3-2.H", "3-2.G", "3-3.H", "3-3.G", "3-4.F", "3-4.E", "3-5.F", "3-5.E", "3-6.F", "3-6.E"),
-         ("4-1.E", "4-1.F", "4-2.E", "4-2.F", "4-3.E", "4-3.F", "4-4.G", "4-4.H", "4-5.G", "4-5.H", "4-6.G", "4-6.H"),
-         ("4-1.H", "4-1.G", "4-2.H", "4-2.G", "4-3.H", "4-3.G", "4-4.F", "4-4.E", "4-5.F", "4-5.E", "4-6.F", "4-6.E"),
-         ("5-1.E", "5-1.F", "5-2.E", "5-2.F", "5-3.E", "5-3.F", "5-4.G", "5-4.H", "5-5.G", "5-5.H", "5-6.G", "5-6.H"),
-         ("5-1.H", "5-1.G", "5-2.H", "5-2.G", "5-3.H", "5-3.G", "5-4.F", "5-4.E", "5-5.F", "5-5.E", "5-6.F", "5-6.E"),
-         ("6-1.E", "6-1.F", "6-2.E", "6-2.F", "6-3.E", "6-3.F", "6-4.G", "6-4.H", "6-5.G", "6-5.H", "6-6.G", "6-6.H"),
-         ("6-1.H", "6-1.G", "6-2.H", "6-2.G", "6-3.H", "6-3.G", "6-4.F", "6-4.E", "6-5.F", "6-5.E", "6-6.F", "6-6.E"))
+        (
+            (
+                "1-1.E",
+                "1-1.F",
+                "1-2.E",
+                "1-2.F",
+                "1-3.E",
+                "1-3.F",
+                "1-4.G",
+                "1-4.H",
+                "1-5.G",
+                "1-5.H",
+                "1-6.G",
+                "1-6.H",
+            ),
+            (
+                "1-1.H",
+                "1-1.G",
+                "1-2.H",
+                "1-2.G",
+                "1-3.H",
+                "1-3.G",
+                "1-4.F",
+                "1-4.E",
+                "1-5.F",
+                "1-5.E",
+                "1-6.F",
+                "1-6.E",
+            ),
+            (
+                "2-1.E",
+                "2-1.F",
+                "2-2.E",
+                "2-2.F",
+                "2-3.E",
+                "2-3.F",
+                "2-4.G",
+                "2-4.H",
+                "2-5.G",
+                "2-5.H",
+                "2-6.G",
+                "2-6.H",
+            ),
+            (
+                "2-1.H",
+                "2-1.G",
+                "2-2.H",
+                "2-2.G",
+                "2-3.H",
+                "2-3.G",
+                "2-4.F",
+                "2-4.E",
+                "2-5.F",
+                "2-5.E",
+                "2-6.F",
+                "2-6.E",
+            ),
+            (
+                "3-1.E",
+                "3-1.F",
+                "3-2.E",
+                "3-2.F",
+                "3-3.E",
+                "3-3.F",
+                "3-4.G",
+                "3-4.H",
+                "3-5.G",
+                "3-5.H",
+                "3-6.G",
+                "3-6.H",
+            ),
+            (
+                "3-1.H",
+                "3-1.G",
+                "3-2.H",
+                "3-2.G",
+                "3-3.H",
+                "3-3.G",
+                "3-4.F",
+                "3-4.E",
+                "3-5.F",
+                "3-5.E",
+                "3-6.F",
+                "3-6.E",
+            ),
+            (
+                "4-1.E",
+                "4-1.F",
+                "4-2.E",
+                "4-2.F",
+                "4-3.E",
+                "4-3.F",
+                "4-4.G",
+                "4-4.H",
+                "4-5.G",
+                "4-5.H",
+                "4-6.G",
+                "4-6.H",
+            ),
+            (
+                "4-1.H",
+                "4-1.G",
+                "4-2.H",
+                "4-2.G",
+                "4-3.H",
+                "4-3.G",
+                "4-4.F",
+                "4-4.E",
+                "4-5.F",
+                "4-5.E",
+                "4-6.F",
+                "4-6.E",
+            ),
+            (
+                "5-1.E",
+                "5-1.F",
+                "5-2.E",
+                "5-2.F",
+                "5-3.E",
+                "5-3.F",
+                "5-4.G",
+                "5-4.H",
+                "5-5.G",
+                "5-5.H",
+                "5-6.G",
+                "5-6.H",
+            ),
+            (
+                "5-1.H",
+                "5-1.G",
+                "5-2.H",
+                "5-2.G",
+                "5-3.H",
+                "5-3.G",
+                "5-4.F",
+                "5-4.E",
+                "5-5.F",
+                "5-5.E",
+                "5-6.F",
+                "5-6.E",
+            ),
+            (
+                "6-1.E",
+                "6-1.F",
+                "6-2.E",
+                "6-2.F",
+                "6-3.E",
+                "6-3.F",
+                "6-4.G",
+                "6-4.H",
+                "6-5.G",
+                "6-5.H",
+                "6-6.G",
+                "6-6.H",
+            ),
+            (
+                "6-1.H",
+                "6-1.G",
+                "6-2.H",
+                "6-2.G",
+                "6-3.H",
+                "6-3.G",
+                "6-4.F",
+                "6-4.E",
+                "6-5.F",
+                "6-5.E",
+                "6-6.F",
+                "6-6.E",
+            ),
+        )
     ),
     chip_rotations=np.zeros(dtype=bool, shape=(12, 12)),
     nominal_zeropoint=dict(VIS=24.56605),
@@ -69,11 +238,13 @@ VIS = Camera(
 NISP = Camera(
     name="NISP",
     chips=tuple(f"DET{x}{y}" for x in range(1, 5) for y in range(1, 5)),
-    readout_unit_size=(2040, 2040),
+    detector_dimensions=(2040, 2040),
+    n_detector_per_chip=(1, 1),
     filters=("Y", "J", "H"),
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.3,
     n_dithers_per_obs=4,
+    gaps=(50.6, (101.4, 86.1)),  # extracted from Table 1 of 2022A&A...662A.112E
     chip_layout=np.array([[f"DET{y}{x}" for x in range(1, 5)] for y in range(1, 5)]),
     chip_rotations=np.array([[y > 2 for x in range(1, 5)] for y in range(1, 5)]),
     nominal_zeropoint=dict(H=29.94, J=30.03, Y=29.76),
@@ -111,19 +282,19 @@ WEIGHT_THRESH                          # Bad pixel weight-threshold
 #------------------------------- Co-addition ----------------------------------
  
 COMBINE                Y               # Combine resampled images (Y/N)?
-COMBINE_TYPE           WEIGHTED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
+COMBINE_TYPE           CLIPPED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
                                        # CHI-OLD,CHI-MODE,CHI-MEAN,SUM,
                                        # WEIGHTED_WEIGHT,MEDIAN_WEIGHT,
                                        # AND,NAND,OR or NOR
-#CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
+CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
                                        # with clipping
-#CLIP_SIGMA             4.0             # RMS error multiple variation allowed
+CLIP_SIGMA             4.0             # RMS error multiple variation allowed
                                        # with clipping
-#CLIP_WRITELOG          N               # Write output file with coordinates of
+CLIP_WRITELOG          N               # Write output file with coordinates of
                                        # clipped pixels (Y/N)
-#CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
+CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
                                        # of clipped pixels
-#BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
+BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
  
 #-------------------------------- Astrometry ----------------------------------
  
@@ -152,7 +323,7 @@ INTERPOLATE            N               # Interpolate bad input pixels (Y/N)?
                                        # (all or for each image)
  
 FSCALASTRO_TYPE        VARIABLE            # NONE,FIXED, or VARIABLE
-FSCALE_KEYWORD         PHOSCALE            # FITS keyword for the multiplicative
+FSCALE_KEYWORD         FLXSCALE            # FITS keyword for the multiplicative
                                        # factor applied to each input image
 FSCALE_DEFAULT         1.0             # Default FSCALE value if not in header
  
@@ -222,19 +393,19 @@ WEIGHT_THRESH                          # Bad pixel weight-threshold
 #------------------------------- Co-addition ----------------------------------
  
 COMBINE                Y               # Combine resampled images (Y/N)?
-COMBINE_TYPE           WEIGHTED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
+COMBINE_TYPE           CLIPPED         # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
                                        # CHI-OLD,CHI-MODE,CHI-MEAN,SUM,
                                        # WEIGHTED_WEIGHT,MEDIAN_WEIGHT,
                                        # AND,NAND,OR or NOR
-#CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
+CLIP_AMPFRAC           0.3             # Fraction of flux variation allowed
                                        # with clipping
-#CLIP_SIGMA             4.0             # RMS error multiple variation allowed
+CLIP_SIGMA             4.0             # RMS error multiple variation allowed
                                        # with clipping
-#CLIP_WRITELOG          N               # Write output file with coordinates of
+CLIP_WRITELOG          N               # Write output file with coordinates of
                                        # clipped pixels (Y/N)
-#CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
+CLIP_LOGNAME           clipped.log     # Name of output file with coordinates
                                        # of clipped pixels
-#BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
+BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
  
 #-------------------------------- Astrometry ----------------------------------
  

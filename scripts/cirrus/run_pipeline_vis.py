@@ -29,7 +29,6 @@ obs_ids = [
     412,
     178,
     141,
-    305,
     326,
     335,
     412,
@@ -44,7 +43,6 @@ obs_ids = [
     801,
     822,
     871,
-    178,
     321,
     333,
     336,
@@ -52,7 +50,6 @@ obs_ids = [
     502,
     618,
     697,
-    707,
     738,
     765,
     780,
@@ -61,9 +58,9 @@ obs_ids = [
     856,
     979,
 ]
-obs_ids = sorted(obs_ids)
+obs_ids = sorted(list(set(obs_ids)))
 
-with pipeline(target_obs_ids=obs_ids) as p:
+with pipeline(target_obs_ids=obs_ids, max_workers=4) as p:
     p.get_vis_data()
     p.create_vis_skyflats()
     p.create_stacks(instrument="VIS", bkg_sub=False)
