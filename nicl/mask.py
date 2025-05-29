@@ -72,9 +72,13 @@ def keep_segment_at_position(
     """
     logger = logging.getLogger(__name__)
     label = get_label_at_position(segm, image, position, wcs)
-    logger.debug(f"Keeping segment with label {label}")
-    segm = segm.copy()
-    segm.keep_label(label, relabel=True)
+    if label <= 0:
+        logger.debug("No segment found at specified position")
+        segm = None
+    else:
+        logger.debug(f"Keeping segment with label {label}")
+        segm = segm.copy()
+        segm.keep_label(label, relabel=True)
     return segm
 
 
@@ -141,8 +145,12 @@ def create_bcg_mask(
     logger.info("Creating BCG mask")
     segm = detect_sources(data=image, threshold=sb_threshold, npixels=5)
     segm = keep_segment_at_position(segm, image, centre_pos, wcs)
-    bcg_mask = segm.make_source_mask()
-    bcg_mask = binary_closing(bcg_mask, iterations=3)
+    if segm is None:
+        logger.warning("No source detected at BCG position")
+        bcg_mask = None
+    else:
+        bcg_mask = segm.make_source_mask()
+        bcg_mask = binary_closing(bcg_mask, iterations=3)
     return bcg_mask
 
 # %% ../nbs/13_mask.ipynb 7
@@ -150,7 +158,7 @@ def create_icl_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
     nsigma=2.0,  # multiple of the background RMS required for detection
-    smooth_sigma=10.0,  # sigma of the Gaussian used to smooth the image
+    initial_smooth_sigma=50.0,  # sigma of the Gaussian used to smooth the image
     centre_pos=None,  # position of the cluster centre, if None assume the image centre
     bkg_box_size=500,  # the size (in pixels) of the boxes to use in estimating the background RMS
     bkg_filter_size=3,  # the size of the median filter to use in estimating the background RMS
@@ -163,10 +171,13 @@ def create_icl_mask(
     The background noise in the input `image` is estimated on a spatial scale of `bkg_box_size`,
     which is them multiplied by `nsigma` to define the detection threshold.
 
-    The input `image` is smoothed using a Gaussian kernal of size `smooth_sigma` and sources
-    detected above the defined threshold. Only the source at `centre_pos` is kept in the returned mask.
-    The `centre_pos` can be provided as (x, y) pixels or a SkyCoord, in which case the `wcs` must be supplied.
-    If no `position` is provided, the image centre is assumed.
+    The input `image` is smoothed using a Gaussian kernal and sources detected above the defined threshold.
+    Only the source at `centre_pos` is kept in the returned mask. The `centre_pos` can be provided as
+    (x, y) pixels or a SkyCoord, in which case the `wcs` must be supplied. If no `position` is provided,
+    the image centre is assumed.
+
+    The smoothing kernel starts with a sigma of `initial_smooth_sigma`. After smoothing, if no source is
+    detected at `centre_pos`, the kernel is reduced in size by 20%. This repeats until a source is detected.
 
     The purpose of this mask is to mask ICL flux as completely as possible, so that it does not influence
     measurements of the background.
@@ -186,36 +197,50 @@ def create_icl_mask(
     threshold = nsigma * bkg.background_rms
     logger.debug(f"Average {nsigma} sigma detection threshold: {threshold.mean():.5f}")
 
-    logger.debug(f"Smoothing image with sigma={smooth_sigma}")
-    if median_filter:
-        logger.debug("Smoothing with a sampled median filter")
-        smoothed_image = sampled_median_filter(
-            image, size=smooth_sigma * 5, gaussian_sigma=smooth_sigma
+    smooth_sigma = initial_smooth_sigma
+    while True:
+        logger.debug(f"Smoothing image with sigma={smooth_sigma}")
+        if median_filter:
+            logger.debug("Smoothing with a sampled median filter")
+            smoothed_image = sampled_median_filter(
+                image, size=smooth_sigma * 5, gaussian_sigma=smooth_sigma
+            )
+        else:
+            logger.debug("Smoothing with a Gaussian kernel")
+            smoothed_image = smooth_image(image, sigma=smooth_sigma)
+
+        logger.debug("Detecting sources")
+        segm = detect_sources(data=smoothed_image, threshold=threshold, npixels=5)
+        logger.debug(f"Initial segmentation map contains {segm.nlabels} sources")
+
+        logger.debug("Keeping segment at specified position")
+        segm = keep_segment_at_position(segm, image, centre_pos, wcs)
+        if segm is None:
+            logger.debug("No ICL segment found, reducing size of smoothing kernel")
+            if smooth_sigma < 1:
+                break
+            else:
+                smooth_sigma = smooth_sigma * 0.8
+        else:
+            logger.debug(f"Segmentation map now contains {segm.nlabels} sources")
+            break
+
+    if segm is None:
+        logger.warning("Unable to create an ICL mask")
+        icl_mask = None
+    else:
+        if dilation_radius is not None:
+            logger.debug(f"Creating source mask with dilation radius {dilation_radius}")
+            footprint = circular_footprint(dilation_radius)
+        else:
+            logger.debug("Creating source mask without dilation")
+            footprint = None
+        icl_mask = segm.make_source_mask(footprint=footprint)
+
+        masked_percentage = np.sum(icl_mask) / icl_mask.size * 100
+        logger.info(
+            f"ICL mask created, {np.sum(icl_mask)} pixels masked ({masked_percentage:.2f}%)"
         )
-    else:
-        logger.debug("Smoothing with a Gaussian kernel")
-        smoothed_image = smooth_image(image, sigma=smooth_sigma)
-
-    logger.debug("Detecting sources")
-    segm = detect_sources(data=smoothed_image, threshold=threshold, npixels=5)
-    logger.debug(f"Initial segmentation map contains {segm.nlabels} sources")
-
-    logger.debug("Keeping segment at specified position")
-    segm = keep_segment_at_position(segm, image, centre_pos, wcs)
-    logger.debug(f"Segmentation map now contains {segm.nlabels} sources")
-
-    if dilation_radius is not None:
-        logger.debug(f"Creating source mask with dilation radius {dilation_radius}")
-        footprint = circular_footprint(dilation_radius)
-    else:
-        logger.debug("Creating source mask without dilation")
-        footprint = None
-    icl_mask = segm.make_source_mask(footprint=footprint)
-
-    masked_percentage = np.sum(icl_mask) / icl_mask.size * 100
-    logger.info(
-        f"ICL mask created, {np.sum(icl_mask)} pixels masked ({masked_percentage:.2f}%)"
-    )
 
     return icl_mask, smoothed_image
 

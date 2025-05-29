@@ -49,7 +49,7 @@ def calc_sb_threshold(
 
 # %% ../../nbs/euclid/mask.ipynb 8
 ICL_NSIGMA = 2
-ICL_SMOOTH_SIGMA = 10.0
+ICL_SMOOTH_SIGMA = 50.0
 ICL_BKG_BOX_SIZE = 300
 ICL_BKG_FILTER_SIZE = 3
 ICL_DILATION_RADIUS = 100
@@ -84,6 +84,7 @@ def create_masks(
     z=None,  # the cluster redshift for the BCG mask; if None then returned BCG mask is None
     filter=None,  # the filter name for the BCG mask; if None then returned BCG mask is None
     centre_pos=None,  # the position of the BCG/cluster centre; set to False for a non-cluster image
+    make_bcg_mask=False,  # whether to create a BCG mask to a standard surface brightness threshold
     make_faint_mask=True,  # whether to create a separate object mask in the ICL region
     zeropoint="ZPAB",  # the zeropoint, either as a header keyword or numeric value
     ICL_BKG_BOX_SIZE=300,
@@ -97,7 +98,12 @@ def create_masks(
     # === Bad pixels ===
     badpixel_mask = ~np.isfinite(image)
     # === BCG ===
-    if centre_pos is not False and z is not None and filter is not None:
+    if (
+        make_bcg_mask
+        and centre_pos is not False
+        and z is not None
+        and filter is not None
+    ):
         sb_threshold = calc_sb_threshold(z, filter)
         if isinstance(zeropoint, str):
             zp = image.header[zeropoint] * u.ABmag
