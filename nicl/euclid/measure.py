@@ -33,12 +33,13 @@ def mpc_to_pixels(z, pixel_scale_arcsec=0.3, physical_mpc=1.0):
     pixels_per_mpc = arcsec_per_mpc / pixel_scale_arcsec
     return pixels_per_mpc * physical_mpc
 
-# %% ../../nbs/euclid/measure.ipynb 4
+# %% ../../nbs/euclid/measure.ipynb 5
 def process_cluster_pipeline(
     image_dir,
     outdir,
     cluster_ids,
     filters,  # filter for detection image
+    field,  # the field where data belongs to. This ensures the field for correct noise properties to be taken from. e,g, EDFS, EDFF or EDFN
     mask_filter=None,  # filter for mask that will be applied on detection image
     mask_prefix=None,  # if certain mask parameters are changed and wanted to take a different name (useful during tests).
     cluster_info_table=None,
@@ -422,46 +423,51 @@ def process_cluster_pipeline(
 
                 # Loading noise file and finding appropriate box sized one...
                 if noise_file_path is not None:
-                    noise_bkg_sizes = np.array(
-                        [450, 500, 550, 650, 750, 1000, 1800, 2350]
-                    )
-                    idx = (np.abs(noise_bkg_sizes - box_size)).argmin()
-                    closest_bs = noise_bkg_sizes[idx]
-                    logger.info(
-                        f"1 Mpc at cluster corresponds to {box_size} and closest box size used in noise measurements is: {closest_bs}"
-                    )
+                    if field:
+                        print(f"Noise field is {field}")
+                        noise_bkg_sizes = np.array(
+                            [450, 500, 550, 650, 750, 1000, 1800, 2350]
+                        )
+                        idx = (np.abs(noise_bkg_sizes - box_size)).argmin()
+                        closest_bs = noise_bkg_sizes[idx]
+                        logger.info(
+                            f"1 Mpc at cluster corresponds to {box_size} and closest box size used in noise measurements is: {closest_bs}"
+                        )
 
-                    noise_file = (
-                        noise_file_path
-                        / f"Skypatch_bs{closest_bs}_{filter}_noise_measurements.csv"
-                    )
+                        noise_file = (
+                            noise_file_path
+                            / f"{field}_Skypatch_bs{closest_bs}_{filter}_noise_measurements.csv"
+                        )
 
-                    if noise_file.exists():
-                        noise_df = pd.read_csv(noise_file)
+                        if noise_file.exists():
+                            noise_df = pd.read_csv(noise_file)
+                        else:
+                            logger.warning(
+                                f"Noise file {noise_file.name} not found. Creating dummy noise data filled with zeros."
+                            )
+                            n_rows = len(data_df)
+                            noise_df = pd.DataFrame(
+                                {
+                                    "SMA_annulus_centre_noise": np.zeros(n_rows),
+                                    "MAD_median_clipped_flux_noise": np.zeros(n_rows),
+                                    "MAD_bkg_subtracted_flux_noise": np.zeros(n_rows),
+                                }
+                            )
+
+                        # Adding noise columns
+                        data_df["SMA_annulus_centre_noise"] = noise_df[
+                            "SMA_annulus_centre_arcsec"
+                        ]
+                        data_df["MAD_median_clipped_flux_noise"] = noise_df[
+                            "MAD_Median_Clipped_Flux"
+                        ]
+                        data_df["MAD_bkg_subtracted_flux_noise"] = noise_df[
+                            "MAD_Bkg_Subtracted_Flux"
+                        ]
                     else:
-                        logger.warning(
-                            f"Noise file {noise_file.name} not found. Creating dummy noise data filled with zeros."
+                        raise ValueError(
+                            "Field needs to be provided to ensure correct noise properties are added to the cluster profile file."
                         )
-                        n_rows = len(data_df)
-                        noise_df = pd.DataFrame(
-                            {
-                                "SMA_annulus_centre_noise": np.zeros(n_rows),
-                                "MAD_median_clipped_flux_noise": np.zeros(n_rows),
-                                "MAD_bkg_subtracted_flux_noise": np.zeros(n_rows),
-                            }
-                        )
-
-                    # Adding noise columns
-                    data_df["SMA_annulus_centre_noise"] = noise_df[
-                        "SMA_annulus_centre_arcsec"
-                    ]
-                    data_df["MAD_median_clipped_flux_noise"] = noise_df[
-                        "MAD_Median_Clipped_Flux"
-                    ]
-                    data_df["MAD_bkg_subtracted_flux_noise"] = noise_df[
-                        "MAD_Bkg_Subtracted_Flux"
-                    ]
-
                 # Cleaning nans for Autoprof, it hates nans
                 data_df.fillna(0, inplace=True)
 
