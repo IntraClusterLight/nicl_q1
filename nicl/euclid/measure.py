@@ -75,11 +75,14 @@ def process_cluster_pipeline(
                     cluster_info_table.Label_ID == cluster_id
                 ].reset_index(drop=True)
                 cluster_z = cluster_info.BEST_Z[0]
-                bcg_pos = SkyCoord(
-                    cluster_info.RA_BCG[0] * u.deg,
-                    cluster_info.DEC_BCG[0] * u.deg,
-                    frame="icrs",
-                )
+                if bcg_pos is None:
+                    bcg_pos = SkyCoord(
+                        cluster_info.RA_BCG[0] * u.deg,
+                        cluster_info.DEC_BCG[0] * u.deg,
+                        frame="icrs",
+                    )
+                else:
+                    bcg_pos = bcg_pos
 
         if cluster_z is not None:
             cluster_z = cluster_z
