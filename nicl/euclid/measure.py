@@ -69,26 +69,42 @@ def process_cluster_pipeline(
         cluster_output_dir = outdir / cluster_id
         cluster_output_dir.mkdir(parents=True, exist_ok=True)
 
-        if not mock_image:
-            if cluster_info_table is not None:
-                cluster_info = cluster_info_table[
-                    cluster_info_table.Label_ID == cluster_id
-                ].reset_index(drop=True)
-                cluster_z = cluster_info.BEST_Z[0]
-                if bcg_pos is None:
-                    bcg_pos = SkyCoord(
-                        cluster_info.RA_BCG[0] * u.deg,
-                        cluster_info.DEC_BCG[0] * u.deg,
-                        frame="icrs",
-                    )
-                else:
-                    bcg_pos = bcg_pos
-
-        if cluster_z is not None:
-            cluster_z = cluster_z
-            bcg_pos = bcg_pos
+        if cluster_z is None:
+            if (
+                cluster_info_table is not None
+                and "BEST_Z" in cluster_info_table.columns
+            ):
+                cluster_z = float(cluster_info_table.BEST_Z[0])
+                logger.info(f"Cluster redshift is taken from table: z = {cluster_z}")
+            else:
+                raise ValueError(
+                    "Cluster redshift must be provided (either directly or via cluster_info_table)."
+                )
         else:
-            raise ValueError("Cluster redshift must be provided...")
+            logger.info(
+                f"Cluster redshift is taken from passed argument: z = {cluster_z}"
+            )
+
+        if bcg_pos is None:
+            if cluster_info_table is not None and {"RA_BCG", "DEC_BCG"}.issubset(
+                cluster_info_table.columns
+            ):
+                bcg_pos = SkyCoord(
+                    float(cluster_info_table.RA_BCG[0]) * u.deg,
+                    float(cluster_info_table.DEC_BCG[0]) * u.deg,
+                    frame="icrs",
+                )
+                logger.info(
+                    f"BCG position taken from table: RA = {bcg_pos.ra.deg}, Dec = {bcg_pos.dec.deg}"
+                )
+            else:
+                raise ValueError(
+                    "BCG coordinates must be provided (either directly or via cluster_info_table)."
+                )
+        else:
+            logger.info(
+                f"BCG position is taken from passed argument: RA = {bcg_pos.ra.deg}, Dec = {bcg_pos.dec.deg}"
+            )
 
         logger.info(
             f"Cluster id: {cluster_id}, redshift: {cluster_z}, BCG coords: {bcg_pos}"
