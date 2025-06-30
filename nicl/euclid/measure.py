@@ -343,12 +343,12 @@ def process_cluster_pipeline(
                     image_files=[str(cleaned_image_path)],
                     mask_files=[str(mask_path)] if masking else None,
                     out_dir=str(AP_results_dir),
+                    gscale=gscale,
                     forced_photometry=forced_photometry,
                     forced_profile_filter=forced_profile_filter,
                     forced_profile_path=str(forced_profile_path)
                     if forced_photometry
                     else None,
-                    gscale=gscale,
                 )
 
                 ###### Cleaning some of the excess diagnostic plots ....
