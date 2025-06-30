@@ -45,6 +45,7 @@ def process_cluster_pipeline(
     cluster_info_table=None,
     cluster_z=None,
     pixelscale=0.3,
+    gscale=0.4,
     bcg_pos=None,  # Skycoord object
     mock_image=False,
     masking=True,
@@ -344,9 +345,8 @@ def process_cluster_pipeline(
                     out_dir=str(AP_results_dir),
                     forced_photometry=forced_photometry,
                     forced_profile_filter=forced_profile_filter,
-                    forced_profile_path=str(forced_profile_path)
-                    if forced_photometry
-                    else None,
+                    forced_profile_path=str(forced_profile_path),
+                    gscale=gscale if forced_photometry else None,
                 )
 
                 ###### Cleaning some of the excess diagnostic plots ....
