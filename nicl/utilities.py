@@ -650,6 +650,8 @@ def fast_median_error(data, axis=None):
     The median error is estimated as 1.253 * MAD / sqrt(n), where MAD is
     the median absolute deviation and n is the number of finite samples.
 
+    Raises a ValueError if the specified axis has length 1 or the data size is <= 1.
+
     Parameters
     ----------
     data : array-like
@@ -662,11 +664,6 @@ def fast_median_error(data, axis=None):
     float or ndarray
         Estimated standard error of the median. Scalar if `axis` is None or the
         selected axis has length 1, otherwise an array with that axis removed.
-
-    Raises
-    ------
-    ValueError
-        If the specified axis has length 1 or data size <= 1.
 
     """
     data = np.asarray(data)
