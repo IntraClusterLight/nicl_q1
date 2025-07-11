@@ -10,10 +10,10 @@ import logging
 
 # %% ../nbs/00_main.ipynb 3
 def configure_logging(level=None, name=None, logfile=None):
-    # ensure the nicl logger is set up
-    nicl_logger = logging.getLogger("nicl")
-    if logfile is not None or len(nicl_logger.handlers) == 0:
-        nicl_logger.handlers.clear()
+    # ensure the root logger is set up
+    root_logger = logging.getLogger()
+    if logfile is not None or len(root_logger.handlers) == 0:
+        root_logger.handlers.clear()
         formatter = logging.Formatter(
             fmt="%(asctime)s - %(name)s.%(funcName)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
@@ -23,7 +23,9 @@ def configure_logging(level=None, name=None, logfile=None):
         else:
             handler = logging.StreamHandler()
         handler.setFormatter(formatter)
-        nicl_logger.addHandler(handler)
+        root_logger.addHandler(handler)
+        root_logger.setLevel("WARNING")
+        nicl_logger = logging.getLogger("nicl")
         nicl_logger.setLevel("WARNING")
     # set the level for the specific logger
     if name is None:
