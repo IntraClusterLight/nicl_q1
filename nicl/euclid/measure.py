@@ -45,6 +45,7 @@ def process_cluster_pipeline(
     cluster_info_table=None,
     cluster_z=None,
     pixelscale=0.3,
+    gscale=0.4,
     bcg_pos=None,  # Skycoord object
     mock_image=False,
     masking=True,
@@ -342,6 +343,7 @@ def process_cluster_pipeline(
                     image_files=[str(cleaned_image_path)],
                     mask_files=[str(mask_path)] if masking else None,
                     out_dir=str(AP_results_dir),
+                    gscale=gscale,
                     forced_photometry=forced_photometry,
                     forced_profile_filter=forced_profile_filter,
                     forced_profile_path=str(forced_profile_path)
