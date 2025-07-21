@@ -21,16 +21,44 @@ changing to the root repository folder, and running:
 
     pip install .
 
+You will also need working installations of SWarp and AutoProf on your
+path.
+
+#### SWarp
+
+If you are using a conda environment you can install SWarp with
+`conda install conda-forge::astromatic-swarp`. Alternatively, see the
+[SWarp homepage](https://www.astromatic.net/software/swarp/) for Linux
+binaries or to build from source.
+
+#### AutoProf
+
+While AutoProf is a Python package, it currently (as of May 2025)
+requires old versions of several key packages, e.g. photutils. To avoid
+the same requirements for nicl, AutoProf is not included as a
+dependency, but instead should be installed in a separate environment.
+To achieve this, using conda, you can do the following
+
+    conda create -y -n autoprof python=3.12
+    conda activate autoprof
+    pip install autoprof
+    AUTOPROF=`which autoprof`
+    conda deactivate
+
+Then, activate the environment in which you have installed nicl,
+e.g. `conda activate icl`, and create a symlink the main AutoProf script
+in the binary folder, as follows:
+
+    ln -sf $AUTOPROF $CONDA_PREFIX/bin/
+
 ### Development install
 
 To install the software for development, first create a clean Python
-(\>= 3.12) environment. Clone this repository and change to the root
-repository folder. With your environment activated, install nbdev by
-running:
-
-    pip install -U nbdev
-
-Then install nicl and all its dependencies with:
+(\>= 3.12) environment. This could be a virtualenv or a conda
+environment (e.g. `conda create -n icl python=3.12`). Clone this
+repository and change to the root repository folder. With your
+environment activated (e.g. `conda activate icl`), install nicl and all
+its dependencies with:
 
     pip install -e '.[dev]'
 
@@ -38,19 +66,13 @@ The `-e` here performs an ‘editable’ installation, i.e. the files in the
 repository are used directly, rather than being copied to a central
 location.
 
-If you prefer to use conda, you can alternatively first install
-dependencies using:
-
-    conda env create -f environment.yaml
-
-followed by
-
-    pip install -e '.[dev]'
+To run particular elements of the code you will also need to have SWarp
+and/or AutoProf installed; see the instructions above.
 
 The core code, documentation, tests and applications are written in
 Jupyter notebooks. To faciliate this, the development of this software
-uses [nbdev](https://nbdev.fast.ai). To understand this system, you
-should familiarise yourself with the [introductory
+uses [nbdev](https://nbdev.fast.ai). To understand this system, you must
+familiarise yourself with the [introductory
 walkthrough](https://nbdev.fast.ai/tutorials/tutorial.html).
 
 To ensure the code committed to the repository is well-formatted and
