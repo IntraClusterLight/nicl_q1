@@ -62,6 +62,7 @@ class DataAccess:
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
         self.mer_filename_lookup = self.get_mer_filename_lookup()
+        self.logger = logging.getLogger(__name__)
 
     def tap_login(self):
         self.tap.login(user=self.esa_username, password=self.esa_password)
@@ -313,7 +314,7 @@ class DataAccess:
                 except (Exception, KeyboardInterrupt):
                     if outfn.exists():
                         os.remove(outfn)
-                    raise
+                    self.logger.warning(f"Error downloading {filename}")
             else:
                 print(f"File already exists, skipping: {outfn}")
 
