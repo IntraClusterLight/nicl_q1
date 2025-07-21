@@ -199,7 +199,9 @@ def create_icl_mask(
             filter_size=bkg_filter_size,
         )
     threshold = nsigma * bkg.background_rms
-    logger.debug(f"Average {nsigma} sigma detection threshold: {threshold.mean():.5f}")
+    logger.debug(
+        f"Average {nsigma} sigma detection threshold is {threshold.mean():.5f}"
+    )
 
     smooth_sigma = initial_smooth_sigma
     while True:
@@ -275,7 +277,7 @@ def fast_mask(
     if mask_params:
         params.update(mask_params)
     if params["smooth_sigma"] > 0:
-        logger.info(f"smoothing image with sigma of {params['smooth_sigma']} pixels")
+        logger.debug(f"smoothing image with sigma of {params['smooth_sigma']} pixels")
         smoothed_image = smooth_image(image, params["smooth_sigma"])
     else:
         smoothed_image = image
@@ -283,7 +285,7 @@ def fast_mask(
     previous_rms = np.inf
     mask = None
     for i in range(max_repeat + 1):
-        logger.info(f"iteration {i}")
+        logger.debug(f"iteration {i}")
         if mask is not None:
             valid_pixels = image[~mask & np.isfinite(image)]
         else:
@@ -291,9 +293,9 @@ def fast_mask(
         if estimate_background:
             logger.debug(f"estimating background from {len(valid_pixels)} pixels")
             bkg = np.median(valid_pixels)
-            logger.info(f"estimated background is {bkg}")
+            logger.debug(f"estimated background is {bkg}")
         rms = np.median(abs(valid_pixels - bkg)) / 0.67449
-        logger.info(f"background RMS is {rms:.5f}")
+        logger.debug(f"background RMS is {rms:.5f}")
         if abs(rms - previous_rms) / rms < relative_rms_tolerance:
             break
         previous_rms = rms
@@ -392,7 +394,7 @@ def create_object_mask(
     }
     if detection_params:
         params.update(detection_params)
-    logger.info("Estimating background and detection threshold")
+    logger.debug("Estimating background and detection threshold")
     if params["bkg_box_size"] is not None:
         with catch_warnings():
             filterwarnings("ignore", ".*Input data contains invalid values*")
@@ -410,16 +412,18 @@ def create_object_mask(
             nsigma=params["nsigma"],
             background=bkg,
         )
-    logger.info(f"Average {params['nsigma']} sigma threshold is {threshold.mean():.5f}")
-    logger.info("Smoothing image")
+    logger.debug(
+        f"Average {params['nsigma']} sigma detection threshold is {threshold.mean():.5f}"
+    )
+    logger.debug("Smoothing image")
     detection_image = smooth_image(image, sigma=params["smooth_sigma"])
-    logger.info("Detecting sources")
+    logger.debug("Detecting sources")
     segm = detect_sources(
         data=detection_image,
         threshold=threshold,
         npixels=params["npixels"],
     )
-    logger.info(f"Deblending {segm.nlabels} sources")
+    logger.debug(f"Deblending {segm.nlabels} sources")
     with catch_warnings():
         filterwarnings("ignore", ".*[Dd]eblending mode.*changed.*")
         segm_deblend = deblend_sources(
@@ -430,30 +434,30 @@ def create_object_mask(
             contrast=params["contrast"],
             progress_bar=False,
         )
-    logger.info(f"Object mask contains {segm_deblend.nlabels} sources")
+    logger.debug(f"Object mask contains {segm_deblend.nlabels} sources")
     segm_full = segm_deblend.copy()
     if exclude_mask is not None:
-        logger.info(f"Supplied exclude mask contains {exclude_mask.sum()} pixels")
+        logger.debug(f"Supplied exclude mask contains {exclude_mask.sum()} pixels")
         segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=True)
     elif exclude_position is not False:
-        logger.info("Removing segment at exclude_position")
+        logger.debug("Removing segment at exclude_position")
         segm_deblend = remove_segment_at_position(
             segm_deblend, image, exclude_position, wcs
         )
     nlabels_centre = segm_full.nlabels - segm_deblend.nlabels
     if nlabels_centre > 0:
-        logger.info(f"Removed {nlabels_centre} sources at the centre")
-        logger.info(f"Object mask now contains {segm_deblend.nlabels} sources")
+        logger.debug(f"Removed {nlabels_centre} sources at the centre")
+        logger.debug(f"Object mask now contains {segm_deblend.nlabels} sources")
         excluded_labels = set(segm_full.labels) - set(segm_deblend.labels)
         segm_excluded = segm_full.copy()
         segm_excluded.keep_labels(list(excluded_labels))
         new_exclude_mask = segm_excluded.make_source_mask()
         if exclude_mask is not None:
             new_exclude_mask |= exclude_mask
-        logger.info(f"New exclude mask contains {new_exclude_mask.sum()} pixels")
+        logger.debug(f"New exclude mask contains {new_exclude_mask.sum()} pixels")
     else:
         new_exclude_mask = None
-    logger.info("Dilating mask")
+    logger.debug("Dilating mask")
     obj_mask = dilated_object_mask(segm_deblend, growth)
     return obj_mask, bkg, threshold, new_exclude_mask
 
@@ -488,7 +492,9 @@ def create_faint_mask(
     threshold = detect_threshold(
         image.data, nsigma=params["nsigma"], background=bkg, error=rms
     )
-    logger.info(f"Average {params['nsigma']} sigma threshold is {threshold.mean():.5f}")
+    logger.info(
+        f"Average {params['nsigma']} sigma detection threshold is {threshold.mean():.5f}"
+    )
     logger.info("Smoothing image")
     detection_image = smooth_image(image, sigma=params["smooth_sigma"])
     if include_mask is not None:

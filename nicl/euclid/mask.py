@@ -15,6 +15,7 @@ from pathlib import Path
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
+from astropy.constants import c as c0
 from astropy.io import fits
 from astropy.nddata import CCDData
 
@@ -87,7 +88,7 @@ def create_masks(
     make_bcg_mask=False,  # whether to create a BCG mask to a standard surface brightness threshold
     make_faint_mask=True,  # whether to create a separate object mask in the ICL region
     zeropoint="ZPAB",  # the zeropoint, either as a header keyword or numeric value
-    ICL_BKG_BOX_SIZE=300,
+    icl_bkg_box_size=300,
 ):
     """Create BCG, ICL, object and faint masks with default settings for Euclid data.
 
@@ -126,7 +127,7 @@ def create_masks(
             wcs=image.wcs,
             nsigma=ICL_NSIGMA,
             initial_smooth_sigma=ICL_INITIAL_SMOOTH_SIGMA,
-            bkg_box_size=ICL_BKG_BOX_SIZE,
+            bkg_box_size=icl_bkg_box_size,
             bkg_filter_size=ICL_BKG_FILTER_SIZE,
             dilation_radius=ICL_DILATION_RADIUS,
             median_filter=ICL_MEDIAN_FILTER,
@@ -203,14 +204,24 @@ def stack_nir_bands(H_filename, J_filename, Y_filename, output_dir=None, label=N
     for band in ["H", "J", "Y"]:
         images[band][global_mask] = np.nan
 
-    bandwidth = {"H": 499.9, "J": 399.4, "Y": 262.7}
+    bandwidth_ranges = {"H": [1522, 2020], "J": [1168, 1566], "Y": [950, 1212]}  # nm
+    bandwidth = {}
+    for band, (low_nm, high_nm) in bandwidth_ranges.items():
+        f_high = c0.value / (low_nm * 1e-9)  # Hz
+        f_low = c0.value / (high_nm * 1e-9)  # Hz
+        bandwidth[band] = f_high - f_low  # bandwidth in Hz
     total_bandwidth = sum(bandwidth.values())
+    band_weights = {}
+    for band, width in bandwidth.items():
+        band_weights[band] = round(width / total_bandwidth, 3)
+
+    logger.info(f"Band weights: {band_weights}")
 
     combined_image = (
-        (images["H"] * bandwidth["H"])
-        + (images["J"] * bandwidth["J"])
-        + (images["Y"] * bandwidth["Y"])
-    ) / total_bandwidth
+        (images["H"] * band_weights["H"])
+        + (images["J"] * band_weights["J"])
+        + (images["Y"] * band_weights["Y"])
+    )
 
     logger.debug(
         f"Combined Image: Min={np.nanmin(combined_image)}, Max={np.nanmax(combined_image)}, NaN Count={np.isnan(combined_image).sum()}"
@@ -241,56 +252,70 @@ def create_combined_nir_mask(
     output_dir=None,
     label=None,
     centre_pos=None,
-    redshift=None,
-    filter=None,
-    zeropoint=23.9,
-    ICL_BKG_BOX_SIZE=300,
-    NIR_STACK_BKG_BOX_SIZE=300,
+    icl_bkg_box_size=300,
+    nir_stack_bkg_box_size=300,
 ):
     """Create a combined NIR mask for use when measuring ICL."""
     logger = logging.getLogger(__name__)
     filenames = {"H": H_filename, "J": J_filename, "Y": Y_filename}
-    images = {}
 
+    def save_temp_image(image, filename, wcs=None):
+        temp_dir = output_dir / "tmp/nir_mask"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        fn = temp_dir / f"{filename}.fits"
+        if image.dtype == "bool":
+            image = image.astype("uint8")
+        temp_ccd = CCDData(image, unit="adu", wcs=wcs)
+        temp_ccd.write(fn, overwrite=True)
+        return fn
+
+    bkgsub_filenames = {}
     for band in ["H", "J", "Y"]:
         image = CCDData.read(filenames[band], unit="adu")
 
+        logger.info(f"Creating masks for {band} band...")
         m = create_masks(
             image,
             make_faint_mask=False,
             centre_pos=centre_pos,
-            z=redshift,
-            filter=filter,
-            zeropoint=23.9,
-            ICL_BKG_BOX_SIZE=ICL_BKG_BOX_SIZE,
+            icl_bkg_box_size=icl_bkg_box_size,
         )
 
         if centre_pos is not False:
             mask_for_background = m["badpixel"] | m["icl"] | m["object"]
-
         else:
             mask_for_background = m["badpixel"] | m["object"]
 
+        # Saving temp masks
+        save_temp_image(m["object"], f"object_mask_{band}", wcs=image.wcs)
+        save_temp_image(mask_for_background, f"mask_for_bkg_{band}", wcs=image.wcs)
+
+        logger.info(f"Estimating background for {band} band...")
         bkg = get_background(
             image.data,
             mask=mask_for_background,
-            box_size=NIR_STACK_BKG_BOX_SIZE,
+            box_size=nir_stack_bkg_box_size,
             filter_size=NIR_STACK_BKG_FILTER_SIZE,
         )
 
+        # Saving temp background
+        save_temp_image(bkg.background, f"bkg_{band}", wcs=image.wcs)
+
+        logger.info(f"Subtracting background for {band} band...")
         image_bkg_sub = image.data - bkg.background
-        images[band] = image_bkg_sub
 
         # Saving temp background-subtracted image
-        temp_filename = f"_temp_bkgsub_{band}.fits"
-        temp_ccd = CCDData(image_bkg_sub, unit="adu", wcs=image.wcs)
-        temp_ccd.write(temp_filename, overwrite=True)
-        filenames[band] = temp_filename
+        temp_filename = save_temp_image(image_bkg_sub, f"bkgsub_{band}", wcs=image.wcs)
+        bkgsub_filenames[band] = temp_filename
 
     # Now pass temp files to stacking function
     logger.info("Proceeding to stack_nir_bands...")
     combined_ccd = stack_nir_bands(
-        filenames["H"], filenames["J"], filenames["Y"], output_dir=None, label=None
+        bkgsub_filenames["H"],
+        bkgsub_filenames["J"],
+        bkgsub_filenames["Y"],
+        output_dir=None,
+        label=None,
     )
     logger.info("stack_nir_bands is complete...")
 
@@ -299,9 +324,8 @@ def create_combined_nir_mask(
         output_dir.mkdir(parents=True, exist_ok=True)
         prefix = f"{label}_" if label else ""
         header = combined_ccd.wcs.to_header()
-
         fits.writeto(
-            output_dir / f"{prefix}NIR_YJH_coadded.fits",
+            output_dir / f"{prefix}YJH.fits",
             combined_ccd.data,
             header=header,
             overwrite=True,
@@ -310,48 +334,32 @@ def create_combined_nir_mask(
 
     logger.info("Masking the coadded image...")
 
-    masks = create_masks(
-        combined_ccd, centre_pos=centre_pos, z=redshift, filter=filter, zeropoint=23.9
-    )
+    masks = create_masks(combined_ccd, centre_pos=centre_pos)
 
     if centre_pos is not False:
         mask_for_background = masks["badpixel"] | masks["icl"] | masks["object"]
+        mask_for_measurement = masks["badpixel"] | masks["object"] | masks["faint"]
     else:
         mask_for_background = masks["badpixel"] | masks["object"]
-
-    faint_mask = (
-        masks["faint"]
-        if masks["faint"] is not None
-        else np.zeros_like(masks["object"], dtype=bool)
-    )
-    mask_for_measurement = masks["badpixel"] | masks["object"] | faint_mask
+        mask_for_measurement = masks["badpixel"] | masks["object"]
 
     logger.info("Masks are generated...")
 
-    if output_dir:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        prefix = f"{label}_" if label else ""
-        header = combined_ccd.wcs.to_header()
+    save_temp_image(masks["object"], "object_mask_YJH")
 
+    if output_dir:
         fits.writeto(
-            output_dir / f"{prefix}NIR_background_mask.fits",
+            output_dir / f"{prefix}YJH_background_mask.fits",
             mask_for_background.astype("uint8"),
             header=header,
             overwrite=True,
         )
         fits.writeto(
-            output_dir / f"{prefix}NIR_measurement_mask.fits",
+            output_dir / f"{prefix}YJH_measurement_mask.fits",
             mask_for_measurement.astype("uint8"),
             header=header,
             overwrite=True,
         )
-
-    # Cleanup temp files
-    for band in ["H", "J", "Y"]:
-        temp_file = filenames[band]
-        if "_temp_bkgsub_" in temp_file and Path(temp_file).exists():
-            Path(temp_file).unlink()
 
     return mask_for_background, mask_for_measurement, combined_ccd.data
 
@@ -363,7 +371,7 @@ def create_vis_mask(
     centre_pos=None,
     redshift=None,
     filter=None,
-    ICL_BKG_BOX_SIZE=300,
+    icl_bkg_box_size=300,
 ):
     """Create a VIS mask for use when measuring ICL."""
     image = CCDData.read(VIS_filename, unit="adu")
@@ -373,7 +381,7 @@ def create_vis_mask(
         z=redshift,
         filter=filter,
         zeropoint=23.9,
-        ICL_BKG_BOX_SIZE=ICL_BKG_BOX_SIZE,
+        icl_bkg_box_size=icl_bkg_box_size,
     )
 
     if centre_pos is not False:
