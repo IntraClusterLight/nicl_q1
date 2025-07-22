@@ -129,7 +129,10 @@ class ClusterPipeline:
         return isophotes_filter
 
     def _validate_bcg_pos(self, bcg_pos):
-        if isinstance(bcg_pos, SkyCoord):
+        if isinstance(bcg_pos, str):
+            bcg_pos = SkyCoord(bcg_pos)
+            self.logger.debug(f"BCG position parsed from passed argument: {bcg_pos}")
+        elif isinstance(bcg_pos, SkyCoord):
             self.logger.debug(f"BCG position is taken from passed argument: {bcg_pos}")
         elif bcg_pos is None:
             self.logger.debug("BCG position will be taken as centre of the image.")
@@ -230,13 +233,14 @@ class ClusterPipeline:
             )
         return bkg_mask_path
 
-    def _create_masks_if_needed(self):
+    def create_masks(self):
         try:
             self._get_masks()
         except FileNotFoundError:
             self._create_masks()
 
     def _create_masks(self):
+        self._create_output_dir()
         mask_name = self._get_mask_name()
         if self.mask_filter == "YJH":
             self.logger.info(f"Creating new NIR masks for {mask_name}...")
@@ -299,7 +303,7 @@ class ClusterPipeline:
         self.cluster_output_dir = self.outdir / self.cluster_id
         self.cluster_output_dir.mkdir(parents=True, exist_ok=True)
 
-    def _run_autoprof(self, filter):
+    def measure_isophotes(self, filter):
         self.logger.info(
             f"Getting AutoProf isophotes for {self.cluster_id} in {filter} band"
         )
@@ -400,12 +404,16 @@ class ClusterPipeline:
                 except Exception as e:
                     self.logger.warning(f"Could not delete {name}: {e}")
 
-    def _extract_sb_profile(self, filter, autoprof_filename):
+    def measure_photometry(self, filter, isophotes_filter=None):
         self.logger.info(f"Subtracting background with box size {self.box_size} pixels")
         image_filename = self._get_image_filename(filter)
         mask_path, bkg_mask_path = self._get_masks()
         temp_dir = self.cluster_output_dir / "tmp/sb_profile"
-        label = self._get_photometry_name(autoprof_filename.stem, filter)
+        isophotes_name = self._get_isophotes_name(isophotes_filter)
+        label = self._get_photometry_name(isophotes_name, filter)
+        autoprof_filename = (
+            self.cluster_output_dir / "autoprof_results" / f"{isophotes_name}.prof"
+        )
 
         bkgsub_image_filename = create_bkgsub_clean_images(
             image_filenames=image_filename,
@@ -438,7 +446,8 @@ class ClusterPipeline:
 
         flux_outfile = self.cluster_output_dir / f"{label}-profile_measurements.csv"
         flux_measurements.to_csv(flux_outfile, index=False)
-        return flux_outfile
+        profile_df = self._merge_profiles(filter, autoprof_filename, flux_outfile)
+        return profile_df, flux_outfile
 
     def _get_noise_profile(self, filter):
         # Loading noise file and finding appropriate box sized one...
@@ -618,13 +627,10 @@ class ClusterPipeline:
             f"Processing {filter} band image with {self.mask_filter} band mask."
         )
 
-        self._create_output_dir()
-        self._create_masks_if_needed()
-        autoprof_filename = self._run_autoprof(filter)
+        self.create_masks()
+        self.measure_isophotes(filter)
         if extract_sb_profile:
-            sb_profile_filename = self._extract_sb_profile(filter, autoprof_filename)
-            profile_df = self._merge_profiles(
-                filter, autoprof_filename, sb_profile_filename
-            )
+            profile_df, sb_profile_filename = self.measure_photometry(filter)
+            # FIXME: The plotting code should find and read the correct isophotes file independently
             if plot_profiles:
                 self._plot_profiles(profile_df, sb_profile_filename.stem)
