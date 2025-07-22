@@ -5,12 +5,14 @@ from astropy.table import Table
 
 if __name__ == "__main__":
     table = Table.read("~/euclid_data/catalogues/EDFS_EDFF_DES_Sample.fits")
-    for row in table[:1]:
+    for row in table:
         z = str(row["BEST_Z"])
+        if z == "--":
+            continue
         ra = row["RA_BCG"]
         dec = row["DEC_BCG"]
         centre = SkyCoord(ra=ra, dec=dec, unit="deg")
-        centre = centre.to_string()
+        centre = centre.to_string(precision=8)
         cluster_id = row["Label_ID"]
         cluster_id = cluster_id.replace("Cluster", "")
         initials = "TK" if cluster_id.startswith("E") else "JGM"
