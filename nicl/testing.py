@@ -23,7 +23,8 @@ def create_test_background(
     rms=1.0,  # rms of the Gaussian background noise, in absence of spatial variations
     background_scale=100,  # scale, in pixels, of the spatial background variations
     background_rms=0.1,  # rms of the spatial background variations
-):  # `random`, `background`, `random_with_background`
+    return_all=True,
+):  # `random`, `background`, `random_with_background` if return_all, otherwise just `random_with_background`
     """Create a background image for testing.
 
     A `random` flat background is created by sampling a Gaussian distribution with the
@@ -33,7 +34,6 @@ def create_test_background(
     `background_scale`. This spatially varying background is scaled to have an rms of
     `background_rms`. The two are summed to produce `random_with_background`.
     """
-    random = norm(0, rms).rvs(size=shape)
     if (
         background_rms is not None
         and background_rms > 0
@@ -46,8 +46,16 @@ def create_test_background(
         background *= background_rms / background.std()
     else:
         background = np.zeros(shape)
-    random_with_background = random + background
-    return random, background, random_with_background
+    random = norm(0, rms).rvs(size=shape)
+    if return_all:
+        random_with_background = random + background
+    else:
+        background += norm(0, rms).rvs(size=shape)
+        del random
+    if return_all:
+        return random, background, random_with_background
+    else:
+        return background
 
 
 def create_test_mask(

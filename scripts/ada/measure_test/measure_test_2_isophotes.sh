@@ -18,6 +18,6 @@ module load anaconda-uoneasy/2023.09-0
 eval "$(conda shell.bash hook)"
 conda activate icl
 
-command="python ../../run_measure.py --test-name \"$1\" --measure-isophotes --isophotes-filter \"$2\" --image-label \"$3\""
+command="python ../../run_measure.py --test-name $1 --measure-isophotes --isophotes-filter $2 --image-label $3"
 echo $command
 $command
