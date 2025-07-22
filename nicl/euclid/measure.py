@@ -98,6 +98,7 @@ class ClusterPipeline:
         self.noise_file_dir = self._validate_path(noise_file_dir, is_dir=True)
         self.noise_field = noise_field
         self._set_box_size(box_size)
+        self.cluster_output_dir = self.outdir / self.cluster_id
 
     def _validate_filters(self, filters):
         filters = [filters] if isinstance(filters, str) else filters
@@ -282,25 +283,27 @@ class ClusterPipeline:
         if filter == "YJH":
             search_dir = self.cluster_output_dir
             pattern = f"{self.cluster_id}{suffix}_{filter}.fits"
+            self.logger.debug(f"Searching for {pattern} in {search_dir}")
             matches = list(search_dir.glob(pattern))
         else:
             search_dir = self.image_dir
             pattern = f"{self.cluster_id}[_-]{filter}{suffix}.fits"
+            self.logger.debug(f"Searching for {pattern} in {search_dir}")
             matches = list(search_dir.glob(pattern))
-            pattern = f"*[_-]{filter}[_-]{self.cluster_id}{suffix}.fits"
+            pattern = f"*[_-]{filter}[_-]*{self.cluster_id}{suffix}.fits"
+            self.logger.debug(f"Searching for {pattern} in {search_dir}")
             matches += list(search_dir.glob(pattern))
         if len(matches) == 0:
             raise FileNotFoundError(
-                f"No image found for cluster {self.cluster_id} and filter {filter} in {search_dir}"
+                f"No image found for {self.cluster_id} and filter {filter} in {search_dir}"
             )
         if len(matches) > 1:
             raise FileNotFoundError(
-                f"Multiple images found for cluster {self.cluster_id} and filter {filter} in {search_dir}"
+                f"Multiple images found for {self.cluster_id} and filter {filter} in {search_dir}"
             )
         return str(matches[0])
 
     def _create_output_dir(self):
-        self.cluster_output_dir = self.outdir / self.cluster_id
         self.cluster_output_dir.mkdir(parents=True, exist_ok=True)
 
     def measure_isophotes(self, filter):

@@ -8,15 +8,14 @@ The masks must be created first, and then the isophotes and photometry can be me
 import argparse
 import logging
 
+from astropy.coordinates import SkyCoord
+
 from nicl import configure_logging
 from nicl.euclid.measure import ClusterPipeline
 from nicl.euclid.utilities import default_data_path
 
 if __name__ == "__main__":
-    configure_logging(logfile=default_data_path("test_measure") / "measure.log")
-    configure_logging(name="__main__", level="DEBUG")
-    configure_logging(name="nicl.euclid.mask", level="DEBUG")
-    configure_logging(name="nicl.mask", level="DEBUG")
+    configure_logging(level="DEBUG")
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(
@@ -39,8 +38,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--cluster-centre",
-        type=str,
-        help="RA and Dec of the centre of the cluster.",
+        nargs=2,
+        type=float,
+        help="RA and Dec of the centre of the cluster, in degrees",
     )
     parser.add_argument(
         "--image-dir",
@@ -56,7 +56,6 @@ if __name__ == "__main__":
         "--output-dir",
         type=str,
         help="Name of the directory in which to save the output.",
-        required=True,
     )
     parser.add_argument(
         "--isophotes-filter",
@@ -69,6 +68,11 @@ if __name__ == "__main__":
         type=str,
         choices=["Y", "J", "H", "YJH", "VIS"],
         help="Filter in which to measure photometry.",
+    )
+    parser.add_argument(
+        "--true-model",
+        action="store_true",
+        help="Measuring a true model, i.e. do not use a mask, do not estimate background.",
     )
     process = parser.add_mutually_exclusive_group(required=True)
     process.add_argument(
@@ -95,16 +99,31 @@ if __name__ == "__main__":
         args.cluster_centre = None
         args.image_dir = f"test_images/{args.test_name}"
         args.output_dir = f"test_measure/{args.test_name}"
-    image_path = default_data_path(args.image_dir) / args.name
-    out_path = default_data_path(args.output_dir) / args.name
+    else:
+        if None in [args.cluster_id, args.cluster_z, args.image_dir, args.output_dir]:
+            parser.error("Missing required arguments")
+    image_path = default_data_path(args.image_dir)
+    out_path = default_data_path(args.output_dir)
+    box_size = None  # use the default box size of 1 Mpc
+    if args.cluster_centre:
+        cluster_centre = SkyCoord(
+            ra=args.cluster_centre[0], dec=args.cluster_centre[1], unit="deg"
+        )
+    else:
+        cluster_centre = None
     if args.create_masks:
         mask_filter = args.create_masks
+        filters = mask_filter
     else:
         if args.measure_isophotes:
-            filter = args.isophotes_filter
+            filters = args.isophotes_filter
         elif args.measure_photometry:
-            filter = args.photometry_filter
-        mask_filter = "VIS" if filter == "VIS" else "YJH"
+            filters = args.photometry_filter
+        if args.true_model:
+            mask_filter = None
+            box_size = False  # do not subtract a background
+        else:
+            mask_filter = "VIS" if filters == "VIS" else "YJH"
 
     pipeline = ClusterPipeline(
         image_dir=image_path,
@@ -112,8 +131,9 @@ if __name__ == "__main__":
         output_dir=out_path,
         cluster_id=args.cluster_id,
         cluster_z=args.cluster_z,
-        bcg_pos=args.cluster_centre,
-        filters=args.photometry_filter,
+        box_size=box_size,
+        bcg_pos=cluster_centre,
+        filters=filters,
         mask_filter=mask_filter,
         isophotes_filter=args.isophotes_filter,
     )
