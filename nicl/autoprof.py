@@ -107,7 +107,6 @@ def run_autoprof(
     background_noise: float
     | None = None,  # fixed background noise level; if None, the background noise level is estimated
     out_dir: Path | str = "./",  # output directory
-    config_filename: str = "config.py",  # name of the config file to write
     fourier_orders: tuple[int, ...] | None = None,  # Fourier orders to measure
     fixed_centre: SkyCoord
     | bool
@@ -121,8 +120,8 @@ def run_autoprof(
     """Run AutoProf with optional forced photometry."""
     logger = logging.getLogger(__name__)
     os.makedirs(out_dir, exist_ok=True)
+    config_filename = f"config-{name}.py"
     config_file = os.path.join(out_dir, config_filename)
-
     if forced_photometry:
         mode = "forced image"
         if not forced_profile_filename:
@@ -199,27 +198,25 @@ def run_autoprof(
             f.write(f"ap_iso_measurecoefs = {fourier_orders}\n")
 
     # Run AutoProf
-    log_file = Path(out_dir) / "AutoProf.log"
+    log_filename = Path(out_dir) / f"autoprof-{name}.log"
     env = os.environ.copy()
     try:
         del env["MPLBACKEND"]
     except KeyError:
         pass
-    with open(log_file, "w") as log:
-        process = subprocess.run(
-            ["autoprof", config_filename],
-            cwd=out_dir,
-            stderr=subprocess.STDOUT,
-            stdout=log,
-            text=True,
-            env=env,
-        )
+    process = subprocess.run(
+        ["autoprof", config_filename, log_filename],
+        cwd=out_dir,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+    )
 
     if process.returncode == 0:
         logger.info(f"AutoProf completed successfully for {name}!")
     else:
         logger.error(f"AutoProf failed for {name}.")
-        raise RuntimeError(f"AutoProf failed, see {log_file} for details.")
+        raise RuntimeError(f"AutoProf failed, see {log_filename} for details.")
 
 # %% ../nbs/14_autoprof.ipynb 5
 def get_autoprof_info(profile_filename):

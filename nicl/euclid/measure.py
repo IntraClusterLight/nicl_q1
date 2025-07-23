@@ -290,7 +290,10 @@ class ClusterPipeline:
             pattern = f"{self.cluster_id}[_-]{filter}{suffix}.fits"
             self.logger.debug(f"Searching for {pattern} in {search_dir}")
             matches = list(search_dir.glob(pattern))
-            pattern = f"*[_-]{filter}[_-]*{self.cluster_id}{suffix}.fits"
+            pattern = f"*[_-]{filter}[_-]{self.cluster_id}{suffix}.fits"
+            self.logger.debug(f"Searching for {pattern} in {search_dir}")
+            matches += list(search_dir.glob(pattern))
+            pattern = f"*[_-]{filter}[_-]*[_-]{self.cluster_id}{suffix}.fits"
             self.logger.debug(f"Searching for {pattern} in {search_dir}")
             matches += list(search_dir.glob(pattern))
         if len(matches) == 0:
@@ -381,14 +384,14 @@ class ClusterPipeline:
         return output_filename
 
     def _clean_autoprof_results(self, autoprof_results_dir):
-        always_keep = {"config.py", "AutoProf.log"}
+        always_keep = []
         jpg_keywords_to_keep = [
             "mask_",
             "initialize_ellipse_",
             "photometry_",
             "photometry_ellipse_",
         ]
-        valid_suffixes_to_keep = [".prof", ".aux"]
+        valid_suffixes_to_keep = [".prof", ".aux", ".py", ".log"]
 
         for f in autoprof_results_dir.iterdir():
             if f.is_file():
@@ -443,7 +446,6 @@ class ClusterPipeline:
                 else None,
                 profile_filename=autoprof_filename,
                 centre=self.bcg_pos,
-                plot_filename=self.cluster_output_dir / f"{label}-annuli_overlay.pdf",
             )
         )
 
