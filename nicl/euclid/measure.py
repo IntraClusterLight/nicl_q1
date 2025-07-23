@@ -113,13 +113,14 @@ class ClusterPipeline:
             raise ValueError(
                 f"Unknown mask filter: {mask_filter}. Valid mask filters are {self.valid_mask_filters}."
             )
-        for filter in self.filters:
-            filters_match = filter == mask_filter
-            filters_match |= filter in ("Y", "J", "H") and mask_filter == "YJH"
-            if not filters_match:
-                raise ValueError(
-                    f"Mask filter {mask_filter} does not match filter {filter}."
-                )
+        if mask_filter is not None:
+            for filter in self.filters:
+                filters_match = filter == mask_filter
+                filters_match |= filter in ("Y", "J", "H") and mask_filter == "YJH"
+                if not filters_match:
+                    raise ValueError(
+                        f"Mask filter {mask_filter} does not match filter {filter}."
+                    )
         return mask_filter
 
     def _validate_isophotes_filter(self, isophotes_filter):
@@ -184,7 +185,8 @@ class ClusterPipeline:
             name += "-mask"
         if self.mask_label:
             name += f"_{self.mask_label}"
-        name += f"_{self.mask_filter}"
+        if self.mask_filter is not None:
+            name += f"_{self.mask_filter}"
         name += "-iso"
         if self.isophotes_label:
             name += f"_{self.isophotes_label}"
@@ -203,18 +205,31 @@ class ClusterPipeline:
         return name
 
     def _get_masks(self):
-        self.logger.info(f"Getting masks for {self.cluster_id}")
-        mask_path = self._get_measurement_mask()
-        bkg_mask_path = self._get_background_mask()
+        if any(
+            [
+                self.mask_filter,
+                self.external_mask_filename,
+                self.external_bkg_mask_filename,
+            ]
+        ):
+            self.logger.info(f"Getting masks for {self.cluster_id}")
+            mask_path = self._get_measurement_mask()
+            bkg_mask_path = self._get_background_mask()
+            self.logger.info(f"Measurement mask is {mask_path}")
+            self.logger.info(f"Background mask is {bkg_mask_path}")
+        else:
+            mask_path = bkg_mask_path = None
         return mask_path, bkg_mask_path
 
     def _get_measurement_mask(self):
         mask_name = self._get_mask_name(include_filter=True)
         if self.external_mask_filename is not None:
             mask_path = Path(self.external_mask_filename)
+        elif self.mask_filter is None:
+            mask_path = None
         else:
             mask_path = self.cluster_output_dir / f"{mask_name}_measurement_mask.fits"
-        if not mask_path.exists():
+        if mask_path is not None and not mask_path.exists():
             raise FileNotFoundError(
                 f"Expected measurement mask not found at {mask_path}"
             )
@@ -224,11 +239,13 @@ class ClusterPipeline:
         mask_name = self._get_mask_name(include_filter=True)
         if self.external_bkg_mask_filename is not None:
             bkg_mask_path = Path(self.external_bkg_mask_filename)
+        elif self.mask_filter is None:
+            bkg_mask_path = None
         else:
             bkg_mask_path = (
                 self.cluster_output_dir / f"{mask_name}_background_mask.fits"
             )
-        if not bkg_mask_path.exists():
+        if bkg_mask_path is not None and not bkg_mask_path.exists():
             raise FileNotFoundError(
                 f"Expected background mask not found at {bkg_mask_path}"
             )
@@ -242,6 +259,8 @@ class ClusterPipeline:
 
     def _create_masks(self):
         self._create_output_dir()
+        if self.mask_label is None:
+            self.mask_label = self.image_label
         mask_name = self._get_mask_name()
         if self.mask_filter == "YJH":
             self.logger.info(f"Creating new NIR masks for {mask_name}...")
@@ -340,18 +359,7 @@ class ClusterPipeline:
         self.logger.debug(f"Cluster output directory is {self.cluster_output_dir}")
         autoprof_results_dir.mkdir(parents=True, exist_ok=True)
 
-        if any(
-            [
-                self.mask_filter,
-                self.external_mask_filename,
-                self.external_bkg_mask_filename,
-            ]
-        ):
-            mask_path, bkg_mask_path = self._get_masks()
-            self.logger.info(f"Measurement mask is {mask_path}")
-            self.logger.info(f"Background mask is {bkg_mask_path}")
-        else:
-            mask_path = bkg_mask_path = None
+        mask_path, bkg_mask_path = self._get_masks()
 
         temp_dir = self.cluster_output_dir / "tmp/autoprof"
 
