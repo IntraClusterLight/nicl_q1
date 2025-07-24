@@ -236,6 +236,10 @@ def get_autoprof_info(profile_filename):
     info["pixscale"] = pixscale
     info["background_level"] = background_value / pixscale**2
     centre_match = re.search(r"center x:\s*([\d.]+) pix, y:\s*([\d.]+)", content)
+    if centre_match is None:
+        centre_match = re.search(
+            r"ap_set_center:\s*\{'x':\s*([\d.]+) pix, 'y':\s*([\d.]+)\}", content
+        )
     info["centre"] = [float(g) for g in centre_match.groups()]
     central_sb_match = re.search(r"central surface brightness:\s*([\d.]+)", content)
     info["central_sb"] = float(central_sb_match.group(1))
