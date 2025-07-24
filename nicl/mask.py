@@ -217,10 +217,12 @@ def create_icl_mask(
 
         logger.debug("Detecting sources")
         segm = detect_sources(data=smoothed_image, threshold=threshold, npixels=5)
-        logger.debug(f"Initial segmentation map contains {segm.nlabels} sources")
-
-        logger.debug("Keeping segment at specified position")
-        segm = keep_segment_at_position(segm, image, centre_pos, wcs)
+        if segm is None:
+            logger.debug("Initial segmentation map contains no sources")
+        else:
+            logger.debug(f"Initial segmentation map contains {segm.nlabels} sources")
+            logger.debug("Keeping segment at specified position")
+            segm = keep_segment_at_position(segm, image, centre_pos, wcs)
         if segm is None:
             logger.debug("No ICL segment found, reducing size of smoothing kernel")
             if smooth_sigma < 1:
