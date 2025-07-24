@@ -167,9 +167,9 @@ def create_icl_mask(
     bkg_box_size=500,  # the size (in pixels) of the boxes to use in estimating the background RMS
     bkg_filter_size=3,  # the size of the median filter to use in estimating the background RMS
     wcs=None,  # WCS for converting a `centre_pos` supplied as a SkyCoord to pixels
-    dilation_radius=None,  # the radius of the circular structure used to dilate the mask
+    dilation_factor=None,  # the radius of the circular structure used to dilate the mask in units of the final smoothing sigma
     median_filter=False,  # use a median filter to smooth the image
-):  # the ICL image mask
+):  # the ICL image mask, the smoothed image, and the final smoothing sigma
     """Create an ICL mask.
 
     The background noise in the input `image` is estimated on a spatial scale of `bkg_box_size`,
@@ -235,8 +235,11 @@ def create_icl_mask(
         logger.warning("Unable to create an ICL mask")
         icl_mask = None
     else:
-        if dilation_radius is not None:
-            logger.debug(f"Creating source mask with dilation radius {dilation_radius}")
+        if dilation_factor is not None:
+            dilation_radius = int(round(dilation_factor * smooth_sigma, 0))
+            logger.debug(
+                f"Creating source mask with dilation radius {dilation_factor} * {smooth_sigma} = {dilation_radius} pixels"
+            )
             footprint = circular_footprint(dilation_radius)
         else:
             logger.debug("Creating source mask without dilation")
@@ -248,7 +251,7 @@ def create_icl_mask(
             f"ICL mask created, {np.sum(icl_mask)} pixels masked ({masked_percentage:.2f}%)"
         )
 
-    return icl_mask, smoothed_image
+    return icl_mask, smoothed_image, smooth_sigma
 
 # %% ../nbs/13_mask.ipynb 8
 def fast_mask(
@@ -571,7 +574,7 @@ def plot_mask(
         norm = ImageNormalize(vmin=median - 2.5 * rms, vmax=median + 2.5 * rms)
     else:
         norm = ImageNormalize(
-            vmin=median - 2.5 * rms, vmax=median + 10 * rms, stretch=AsinhStretch(0.1)
+            vmin=median - 2.5 * rms, vmax=median + 25 * rms, stretch=AsinhStretch(0.1)
         )
     cmap = mpl.colormaps.get_cmap("viridis")
     cmap.set_bad("black")
@@ -587,9 +590,11 @@ def plot_mask(
     ax[0, 1].set_title("Masked Image")
     if show_mask:
         ax[0, 2].imshow(mask, origin="lower", interpolation="none", cmap="gray_r")
-        ax[0, 2].set_title("Object Mask")
+        ax[0, 2].set_title("Mask")
     if detail:
         ci, cj = get_img_centre_pixel(img).astype(int)
+        ci += int(detail_size / 10)
+        cj += int(detail_size / 10)
         ax[0, 0].plot(
             [ci - detail_size, ci, ci, ci - detail_size, ci - detail_size],
             [cj, cj, cj - detail_size, cj - detail_size, cj],
