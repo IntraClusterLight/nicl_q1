@@ -177,7 +177,7 @@ class ClusterPipeline:
             mask_name += f"_{self.mask_filter}"
         return mask_name
 
-    def _get_isophotes_name(self, filter):
+    def _get_isophotes_name(self, filter, mask_filter=None):
         name = f"{self.cluster_id}"
         if self.mask_filter is None:
             name += "-nomask"
@@ -185,7 +185,10 @@ class ClusterPipeline:
             name += "-mask"
             if self.mask_label:
                 name += f"_{self.mask_label}"
-            name += f"_{self.mask_filter}"
+            if mask_filter is not None:
+                name += f"_{mask_filter}"
+            else:
+                name += f"_{self.mask_filter}"
         name += "-iso"
         if self.isophotes_label:
             name += f"_{self.isophotes_label}"
@@ -422,7 +425,9 @@ class ClusterPipeline:
         image_filename = self._get_image_filename(filter)
         mask_path, bkg_mask_path = self._get_masks()
         temp_dir = self.cluster_output_dir / "tmp/sb_profile"
-        isophotes_name = self._get_isophotes_name(isophotes_filter)
+        isophotes_name = self._get_isophotes_name(
+            isophotes_filter, mask_filter=isophotes_filter
+        )
         label = self._get_photometry_name(isophotes_name, filter)
         autoprof_filename = (
             self.cluster_output_dir / "autoprof_results" / f"{isophotes_name}.prof"
