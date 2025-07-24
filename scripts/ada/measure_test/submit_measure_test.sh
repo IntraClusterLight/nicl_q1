@@ -7,6 +7,11 @@
 # Run this script with the following command:
 # submit_measure_test.sh <test_name> <image_label>
 
+if [ -z "$1" ]; then
+    echo "Error: Arguments are required"
+    exit 1
+fi
+
 if [ -z "$2" ]; then
     label=$1
 else

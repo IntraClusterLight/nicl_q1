@@ -183,9 +183,8 @@ class ClusterPipeline:
             name += "-nomask"
         else:
             name += "-mask"
-        if self.mask_label:
-            name += f"_{self.mask_label}"
-        if self.mask_filter is not None:
+            if self.mask_label:
+                name += f"_{self.mask_label}"
             name += f"_{self.mask_filter}"
         name += "-iso"
         if self.isophotes_label:

@@ -125,6 +125,10 @@ if __name__ == "__main__":
         else:
             mask_filter = "VIS" if filters == "VIS" else "YJH"
 
+    # We only allow use of matching labels. In principle, this could be relaxed, to
+    # allow photometry on the noisy images using isophotes from the true model.
+    mask_label = isophotes_label = args.image_label
+
     pipeline = ClusterPipeline(
         image_dir=image_path,
         image_label=args.image_label,
@@ -136,6 +140,8 @@ if __name__ == "__main__":
         filters=filters,
         mask_filter=mask_filter,
         isophotes_filter=args.isophotes_filter,
+        mask_label=mask_label,
+        isophotes_label=isophotes_label,
     )
     if args.create_masks:
         logger.info(f"Creating masks for {args.cluster_id} in filter {mask_filter}")

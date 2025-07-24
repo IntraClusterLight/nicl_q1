@@ -7,6 +7,11 @@
 # Run this script with the following command:
 # submit_measure.sh <label> <args>
 
+if [ -z "$1" ]; then
+    echo "Error: Arguments are required"
+    exit 1
+fi
+
 label=$1; shift
 args="$@"
 measure_mask="measure.sh $args --create-masks"

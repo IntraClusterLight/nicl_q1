@@ -191,7 +191,7 @@ def run_autoprof(
                 centre_pixels = (np.array(wcs.pixel_shape) - 1) / 2
             centre_pixels = dict(zip(("x", "y"), centre_pixels))
             centre_pixels = {k: float(v) for k, v in centre_pixels.items()}
-            f.write(f"ap_set_centre = {centre_pixels}\n")
+            f.write(f"ap_set_center = {centre_pixels}\n")
         if forced_photometry:
             f.write(f"ap_forcing_profile = '{forced_profile_filename}'\n")
         if fourier_orders:
