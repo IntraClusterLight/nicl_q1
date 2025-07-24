@@ -277,7 +277,6 @@ def create_combined_nir_mask(
         logger.info(f"Creating masks for {band} band...")
         m = create_masks(
             image,
-            make_faint_mask=False,
             centre_pos=centre_pos,
             icl_bkg_box_size=icl_bkg_box_size,
         )
