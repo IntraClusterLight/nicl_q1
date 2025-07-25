@@ -40,4 +40,4 @@ JOB_MASK_VIS=$(sbatch --parsable --job-name=mask_${label}_VIS measure_test_1_mas
 
 JOB_ISO_VIS=$(sbatch --parsable --job-name=iso_${label}_VIS --dependency=afterok:$JOB_MASK_VIS measure_test_2_isophotes.sh $1 VIS $2)
 JOB_PHOT_VIS_VIS=$(sbatch --parsable --job-name=phot_${label}_VIS_VIS --dependency=afterok:$JOB_ISO_VIS measure_test_3_photometry.sh $1 VIS VIS $2)
-JOB_PHOT_VIS_YJH=$(sbatch --parsable --job-name=phot_${label}_VIS_YJH --dependency=afterok:$JOB_MASK_VIS:$JOB_ISO_YJH:$JOB_PHOT_VIS_VIS measure_test_3_photometry.sh $1 VIS YJH $2)
+JOB_PHOT_VIS_YJH=$(sbatch --parsable --job-name=phot_${label}_VIS_YJH --dependency=afterok:$JOB_ISO_YJH:$JOB_PHOT_VIS_VIS measure_test_3_photometry.sh $1 VIS YJH $2)
