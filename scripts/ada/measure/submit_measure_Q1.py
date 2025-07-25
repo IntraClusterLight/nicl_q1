@@ -5,7 +5,7 @@ from astropy.table import Table
 
 if __name__ == "__main__":
     table = Table.read("~/euclid_data/catalogues/EDFS_EDFF_DES_Sample.fits")
-    for row in table[::100]:
+    for row in table:
         z = str(row["BEST_Z"])
         if z == "--":
             continue

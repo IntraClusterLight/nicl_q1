@@ -11,6 +11,7 @@ sbatch create_test.sh varying_background cluster
 SKY_PATCH_DIR=~/euclid_data/Q1_R1_clusters_v1.0/skypatch
 TEST_IMAGES_DIR=~/euclid_data/test_images
 REAL_BACKGROUND_DIR=${TEST_IMAGES_DIR}/real_background
+mkdir -p $REAL_BACKGROUND_DIR
 ln -s $SKY_PATCH_DIR/EUC_NIR_W-STK_H-EDFS_sky.fits $REAL_BACKGROUND_DIR/EUC_NIR_W-STK_H-sky_patch.fits
 ln -s $SKY_PATCH_DIR/EUC_NIR_W-STK_J-EDFS_sky.fits $REAL_BACKGROUND_DIR/EUC_NIR_W-STK_J-sky_patch.fits
 ln -s $SKY_PATCH_DIR/EUC_NIR_W-STK_Y-EDFS_sky.fits $REAL_BACKGROUND_DIR/EUC_NIR_W-STK_Y-sky_patch.fits

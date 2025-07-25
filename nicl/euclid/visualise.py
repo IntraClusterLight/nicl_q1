@@ -27,8 +27,8 @@ def plot_cluster_annuli(
     mask_filename=None,
     true_profile_filename=None,
     ax=None,
-    color="red",
-    true_color="blue",
+    color="cyan",
+    true_color="red",
 ):
     if ax is None:
         fig, ax = plt.subplots()
@@ -42,11 +42,11 @@ def plot_cluster_annuli(
     info = get_autoprof_info(profile_filename)
     x, y = info["centre"]
     central_adu = 10 ** (0.4 * (info["zeropoint"] - info["central_sb"])) * pixelscale**2
-    r_fit = info["fit_limit"]
-    r_min = r_fit * 0.01
+    r_fit = info["fit_limit"] * pixelscale
+    r_min = r_fit * 0.1
     r_max = r_fit * 3
     vmin = -3 * info["noise"]
-    vmax = central_adu / 10
+    vmax = central_adu / 100
     asinh_a = (3 * info["noise"] - vmin) / (vmax - vmin)
     norm = simple_norm(image.data, "asinh", asinh_a=asinh_a, vmin=vmin, vmax=vmax)
     xh = (image.shape[1] - 1) / 2
@@ -54,8 +54,6 @@ def plot_cluster_annuli(
     # set the axes to be centred of the ellipses and in units of arcsec
     extent = np.array([x - 2 * xh - 0.5, x - 0.5, y - 2 * yh - 0.5, y - 0.5])
     extent *= pixelscale
-    ax.set_xlim(-2 * r_fit, 2 * r_fit)
-    ax.set_ylim(-2 * r_fit, 2 * r_fit)
     ax.imshow(
         image.data,
         origin="lower",
@@ -64,8 +62,11 @@ def plot_cluster_annuli(
         interpolation="nearest",
         extent=extent,
     )
-    ax.set_xlabel(r"$\Delta RA$ [arcsec]")
-    ax.set_ylabel(r"$\Delta Dec$ [arcsec]")
+    lim = 2 * r_fit
+    ax.set_xlim(max(-lim, extent[0]), min(lim, extent[1]))
+    ax.set_ylim(max(-lim, extent[2]), min(lim, extent[3]))
+    ax.set_xlabel(r"$\Delta$RA [arcsec]")
+    ax.set_ylabel(r"$\Delta$Dec [arcsec]")
     profile = pd.read_csv(profile_filename, skiprows=1)
     rad = profile["R"].values
     ellip = profile["ellip"].values
@@ -79,9 +80,9 @@ def plot_cluster_annuli(
         r_outer = rad[i + 1]
         if r_outer > r_min and r_outer < r_max:
             if r_outer <= r_fit:
-                ls = "-"
+                ls = (0, (5, 10))
             else:
-                ls = "--"
+                ls = (0, (2, 5))
             ellipse = Ellipse(
                 (0, 0),
                 width=2 * r_outer,
@@ -91,17 +92,19 @@ def plot_cluster_annuli(
                 facecolor="none",
                 ls=ls,
                 lw=0.5,
+                zorder=2,
             )
             ax.add_patch(ellipse)
             if true_profile_filename is not None:
                 true_ellipse = Ellipse(
                     (0, 0),
-                    width=2 * true_rad[i],
-                    height=2 * true_rad[i] * (1 - true_ellip[i]),
+                    width=2 * true_rad[i + 1],
+                    height=2 * true_rad[i + 1] * (1 - true_ellip[i]),
                     angle=true_pa[i],
                     edgecolor=true_color,
                     facecolor="none",
-                    ls=":",
+                    ls="-",
                     lw=0.5,
+                    zorder=1,
                 )
             ax.add_patch(true_ellipse)

@@ -54,6 +54,7 @@ class ClusterPipeline:
         | None = None,  # filter of the mask that will be applied to the measurement image; if None, no mask is applied
         pixelscale: float = 0.3,  # pixel scale of the images in arcsec/pixel
         isophotes_geometric_factor: float = 0.4,  # geometric factor for increasing isophote radii
+        isophotes_regularization_scale: float = 1,  # scale factor for the regularisation of the isophotes
         bcg_pos: SkyCoord
         | None = None,  # BCG position; if None, the BCG position is taken from the cluster_info_table
         box_size: int
@@ -87,6 +88,7 @@ class ClusterPipeline:
         self.cluster_z = cluster_z
         self.pixelscale = pixelscale
         self.isophotes_geometric_factor = isophotes_geometric_factor
+        self.isophotes_regularization_scale = isophotes_regularization_scale
         self.bcg_pos = self._validate_bcg_pos(bcg_pos)
         self.isophotes_filter = self._validate_isophotes_filter(isophotes_filter)
         self.isophotes_label = isophotes_label
@@ -389,6 +391,7 @@ class ClusterPipeline:
             out_dir=autoprof_results_dir,
             gscale=self.isophotes_geometric_factor,
             fixed_centre=fixed_centre,
+            regularize_scale=self.isophotes_regularization_scale,
         )
         self._clean_autoprof_results(autoprof_results_dir)
         return output_filename
@@ -425,8 +428,9 @@ class ClusterPipeline:
         image_filename = self._get_image_filename(filter)
         mask_path, bkg_mask_path = self._get_masks()
         temp_dir = self.cluster_output_dir / "tmp/sb_profile"
+        isophotes_mask_filter = "VIS" if isophotes_filter == "VIS" else "YJH"
         isophotes_name = self._get_isophotes_name(
-            isophotes_filter, mask_filter=isophotes_filter
+            isophotes_filter, mask_filter=isophotes_mask_filter
         )
         label = self._get_photometry_name(isophotes_name, filter)
         autoprof_filename = (

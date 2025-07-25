@@ -105,6 +105,7 @@ if __name__ == "__main__":
     image_path = default_data_path(args.image_dir)
     out_path = default_data_path(args.output_dir)
     box_size = None  # use the default box size of 1 Mpc
+    isophotes_regularization_scale = 1
     if args.cluster_centre:
         cluster_centre = SkyCoord(
             ra=args.cluster_centre[0], dec=args.cluster_centre[1], unit="deg"
@@ -122,6 +123,7 @@ if __name__ == "__main__":
         if args.true_model:
             mask_filter = None
             box_size = False  # do not subtract a background
+            isophotes_regularization_scale = 1e-6
         else:
             mask_filter = "VIS" if filters == "VIS" else "YJH"
 
@@ -142,6 +144,7 @@ if __name__ == "__main__":
         isophotes_filter=args.isophotes_filter,
         mask_label=mask_label,
         isophotes_label=isophotes_label,
+        isophotes_regularization_scale=isophotes_regularization_scale,
     )
     if args.create_masks:
         logger.info(f"Creating masks for {args.cluster_id} in filter {mask_filter}")

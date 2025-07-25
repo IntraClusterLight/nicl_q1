@@ -116,6 +116,7 @@ def run_autoprof(
     forced_profile_filename: Path
     | str
     | None = None,  # path to the forced photometry profile file
+    regularize_scale: float = 1,  # scale for the regularisation of the isophotes
 ):
     """Run AutoProf with optional forced photometry."""
     logger = logging.getLogger(__name__)
@@ -174,6 +175,7 @@ def run_autoprof(
                     ap_isoclip = True
                     ap_isoclip_nsigma = 5
                     ap_fit_limit = 1
+                    ap_regularize_scale = {regularize_scale}
                     ap_new_pipeline_steps = {pipeline_steps}
                     """)
         )
@@ -238,7 +240,7 @@ def get_autoprof_info(profile_filename):
     centre_match = re.search(r"center x:\s*([\d.]+) pix, y:\s*([\d.]+)", content)
     if centre_match is None:
         centre_match = re.search(
-            r"ap_set_center:\s*\{'x':\s*([\d.]+) pix, 'y':\s*([\d.]+)\}", content
+            r"ap_set_center:\s*\{'x':\s*([\d.]+), 'y':\s*([\d.]+)\}", content
         )
     info["centre"] = [float(g) for g in centre_match.groups()]
     central_sb_match = re.search(r"central surface brightness:\s*([\d.]+)", content)
