@@ -521,34 +521,38 @@ def create_faint_mask(
         threshold=threshold,
         npixels=params["npixels"],
     )
-    logger.info(f"Deblending {segm.nlabels} sources")
-    with catch_warnings():
-        filterwarnings("ignore", ".*[Dd]eblending mode.*changed.*")
-        segm_deblend = deblend_sources(
-            detection_image,
-            segm,
-            npixels=params["npixels"],
-            nlevels=params["nlevels"],
-            contrast=params["contrast"],
-            progress_bar=False,
-        )
-    logger.info(f"Faint mask contains {segm_deblend.nlabels} sources")
-    if include_mask is not None:
-        logger.info("Keeping only objects that overlap with include_mask")
-        segm_deblend.remove_masked_labels(~include_mask, partial_overlap=False)
-        logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
-    if exclude_position is not False:
-        logger.info("Removing segment at exclude_position")
-        segm_deblend = remove_segment_at_position(
-            segm_deblend, image, exclude_position, wcs
-        )
-        logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
-    if exclude_mask is not None:
-        logger.info("Removing objects entirely covered by exclude_mask")
-        segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=False)
-        logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
-    logger.info("Dilating mask")
-    faint_mask = dilated_object_mask(segm_deblend, growth)
+    if segm is None:
+        logger.warning("No faint sources found.")
+        faint_mask = np.zeros_like(detection_image, dtype=bool)
+    else:
+        logger.info(f"Deblending {segm.nlabels} sources")
+        with catch_warnings():
+            filterwarnings("ignore", ".*[Dd]eblending mode.*changed.*")
+            segm_deblend = deblend_sources(
+                detection_image,
+                segm,
+                npixels=params["npixels"],
+                nlevels=params["nlevels"],
+                contrast=params["contrast"],
+                progress_bar=False,
+            )
+        logger.info(f"Faint mask contains {segm_deblend.nlabels} sources")
+        if include_mask is not None:
+            logger.info("Keeping only objects that overlap with include_mask")
+            segm_deblend.remove_masked_labels(~include_mask, partial_overlap=False)
+            logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
+        if exclude_position is not False:
+            logger.info("Removing segment at exclude_position")
+            segm_deblend = remove_segment_at_position(
+                segm_deblend, image, exclude_position, wcs
+            )
+            logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
+        if exclude_mask is not None:
+            logger.info("Removing objects entirely covered by exclude_mask")
+            segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=False)
+            logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
+        logger.info("Dilating mask")
+        faint_mask = dilated_object_mask(segm_deblend, growth)
     return faint_mask, bkg, threshold
 
 # %% ../nbs/13_mask.ipynb 12
