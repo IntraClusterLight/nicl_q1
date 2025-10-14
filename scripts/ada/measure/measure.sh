@@ -2,7 +2,7 @@
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8g
-#SBATCH --time=0:15:00
+#SBATCH --time=0:30:00
 #SBATCH --output=logs/%x_%j.out
 
 ## setup conda environment
