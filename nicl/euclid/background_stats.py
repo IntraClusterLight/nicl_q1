@@ -20,7 +20,6 @@ from astropy.wcs import WCS
 from matplotlib import patheffects as pe
 from matplotlib.ticker import FuncFormatter, NullLocator
 from photutils.aperture import (
-    ApertureStats,
     CircularAnnulus,
     CircularAperture,
     RectangularAnnulus,
@@ -64,32 +63,61 @@ def measure_aperture_stats(
 
     x = np.random.uniform(outer_size / 2, data.shape[1] - outer_size / 2, n_apertures)
     y = np.random.uniform(outer_size / 2, data.shape[0] - outer_size / 2, n_apertures)
-    positions = np.transpose(np.vstack((x, y)))
 
-    if aperture_shape == "square":
-        if annulus:
-            ap = RectangularAnnulus(
-                positions,
-                w_in=inner_size,
-                w_out=outer_size,
-                h_in=inner_size,
-                h_out=outer_size,
-            )
-        else:
-            ap = RectangularAperture(positions, w=outer_size, h=outer_size)
-    elif aperture_shape == "circle":
-        if annulus:
-            ap = CircularAnnulus(positions, r_in=inner_size / 2, r_out=outer_size / 2)
-        else:
-            ap = CircularAperture(positions, r=outer_size / 2)
+    # Initialize arrays to store results
+    sum_aper_area = np.full(n_apertures, np.nan)
+    means = np.full(n_apertures, np.nan)
+    medians = np.full(n_apertures, np.nan)
 
-    stats = ApertureStats(
-        data,
-        ap,
-        mask=mask,
-        sum_method="center",
+    # Loop over positions to reduce memory usage
+    for i in range(n_apertures):
+        position = (x[i], y[i])
+
+        # Create aperture for single position
+        if aperture_shape == "square":
+            if annulus:
+                ap = RectangularAnnulus(
+                    position,
+                    w_in=inner_size,
+                    w_out=outer_size,
+                    h_in=inner_size,
+                    h_out=outer_size,
+                )
+            else:
+                ap = RectangularAperture(position, w=outer_size, h=outer_size)
+        elif aperture_shape == "circle":
+            if annulus:
+                ap = CircularAnnulus(
+                    position, r_in=inner_size / 2, r_out=outer_size / 2
+                )
+            else:
+                ap = CircularAperture(position, r=outer_size / 2)
+
+        # Get aperture mask and calculate statistics manually
+        aper_mask = ap.to_mask(method="center")[0]
+        if aper_mask is None:
+            continue
+
+        # Extract data within aperture bounding box
+        aper_data = aper_mask.get_values(data)
+
+        # Apply aperture mask and optionally the data mask
+        valid_mask = aper_mask.data > 0
+        if mask is not None:
+            valid_mask = valid_mask & ~mask
+
+        valid_data = aper_data[valid_mask]
+
+        if len(valid_data) > 0:
+            sum_aper_area[i] = valid_mask.sum()
+            means[i] = np.nanmean(valid_data)
+            medians[i] = np.nanmedian(valid_data)
+
+    # Create table with results
+    stats = table.Table(
+        {"sum_aper_area": sum_aper_area, "mean": means, "median": medians}
     )
-    stats = stats.to_table(columns=("sum_aper_area", "mean", "median"))
+
     return stats, outer_size
 
 
