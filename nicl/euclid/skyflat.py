@@ -60,8 +60,10 @@ def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51):
         masked_data = ds["SCI"].where(~mask)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
-            coarse_data = masked_data.coarsen(dict(x=n_pix, y=n_pix), boundary="pad").median()
-            try:    
+            coarse_data = masked_data.coarsen(
+                dict(x=n_pix, y=n_pix), boundary="pad"
+            ).median()
+            try:
                 coarse_data.to_zarr(coarse_path)
             except (Exception, KeyboardInterrupt):
                 if coarse_path.exists():
@@ -71,7 +73,7 @@ def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51):
 # %% ../../nbs/euclid/skyflat.ipynb 9
 def group_obs_ids(
     target_obs_ids,  # list of observation IDs for which to create groups
-    available_obs_ids,  # list of observation IDs available for grouping 
+    available_obs_ids,  # list of observation IDs available for grouping
     half_window=3,  # half-window size for grouping
     max_gap_size=2,  # maximum gap size for judging whether a sequence is continuous
 ) -> dict[int, list[int]]:  # dict of grouped observation IDs for each observation ID
@@ -91,7 +93,8 @@ def group_obs_ids(
     group_ends = list(gaps) + [len(available_obs_ids)]
 
     sequential_groups = [
-        available_obs_ids[start : end + 1] for start, end in zip(group_starts, group_ends)
+        available_obs_ids[start : end + 1]
+        for start, end in zip(group_starts, group_ends)
     ]
 
     group_for_obs_id = {}
@@ -104,12 +107,14 @@ def group_obs_ids(
                     min_obs_id = max(min_obs_id_group, obs_id - hw)
                     max_obs_id = min(max_obs_id_group, obs_id + hw)
                     selected_obs_ids = [
-                        i for i in range(min_obs_id, max_obs_id + 1) if i in available_obs_ids
+                        i
+                        for i in range(min_obs_id, max_obs_id + 1)
+                        if i in available_obs_ids
                     ]
                     if len(selected_obs_ids) == 2 * half_window + 1:
                         break
                     elif len(selected_obs_ids) > 2 * half_window + 1:
-                        obs_id_idx = selected_obs_ids.index(obs_id) 
+                        obs_id_idx = selected_obs_ids.index(obs_id)
                         if obs_id_idx < half_window:
                             selected_obs_ids = selected_obs_ids[:-1]
                         else:
@@ -122,7 +127,7 @@ def group_obs_ids(
 # %% ../../nbs/euclid/skyflat.ipynb 11
 def normalise_per_dither(data, restore_median_level=True):
     """Additively normalise the data per dither.
-    
+
     If `restore_median_level` is `False`, the median of the normalised data will be zero,
     otherwise it will be restored to the median level across the dithers.
 
@@ -167,7 +172,9 @@ def construct_skyflats_err(group_data, median):
     return err
 
 # %% ../../nbs/euclid/skyflat.ipynb 12
-def write_skyflats(obs_id, flats, outpath, coarse_factor=None, wcs=None, flats_err=None, short=False):
+def write_skyflats(
+    obs_id, flats, outpath, coarse_factor=None, wcs=None, flats_err=None, short=False
+):
     """Write the skyflats for a given `obs_id` to disk as FITS files."""
     if wcs is not None:
         wcs_out = wcs.isel(dither=0, observation_id=0)
@@ -204,6 +211,9 @@ def write_skyflats(obs_id, flats, outpath, coarse_factor=None, wcs=None, flats_e
 # %% ../../nbs/euclid/skyflat.ipynb 13
 def read_skyflat(obs_id, filter, detector, skyflat_path, short=False):
     label = "-short" if short else ""
+    instrument = "VIS" if filter == "VIS" else "NIR"
+    if skyflat_path.name != instrument:
+        skyflat_path = skyflat_path / instrument
     skyflat_fn = skyflat_path / f"flat-{obs_id}-{filter}{label}.fits"
     skyflat = fits.getdata(skyflat_fn, extname=detector)
     header = fits.getheader(skyflat_fn)
@@ -265,23 +275,28 @@ def interpolate_skyflats(flat, data, method="nearest", coarse_factor=None):
 
 # %% ../../nbs/euclid/skyflat.ipynb 16
 def create_skyflats(
-        obs_id,  # observation ID for which to create the skyflats
-        group_for_obs_id,  # dict of grouped observation IDs for each observation ID
-        zarr_path,  # path to the zarr files
-        instrument,  # instrument name (VIS or NISP/NIR)
-        zp=None,  # zero-points if corrections are required (not recommended)
-        n_pix=51,  # the coarsening factor
-        normalise="median",  # normalisation method: "median", "zero" or None
-        filter_size=None,  # size of the median filter for smoothing the skyflats
-        short=False,  # whether to create the skyflats for the short dithers
-        return_coarse_data=False,  # whether to return the coarse data
-    ):
+    obs_id,  # observation ID for which to create the skyflats
+    group_for_obs_id,  # dict of grouped observation IDs for each observation ID
+    zarr_path,  # path to the zarr files
+    instrument,  # instrument name (VIS or NISP/NIR)
+    zp=None,  # zero-points if corrections are required (not recommended)
+    n_pix=51,  # the coarsening factor
+    normalise="median",  # normalisation method: "median", "zero" or None
+    filter_size=None,  # size of the median filter for smoothing the skyflats
+    short=False,  # whether to create the skyflats for the short dithers
+    return_coarse_data=False,  # whether to return the coarse data
+):
     """Read the coarse data and compute the skyflats for a given `obs_id`."""
     group_obs_ids = group_for_obs_id[obs_id]
     for group_obs_id in group_obs_ids:
-        create_coarse_data(group_obs_id, instrument=instrument, zarr_path=zarr_path, n_pix=n_pix)
+        create_coarse_data(
+            group_obs_id, instrument=instrument, zarr_path=zarr_path, n_pix=n_pix
+        )
     coarse_data = xr.open_mfdataset(
-        zarr_path.glob(f"*/coarse_{n_pix}.zarr"), engine="zarr", combine="nested", concat_dim="observation_id"
+        zarr_path.glob(f"*/coarse_{n_pix}.zarr"),
+        engine="zarr",
+        combine="nested",
+        concat_dim="observation_id",
     )
     coarse_data = coarse_data["SCI"]
     coarse_data = prepare_group_data(coarse_data, group_for_obs_id, obs_id, short)
@@ -294,8 +309,10 @@ def create_skyflats(
     else:
         coarse_data_norm = coarse_data
     flats = construct_skyflats(coarse_data_norm)
-    if filter_size is not None: 
-        flats = flats.rolling(x=filter_size, y=filter_size, min_periods=1, center=True).median()
+    if filter_size is not None:
+        flats = flats.rolling(
+            x=filter_size, y=filter_size, min_periods=1, center=True
+        ).median()
     if return_coarse_data:
         return flats, coarse_data, coarse_data_norm
     else:
@@ -304,5 +321,7 @@ def create_skyflats(
 # %% ../../nbs/euclid/skyflat.ipynb 17
 def apply_skyflat(data, skyflat, interpolation_method="nearest", coarse_factor=None):
     """Apply a coarse `skyflat` to some `data`."""
-    skyflat_interp = interpolate_skyflats(skyflat, data, interpolation_method, coarse_factor)
+    skyflat_interp = interpolate_skyflats(
+        skyflat, data, interpolation_method, coarse_factor
+    )
     return data - skyflat_interp
