@@ -93,31 +93,26 @@ def measure_aperture_stats(
             else:
                 ap = CircularAperture(position, r=outer_size / 2)
 
-        # Get aperture mask and calculate statistics manually
-        aper_mask = ap.to_mask(method="center")[0]
+        # Calculate the statistics
+        # Get aperture mask
+        aper_mask = ap.to_mask(method="center")
         if aper_mask is None:
             continue
-
-        # Extract data within aperture bounding box
+        # Extract data within the aperture mask
         aper_data = aper_mask.get_values(data)
-
-        # Apply aperture mask and optionally the data mask
-        valid_mask = aper_mask.data > 0
+        # Apply the data mask, if provided
         if mask is not None:
-            valid_mask = valid_mask & ~mask
-
-        valid_data = aper_data[valid_mask]
+            aper_data_mask = aper_mask.get_values(mask).astype(bool)
+            valid_data = aper_data[~aper_data_mask]
 
         if len(valid_data) > 0:
-            sum_aper_area[i] = valid_mask.sum()
+            sum_aper_area[i] = len(valid_data)
             means[i] = np.nanmean(valid_data)
             medians[i] = np.nanmedian(valid_data)
 
-    # Create table with results
     stats = table.Table(
         {"sum_aper_area": sum_aper_area, "mean": means, "median": medians}
     )
-
     return stats, outer_size
 
 
@@ -212,7 +207,7 @@ def stats_versus_size(
     progress=False,
 ):
     sqrt_n_pix_list = np.logspace(0, np.log10(max_sqrt_n_pix), n_steps)
-    sqrt_n_pix_list = np.unique(sqrt_n_pix_list.astype(int))
+    sqrt_n_pix_list = np.unique(np.round(sqrt_n_pix_list).astype(int))
     results = []
     pbar = tqdm(sqrt_n_pix_list) if progress else sqrt_n_pix_list
     for sqrt_n_pix in pbar:
@@ -250,7 +245,7 @@ def stats_versus_size_for_box_fast(
     This is a fast version that uses block_reduce to calculate the mean and median of the data in each box.
     """
     box_sizes = np.logspace(0, np.log10(max_sqrt_n_pix), n_steps)
-    box_sizes = np.unique(box_sizes.astype(int))
+    box_sizes = np.unique(np.round(box_sizes).astype(int))
     mask = mask.astype(bool)
     data[mask] = np.nan
     bg_stds_mean = np.full(len(box_sizes), np.nan)
@@ -341,11 +336,11 @@ def background_stats_plot(
     true_bkg_std=None,
     errorbars=False,
     zp_mag=None,
-    pix_scl=None,
+    pixel_scale=None,
     filename=None,
 ):
     if zp_mag is not None:
-        results = convert_to_mag(results, zp_mag, pix_scl)
+        results = convert_to_mag(results, zp_mag, pixel_scale)
     fig, ax = plt.subplots()
     ax.plot(
         results["sqrt_n_pix"],
@@ -402,7 +397,7 @@ def background_stats_plot(
             "*",
             color="red",
             mfc="none",
-            markersize=20,
+            markersize=10,
             label="expected rms",
             zorder=10,
         )
@@ -442,7 +437,7 @@ def measure(
     annular_thickness=None,  # None for solid apertures, or a number on range (0, 1) to specify relative thickness of annulus
     n_pix_tolerance=0.1,  # the largest allowed relative deviation from the requested n_pix
     n_steps=25,  # the number of different sqrt_n_pix to measure
-    zp_mag=23.9,  # convert to magntiudes using this zero point, unless it is None
+    zp_mag=23.9,  # convert to magnitudes using this zero point, unless it is None
     errorbars=True,  # plot errorbars
     debug=False,  # save debug images
     verbose=False,  # print verbose output
@@ -463,12 +458,11 @@ def measure(
                 out_fn_stem = f"{fn.stem}_{ext}"
             else:
                 out_fn_stem = f"{fn.stem}"
+            hdr = hdul[ext].header
             if isinstance(zp_mag, str):
-                hdr = hdul[ext].header
                 zp_mag = hdr[zp_mag]
-                wcs = WCS(hdr)
-                pixel_scale = get_pixel_scale(wcs=wcs)
-                zp_mag += 2.5 * np.log10(pixel_scale.to_value("arcsec") ** 2)
+            wcs = WCS(hdr)
+            pixel_scale = get_pixel_scale(wcs=wcs).to_value("arcsec")
             data = hdul[ext].data
             rms = hdul[ext.replace("SCI", "RMS")].data
             data_mask = (rms > 1e6) | np.isnan(rms) | np.isnan(data)
@@ -480,6 +474,7 @@ def measure(
                 else:
                     mask = np.zeros(data.shape, dtype=bool)
             mask |= data_mask
+            del data_mask
             if bkg_mesh_size is not None:
                 bkg_filter_size = 3 if bkg_filter_size is None else bkg_filter_size
                 bg = Background2D(
@@ -490,6 +485,7 @@ def measure(
                     exclude_percentile=90.0,
                 )
                 data = data - bg.background
+                del bg
             ext_results = stats_versus_size(
                 data,
                 mask,
@@ -508,7 +504,11 @@ def measure(
             if plots:
                 outfile = outpath / f"{out_fn_stem}.pdf"
                 background_stats_plot(
-                    ext_results, zp_mag=zp_mag, filename=outfile, errorbars=errorbars
+                    ext_results,
+                    zp_mag=zp_mag,
+                    pixel_scale=pixel_scale,
+                    filename=outfile,
+                    errorbars=errorbars,
                 )
             if debug:
                 fits.writeto(
