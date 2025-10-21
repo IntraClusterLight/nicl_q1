@@ -212,7 +212,11 @@ class Pipeline:
             )
 
     def _get_zarr_path(self, instrument):
-        return default_data_path("zarr", self.release_name, instrument)
+        return default_data_path(
+            f"{self.release_name}_processed_{self.processing_version}",
+            "zarr",
+            instrument,
+        )
 
     def _try_create_zarr_refs(self, obs_id, path, zarr_path):
         create_all_zarr_refs(path, zarr_path, obs_id_glob=f"{obs_id}")
@@ -267,7 +271,7 @@ class Pipeline:
                 f"Invalid instrument: {instrument}. Must be 'NIR' or 'VIS'."
             )
         self.logger.info(f"=== Creating {instrument} Skyflats ===")
-        zarr_path = default_data_path("zarr", self.release_name, instrument)
+        zarr_path = self._get_zarr_path(instrument)
         outpath = default_data_path(
             f"{self.release_name}_processed_{self.processing_version}",
             "skyflat",

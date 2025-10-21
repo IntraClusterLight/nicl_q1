@@ -3,29 +3,35 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - aiohttp
   - astropy
   - astroquery
-  - astroquery
+  - dask
   - dask-image
-  - fsspec
+  - galsim
+  - ipykernel
+  - ipywidgets
+  - kerchunk
+  - matplotlib
   - memory_profiler
   - nbdev
   - nbdime
   - nbqa
+  - notebook
   - numpy
   - photutils
   - pointpats
   - pre-commit
-  - pyarrow
-  - pymc
   - pyyaml
+  - regions
   - reproject
   - requests
   - ruff
+  - scikit-image
+  - scipy
   - setuptools
+  - shapely
   - sigfig
   - spherical-geometry
-  - xarray
-  - zarr
+  - tqdm
+  - xarray  
 prefix: /Users/spb/anaconda/envs/icl

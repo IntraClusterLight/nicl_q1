@@ -50,7 +50,7 @@ def calc_sb_threshold(
 
 # %% ../../nbs/euclid/mask.ipynb 8
 ICL_NSIGMA = 2
-ICL_INITIAL_SMOOTH_SIGMA = 100.0
+ICL_INITIAL_SMOOTH_SIGMA = 20.0
 ICL_BKG_BOX_SIZE = 300
 ICL_BKG_FILTER_SIZE = 3
 ICL_DILATION_FACTOR = 1.0
