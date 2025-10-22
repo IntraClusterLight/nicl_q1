@@ -339,7 +339,16 @@ class Pipeline:
 
     def _try_correct_persistence(self, obs_id, path, processed_path, **kwargs):
         self.logger.info(f"Processing {obs_id}...")
-        outpath = processed_path / f"persistence/NIR/{obs_id}/"
+        if kwargs.get("correct_persistence", True):
+            label = "persistence"
+        else:
+            label = "no_persistence"
+        if not kwargs.get("final_skyflat_correction", True):
+            label += "_no_skyflat"
+        if not kwargs.get("correct_banding", True):
+            label += "_no_tartan"
+        self.logger.info(f"Processing {obs_id} with {label}...")
+        outpath = processed_path / f"{label}/NIR/{obs_id}/"
         skyflat_path = processed_path / "skyflat/NIR/"
         correct_persistence(
             obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs
