@@ -64,7 +64,9 @@ def read_and_apply_skyflat(img, fn, extname, skyflat_path):
     filter = get_filter_from_filename(fn)
     detector = extname.split(".")[0]
     skyflat, coarse_factor = read_skyflat(obs_id, filter, detector, skyflat_path)
-    return apply_skyflat(img, skyflat, interpolation_method="nearest", coarse_factor=coarse_factor)
+    return apply_skyflat(
+        img, skyflat, interpolation_method="nearest", coarse_factor=coarse_factor
+    )
 
 # %% ../../nbs/euclid/persistence.ipynb 10
 def get_minimum(images, rms_images, take, masked):
@@ -88,9 +90,9 @@ def get_corrected_img(fn, extname, skyflat_path, correct_banding):
         img = read_and_apply_skyflat(img, fn, extname, skyflat_path)
     if correct_banding:
         invalid = get_invalid_mask(fn, extname)
-    masked_image = np.where(invalid, np.nan, img)
-    correction = banding_correction(masked_image)
-    img = img - correction
+        masked_image = np.where(invalid, np.nan, img)
+        correction = banding_correction(masked_image)
+        img = img - correction
     return img
 
 
