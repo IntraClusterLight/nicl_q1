@@ -39,9 +39,9 @@ def get_nisp_images_for_observation(
     obs_id = int(obs_id)
     path = Path(path)
     for i in range(obs_id - n_prior, obs_id + n_after + 1):
-        fns = list(path.glob(f"**/EUC_NIR*-{i}-*Z.fits"))
+        fns = list(path.glob(f"**/EUC_NIR*-{i}-*Z.fits", recurse_symlinks=True))
         if include_sir:
-            sir_fns = list(path.glob(f"**/EUC_SIR*_{i}_*Z.fits"))
+            sir_fns = list(path.glob(f"**/EUC_SIR*_{i}_*Z.fits", recurse_symlinks=True))
             fns += sir_fns
             n_expected = 16
         else:
@@ -208,7 +208,7 @@ class TooManyFilesFoundError(Exception):
 
 
 def find_single_file(fn, path):
-    fns = list(Path(path).glob(f"**/{fn}"))
+    fns = list(Path(path).glob(f"**/{fn}", recurse_symlinks=True))
     if len(fns) == 0:
         raise FileNotFoundError(f"No files found matching {fn}")
     elif len(fns) > 1:
@@ -308,7 +308,9 @@ def round_up_box_size(x, y):
     return z
 
 # %% ../../nbs/euclid/utilities.ipynb 16
-def assemble_fpa_mosaic(hdus, instrument="NISP", binsize=None, unify_zpt=None, unify_pix_scl=None):
+def assemble_fpa_mosaic(
+    hdus, instrument="NISP", binsize=None, unify_zpt=None, unify_pix_scl=None
+):
     """Assemble the focal plane mosaic image from a multi-extension FITS file.
 
     Parameters
@@ -330,6 +332,7 @@ def assemble_fpa_mosaic(hdus, instrument="NISP", binsize=None, unify_zpt=None, u
     np.ndarray
         A 2D numpy array representing the assembled focal plane mosaic image. Gaps between
         detectors are filled with NaN values.
+
     """
     inst = NISP if instrument == "NISP" else VIS
     if instrument == "NISP":
@@ -338,8 +341,8 @@ def assemble_fpa_mosaic(hdus, instrument="NISP", binsize=None, unify_zpt=None, u
         zpt_key = "MAGZEROP"
     chips = inst.chip_layout
     pixel_scale = inst.pix_scale
-    gap_x =  inst.gaps[0]
-    gap_y =  inst.gaps[1]
+    gap_x = inst.gaps[0]
+    gap_y = inst.gaps[1]
     gap_x_pixels = np.round(np.array(gap_x) / pixel_scale).astype(int)
     gap_y_pixels = np.round(np.array(gap_y) / pixel_scale).astype(int)
     # broadcast the gaps array to match number of chips in both dimensions
@@ -353,29 +356,30 @@ def assemble_fpa_mosaic(hdus, instrument="NISP", binsize=None, unify_zpt=None, u
         imgs_per_row = []
         for chip, gap_x in zip(chip_row, gap_x_pixels):
             chip = str(chip)
-            img = hdus[chip+".SCI"].data
-            # NISP DET[34][*] are rotated by 180 degrees; 
+            img = hdus[chip + ".SCI"].data
+            # NISP DET[34][*] are rotated by 180 degrees;
             # VIS rotation already embodied in chip layout (EFGH arrangement)
             if instrument == "NISP":
                 if int(chip[3]) > 2:
                     img = img[::-1, ::-1]
             if unify_zpt is not None:
                 unify_zpt = float(unify_zpt)
-                zpt = hdus[chip+".SCI"].header[zpt_key]
-                img = img * 10**((unify_zpt - zpt) / 2.5)
+                zpt = hdus[chip + ".SCI"].header[zpt_key]
+                img = img * 10 ** ((unify_zpt - zpt) / 2.5)
             if unify_pix_scl is not None:
                 unify_pix_scl = float(unify_pix_scl)
-                eff_pix_scl = compute_pixel_scales(hdus[chip+".SCI"].header)
-                img = img * (unify_pix_scl / eff_pix_scl)**2
+                eff_pix_scl = compute_pixel_scales(hdus[chip + ".SCI"].header)
+                img = img * (unify_pix_scl / eff_pix_scl) ** 2
             # pad the image with NaNs
-            img = np.pad(img, ((0, gap_y), (0, gap_x)), mode="constant", constant_values=np.nan)
+            img = np.pad(
+                img, ((0, gap_y), (0, gap_x)), mode="constant", constant_values=np.nan
+            )
             imgs_per_row.append(img)
         mosaic_per_row = np.concatenate(imgs_per_row, axis=1)
         imgs_all_rows.append(mosaic_per_row)
     mosaic = np.concatenate(imgs_all_rows, axis=0)
     # optionally bin the mosaic
     if binsize is not None:
-        binsize= np.round(binsize).astype(int)
+        binsize = np.round(binsize).astype(int)
         mosaic = block_reduce(mosaic, binsize, np.median)
     return mosaic
-
