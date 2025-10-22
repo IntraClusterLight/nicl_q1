@@ -121,6 +121,7 @@ class Pipeline:
         self,
         target_obs_ids,
         release_name=RELEASE_NAME,
+        release_folder_name=None,
         esac_server_url=ESAC_SERVER_URL,
         processing_version=PROCESSING_VERSION,
         skyflat_n_pix_nir=SKYFLAT_N_PIX_NIR,
@@ -137,6 +138,10 @@ class Pipeline:
             dict.fromkeys(target_obs_ids)
         )  # remove duplicates, preserving order
         self.release_name = release_name
+        if release_folder_name is None:
+            self.release_folder_name = release_name
+        else:
+            self.release_folder_name = release_folder_name
         self.esac_server_url = esac_server_url
         self.processing_version = processing_version
         self.skyflat_n_pix_nir = skyflat_n_pix_nir
@@ -172,7 +177,7 @@ class Pipeline:
         """Download NIR data files."""
         self.logger.info("=== Downloading NIR Data ===")
 
-        outpath = default_data_path(self.release_name)
+        outpath = default_data_path(self.release_folder_name)
         self.logger.info(f"Saving data to {outpath}")
 
         da = self._create_data_access()
@@ -194,7 +199,7 @@ class Pipeline:
         """Download VIS data files."""
         self.logger.info("=== Downloading VIS Data ===")
 
-        outpath = default_data_path(self.release_name)
+        outpath = default_data_path(self.release_folder_name)
         self.logger.info(f"Saving data to {outpath}")
 
         da = self._create_data_access()
@@ -213,7 +218,7 @@ class Pipeline:
 
     def _get_zarr_path(self, instrument):
         return default_data_path(
-            f"{self.release_name}_processed_{self.processing_version}",
+            f"{self.release_folder_name}_processed_{self.processing_version}",
             "zarr",
             instrument,
         )
@@ -232,7 +237,7 @@ class Pipeline:
             data_instrument = "VIS_QUAD"
         else:
             data_instrument = instrument
-        path = default_data_path(self.release_name, data_instrument)
+        path = default_data_path(self.release_folder_name, data_instrument)
         possibly_concurrent(
             self._try_create_zarr_refs,
             obs_ids,
@@ -273,7 +278,7 @@ class Pipeline:
         self.logger.info(f"=== Creating {instrument} Skyflats ===")
         zarr_path = self._get_zarr_path(instrument)
         outpath = default_data_path(
-            f"{self.release_name}_processed_{self.processing_version}",
+            f"{self.release_folder_name}_processed_{self.processing_version}",
             "skyflat",
             instrument,
         )
@@ -358,9 +363,9 @@ class Pipeline:
     def do_persistence_correction(self, **kwargs):
         """Perform persistence correction."""
         self.logger.info("=== Performing Persistence Correction ===")
-        path = default_data_path(self.release_name)
+        path = default_data_path(self.release_folder_name)
         processed_path = default_data_path(
-            f"{self.release_name}_processed_{self.processing_version}"
+            f"{self.release_folder_name}_processed_{self.processing_version}"
         )
         self.logger.info(f"Processing {len(self.target_obs_ids)} observations:")
         self.logger.info(f"{self.target_obs_ids}")
@@ -411,13 +416,13 @@ class Pipeline:
             )
         self.logger.info(f"=== Creating {instrument} Stacks ===")
         processed_path = default_data_path(
-            f"{self.release_name}_processed_{self.processing_version}"
+            f"{self.release_folder_name}_processed_{self.processing_version}"
         )
         if instrument == "NIR":
             in_dir = processed_path / "persistence" / "NIR"
             vis_skyflat_dir = None
         else:
-            data_path = default_data_path(f"{self.release_name}")
+            data_path = default_data_path(f"{self.release_folder_name}")
             in_dir = data_path / "VIS_QUAD"
             vis_skyflat_dir = processed_path / "skyflat" / "VIS"
         if bkg_sub:
@@ -463,7 +468,7 @@ class Pipeline:
             )
         self.logger.info(f"=== Calculating {instrument} Background Statistics ===")
         path = default_data_path(
-            f"{self.release_name}_processed_{self.processing_version}"
+            f"{self.release_folder_name}_processed_{self.processing_version}"
         )
         if bkg_sub:
             path = path / "stacked" / instrument
