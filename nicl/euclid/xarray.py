@@ -447,15 +447,24 @@ def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
         datasets,
         dim="observation_id",
         fill_value={"SCI": np.nan, "RMS": np.nan, "DQ": 0, "FLG": 0},
+        join="outer",
     )
     ds = ds.assign_coords(y=("y", ds.y.values), x=("x", ds.x.values))
     wcs_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/wcs.zarr")]
     wcs = xr.open_mfdataset(
-        wcs_files, engine="zarr", combine="nested", concat_dim="observation_id"
+        wcs_files,
+        engine="zarr",
+        combine="nested",
+        concat_dim="observation_id",
+        join="outer",
     )
     zp_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/zp.zarr")]
     zp = xr.open_mfdataset(
-        zp_files, engine="zarr", combine="nested", concat_dim="observation_id"
+        zp_files,
+        engine="zarr",
+        combine="nested",
+        concat_dim="observation_id",
+        join="outer",
     )
     return ds, wcs, zp
 

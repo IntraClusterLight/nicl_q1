@@ -297,6 +297,7 @@ def create_skyflats(
         engine="zarr",
         combine="nested",
         concat_dim="observation_id",
+        join="outer",
     )
     coarse_data = coarse_data["SCI"]
     coarse_data = prepare_group_data(coarse_data, group_for_obs_id, obs_id, short)
