@@ -243,7 +243,7 @@ def get_autoprof_info(profile_filename):
             r"ap_set_center:\s*\{'x':\s*([\d.]+), 'y':\s*([\d.]+)\}", content
         )
     info["centre"] = [float(g) for g in centre_match.groups()]
-    central_sb_match = re.search(r"central surface brightness:\s*([\d.]+)", content)
+    central_sb_match = re.search(r"central surface brightness:\s*([\d.]+|nan)", content)
     info["central_sb"] = float(central_sb_match.group(1))
     zeropoint_match = re.search(r"ap_zeropoint:\s*([\d.]+)", content)
     info["zeropoint"] = float(zeropoint_match.group(1))

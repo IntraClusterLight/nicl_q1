@@ -18,7 +18,7 @@ measure_mask="measure.sh $args --create-masks"
 measure_iso="measure.sh $args --measure-isophotes --isophotes-filter"
 measure_phot="measure.sh $args --measure-photometry --photometry-filter"
 
-JOB_MASK_YJH=$(sbatch --parsable --time=1:00:00 --job-name=mask_${label}_YJH $measure_mask YJH)
+JOB_MASK_YJH=$(sbatch --parsable --time=1:30:00 --job-name=mask_${label}_YJH $measure_mask YJH)
 
 JOB_ISO_YJH=$(sbatch --parsable --job-name=iso_${label}_YJH --dependency=afterok:$JOB_MASK_YJH $measure_iso YJH)
 JOB_PHOT_YJH_YJH=$(sbatch --parsable --job-name=phot_${label}_YJH_YJH --dependency=afterok:$JOB_ISO_YJH $measure_phot YJH --isophotes-filter YJH)
@@ -36,7 +36,7 @@ JOB_PHOT_H_H=$(sbatch --parsable --job-name=phot_${label}_H_H --dependency=after
 JOB_PHOT_H_YJH=$(sbatch --parsable --job-name=phot_${label}_H_YJH --dependency=afterok:$JOB_ISO_YJH:$JOB_PHOT_H_H $measure_phot H --isophotes-filter YJH)
 
 
-JOB_MASK_VIS=$(sbatch --parsable --job-name=mask_${label}_VIS $measure_mask VIS)
+JOB_MASK_VIS=$(sbatch --parsable --time=1:00:00 --job-name=mask_${label}_VIS $measure_mask VIS)
 
 JOB_ISO_VIS=$(sbatch --parsable --job-name=iso_${label}_VIS --dependency=afterok:$JOB_MASK_VIS $measure_iso VIS)
 JOB_PHOT_VIS_VIS=$(sbatch --parsable --job-name=phot_${label}_VIS_VIS --dependency=afterok:$JOB_ISO_VIS $measure_phot VIS --isophotes-filter VIS)

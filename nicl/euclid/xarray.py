@@ -146,15 +146,14 @@ def process_file(
                         dtype=stored_dtype,
                     )
                 ]
-                #kwargs["filters"] = None
+                # kwargs["filters"] = None
             else:
                 kwargs["filters"] = None
         elif isinstance(hdu, fits.hdu.table.TableHDU):
             # ascii table
             spans = hdu.columns._spans
             outdtype = [
-                [name, hdu.columns[name].format.recformat]
-                for name in hdu.columns.names
+                [name, hdu.columns[name].format.recformat] for name in hdu.columns.names
             ]
             indtypes = [
                 [name, f"S{i + 1}"] for name, i in zip(hdu.columns.names, spans)
@@ -185,9 +184,7 @@ def process_file(
                     for name in dtype.names
                     if hdu.columns[name].format.startswith(("P", "Q"))
                 }
-                kwargs["object_codec"] = VarArrCodec(
-                    str(dtype), str(dt2), nrows, types
-                )
+                kwargs["object_codec"] = VarArrCodec(str(dtype), str(dt2), nrows, types)
                 dtype = dt2
             else:
                 length = dtype.itemsize * nrows
@@ -214,7 +211,6 @@ def process_file(
     if isinstance(out, LazyReferenceMapper):
         out.flush()
     return out, attrs
-
 
 # %% ../../nbs/euclid/xarray.ipynb 7
 def create_zarr_ref_from_fits(fns, out_path=None, progress=False):
@@ -447,12 +443,29 @@ def create_all_zarr_refs(path, zarr_path, obs_id_glob="[23]*"):
 def read_all_zarr_refs(zarr_path, obs_id_glob="[23]*"):
     ref_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/ref.json")]
     datasets = [open_zarr_ref_as_dataset(ref) for ref in ref_files]
-    ds = xr.concat(datasets, dim="observation_id", fill_value={"SCI": np.nan, "RMS": np.nan, "DQ": 0, "FLG": 0})
+    ds = xr.concat(
+        datasets,
+        dim="observation_id",
+        fill_value={"SCI": np.nan, "RMS": np.nan, "DQ": 0, "FLG": 0},
+        join="outer",
+    )
     ds = ds.assign_coords(y=("y", ds.y.values), x=("x", ds.x.values))
     wcs_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/wcs.zarr")]
-    wcs = xr.open_mfdataset(wcs_files, engine="zarr", combine="nested", concat_dim="observation_id")
+    wcs = xr.open_mfdataset(
+        wcs_files,
+        engine="zarr",
+        combine="nested",
+        concat_dim="observation_id",
+        join="outer",
+    )
     zp_files = [str(p) for p in zarr_path.glob(f"{obs_id_glob}/zp.zarr")]
-    zp = xr.open_mfdataset(zp_files, engine="zarr", combine="nested", concat_dim="observation_id")
+    zp = xr.open_mfdataset(
+        zp_files,
+        engine="zarr",
+        combine="nested",
+        concat_dim="observation_id",
+        join="outer",
+    )
     return ds, wcs, zp
 
 # %% ../../nbs/euclid/xarray.ipynb 15

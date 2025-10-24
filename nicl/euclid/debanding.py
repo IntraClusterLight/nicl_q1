@@ -17,7 +17,7 @@ from ..filter import sampled_median_filter
 # %% ../../nbs/euclid/debanding.ipynb 8
 def filter_and_mask_data(data, scale=200):
     """Filter the data to remove large scale variations.
-    
+
     A smoothed, median filtered, version of the data is subtracted from the original data.
     The result is is then masked using an object mask created from the original data.
     The result should a map of the small scale variations in the background.
@@ -46,7 +46,7 @@ def banding_correction(data, rows=True, cols=True, max_size=200):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", "invalid value encountered in reduce")
         filtered_data = filter_and_mask_data(data, scale=max_size)
-        
+
         if rows:
             med_x = filtered_data.median("x")
             try:

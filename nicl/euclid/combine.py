@@ -568,19 +568,13 @@ class DithersMixin:
         if self.multi_chip_bkg:
             # remove the files in the temporary input directory
             rmtree(self.in_dir)
-        with (
-            fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci,
-            fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights,
-        ):
-            # this is necessary because they are both PrimaryHDU objects
+        with fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights:
+            rms_mask = hdul_weights[0].data == 0
+        with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci:
+            # this is necessary because original is a PrimaryHDU object
             hdu_sci = fits.ImageHDU(hdul_sci[0].data, hdul_sci[0].header)
-            hdu_rms = fits.ImageHDU(hdul_weights[0].data, hdul_weights[0].header)
             # set science image to NaN where the weight is zero
-            hdu_sci.data[hdu_rms.data == 0] = np.nan
-            # convert the weight to RMS
-            with np.errstate(divide="ignore"):
-                np.divide(1.0, hdu_rms.data, out=hdu_rms.data)
-            np.sqrt(hdu_rms.data, out=hdu_rms.data)
+            hdu_sci.data[rms_mask] = np.nan
             # clean up the headers
             hdu_sci.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
             hdu_sci.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
@@ -591,15 +585,25 @@ class DithersMixin:
             hdu_sci.header.set("ZPVEGA", 1.0)
             hdu_sci.header.set("ZPVEGAE", 0.0)
             hdu_sci.header.remove("SIMPLE", ignore_missing=True)
-            hdu_rms.header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
-            hdu_rms.header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
-            hdu_rms.header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
-            hdu_rms.header.set("EXTNAME", "RMS", "Extension name", after="GCOUNT")
-            for key in ("SIMPLE", "ZPAB", "ZPAB", "ZPVEGA", "ZPVEGAE"):
-                hdu_rms.header.remove(key, ignore_missing=True)
-            hdul = fits.HDUList([fits.PrimaryHDU(), hdu_sci, hdu_rms])
+            hdul = fits.HDUList([fits.PrimaryHDU(), hdu_sci])
             self.out_dir.mkdir(parents=True, exist_ok=True)
             hdul.writeto(self.out_dir / out_fn, overwrite=self.overwrite)
+            del hdu_sci
+        with fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights:
+            rms_data = hdul_weights[0].data
+            # convert the weight to RMS
+            with np.errstate(divide="ignore"):
+                np.divide(1.0, rms_data, out=rms_data)
+            np.sqrt(rms_data, out=rms_data)
+            # clean up the headers
+            rms_header = hdul_weights[0].header
+            rms_header.set("XTENSION", "IMAGE   ", "Image extension", before=True)
+            rms_header.set("PCOUNT", 0, "number of parameters", after="NAXIS2")
+            rms_header.set("GCOUNT", 1, "number of groups", after="PCOUNT")
+            rms_header.set("EXTNAME", "RMS", "Extension name", after="GCOUNT")
+            for key in ("SIMPLE", "ZPAB", "ZPAB", "ZPVEGA", "ZPVEGAE"):
+                rms_header.remove(key, ignore_missing=True)
+            fits.append(self.out_dir / out_fn, rms_data, rms_header)
         end_time = datetime.now()
         elapsed_secs = (end_time - start_time).total_seconds()
         print(

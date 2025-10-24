@@ -162,7 +162,8 @@ def create_icl_mask(
     image: np.ndarray,  # input image data to mask
     *,  # the following parameters must be provided as keyword arguments if required
     nsigma=2.0,  # multiple of the background RMS required for detection
-    initial_smooth_sigma=50.0,  # sigma of the Gaussian used to smooth the image
+    initial_smooth_sigma=20.0,  # sigma of the Gaussian used to smooth the image
+    smooth_sigma_accuracy=0.05,  # relative accuracy of the optimised smoothing sigma
     centre_pos=None,  # position of the cluster centre, if None assume the image centre
     bkg_box_size=500,  # the size (in pixels) of the boxes to use in estimating the background RMS
     bkg_filter_size=3,  # the size of the median filter to use in estimating the background RMS
@@ -204,6 +205,10 @@ def create_icl_mask(
     )
 
     smooth_sigma = initial_smooth_sigma
+    smooth_sigma_high = None
+    smooth_sigma_low = None
+    segm = None
+    logger.debug("Starting binary search for ICL smoothing sigma")
     while True:
         logger.debug(f"Smoothing image with sigma={smooth_sigma}")
         if median_filter:
@@ -216,21 +221,60 @@ def create_icl_mask(
             smoothed_image = smooth_image(image, sigma=smooth_sigma)
 
         logger.debug("Detecting sources")
-        segm = detect_sources(data=smoothed_image, threshold=threshold, npixels=5)
-        if segm is None:
+        current_segm = detect_sources(
+            data=smoothed_image, threshold=threshold, npixels=5
+        )
+        if current_segm is None:
             logger.debug("Initial segmentation map contains no sources")
         else:
-            logger.debug(f"Initial segmentation map contains {segm.nlabels} sources")
+            logger.debug(
+                f"Initial segmentation map contains {current_segm.nlabels} sources"
+            )
             logger.debug("Keeping segment at specified position")
-            segm = keep_segment_at_position(segm, image, centre_pos, wcs)
-        if segm is None:
-            logger.debug("No ICL segment found, reducing size of smoothing kernel")
-            if smooth_sigma < 1:
-                break
-            else:
-                smooth_sigma = smooth_sigma * 0.8
+            current_segm = keep_segment_at_position(
+                current_segm, image, centre_pos, wcs
+            )
+
+        if current_segm is None:
+            logger.debug("No source detected at specified position")
+            if smooth_sigma_high is None or smooth_sigma < smooth_sigma_high:
+                smooth_sigma_high = smooth_sigma
+            if smooth_sigma_low is None or smooth_sigma_high is None:
+                logger.debug(
+                    "No lower smoothing limit found yet, reducing size of smoothing kernel"
+                )
+                smooth_sigma = smooth_sigma * 0.5
         else:
-            logger.debug(f"Segmentation map now contains {segm.nlabels} sources")
+            logger.debug(
+                f"Segmentation map now contains {current_segm.nlabels} sources"
+            )
+            segm = current_segm
+            if smooth_sigma_low is None or smooth_sigma > smooth_sigma_low:
+                smooth_sigma_low = smooth_sigma
+            if smooth_sigma_low is None or smooth_sigma_high is None:
+                logger.debug(
+                    "No upper smoothing limit found yet, increasing size of smoothing kernel"
+                )
+                smooth_sigma = smooth_sigma * 2
+        if smooth_sigma_low is not None and smooth_sigma_high is not None:
+            acc = (smooth_sigma_high / smooth_sigma_low) - 1
+            if acc > smooth_sigma_accuracy:
+                smooth_sigma = 0.5 * (smooth_sigma_high + smooth_sigma_low)
+            else:
+                logger.debug(
+                    f"Required smooth_sigma accuracy achieved: {acc * 100:.2f}%"
+                )
+                break
+        if smooth_sigma_high is not None and smooth_sigma_high < 1:
+            logger.warning("No ICL detection, even with negligible smoothing")
+            break
+        if (
+            smooth_sigma_low is not None
+            and smooth_sigma_low > 10 * initial_smooth_sigma
+        ):
+            logger.warning(
+                f"Always detecting ICL, even with maximum smoothing of {smooth_sigma_low} pixels"
+            )
             break
 
     if segm is None:
@@ -521,34 +565,38 @@ def create_faint_mask(
         threshold=threshold,
         npixels=params["npixels"],
     )
-    logger.info(f"Deblending {segm.nlabels} sources")
-    with catch_warnings():
-        filterwarnings("ignore", ".*[Dd]eblending mode.*changed.*")
-        segm_deblend = deblend_sources(
-            detection_image,
-            segm,
-            npixels=params["npixels"],
-            nlevels=params["nlevels"],
-            contrast=params["contrast"],
-            progress_bar=False,
-        )
-    logger.info(f"Faint mask contains {segm_deblend.nlabels} sources")
-    if include_mask is not None:
-        logger.info("Keeping only objects that overlap with include_mask")
-        segm_deblend.remove_masked_labels(~include_mask, partial_overlap=False)
-        logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
-    if exclude_position is not False:
-        logger.info("Removing segment at exclude_position")
-        segm_deblend = remove_segment_at_position(
-            segm_deblend, image, exclude_position, wcs
-        )
-        logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
-    if exclude_mask is not None:
-        logger.info("Removing objects entirely covered by exclude_mask")
-        segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=False)
-        logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
-    logger.info("Dilating mask")
-    faint_mask = dilated_object_mask(segm_deblend, growth)
+    if segm is None:
+        logger.warning("No faint sources found.")
+        faint_mask = np.zeros_like(detection_image, dtype=bool)
+    else:
+        logger.info(f"Deblending {segm.nlabels} sources")
+        with catch_warnings():
+            filterwarnings("ignore", ".*[Dd]eblending mode.*changed.*")
+            segm_deblend = deblend_sources(
+                detection_image,
+                segm,
+                npixels=params["npixels"],
+                nlevels=params["nlevels"],
+                contrast=params["contrast"],
+                progress_bar=False,
+            )
+        logger.info(f"Faint mask contains {segm_deblend.nlabels} sources")
+        if include_mask is not None:
+            logger.info("Keeping only objects that overlap with include_mask")
+            segm_deblend.remove_masked_labels(~include_mask, partial_overlap=False)
+            logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
+        if exclude_position is not False:
+            logger.info("Removing segment at exclude_position")
+            segm_deblend = remove_segment_at_position(
+                segm_deblend, image, exclude_position, wcs
+            )
+            logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
+        if exclude_mask is not None:
+            logger.info("Removing objects entirely covered by exclude_mask")
+            segm_deblend.remove_masked_labels(exclude_mask, partial_overlap=False)
+            logger.info(f"Faint mask now contains {segm_deblend.nlabels} sources")
+        logger.info("Dilating mask")
+        faint_mask = dilated_object_mask(segm_deblend, growth)
     return faint_mask, bkg, threshold
 
 # %% ../nbs/13_mask.ipynb 12
