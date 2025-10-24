@@ -1,0 +1,9 @@
+mock_cluster_1 59 -50.3
+mock_cluster_2 58.7 -50.3
+mock_cluster_3 58.7 -50.5
+mock_cluster_4 59 -50.5
+mock_cluster_5 59.3 -50.5
+mock_cluster_6 59.3 -50.3
+mock_cluster_7 59.3 -50.1
+mock_cluster_8 59 -50.1
+mock_cluster_9 58.7 -50.1
