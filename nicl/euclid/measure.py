@@ -417,10 +417,12 @@ class ClusterPipeline:
             fixed_centre=fixed_centre,
             regularize_scale=self.isophotes_regularization_scale,
         )
-        self._clean_autoprof_results(autoprof_results_dir)
+        self._clean_autoprof_results(autoprof_results_dir, cleaned_image_filename)
         return output_filename
 
-    def _clean_autoprof_results(self, autoprof_results_dir):
+    def _clean_autoprof_results(
+        self, autoprof_results_dir, cleaned_image_filename=None
+    ):
         always_keep = []
         jpg_keywords_to_keep = [
             "mask_",
@@ -446,6 +448,13 @@ class ClusterPipeline:
                     self.logger.debug(f"Deleted: {name}")
                 except Exception as e:
                     self.logger.warning(f"Could not delete {name}: {e}")
+
+        if cleaned_image_filename is not None:
+            try:
+                cleaned_image_filename.unlink()
+                self.logger.debug(f"Deleted: {name}")
+            except Exception as e:
+                self.logger.warning(f"Could not delete {cleaned_image_filename}: {e}")
 
     def measure_photometry(
         self, filter, isophotes_filter=None, isophotes_mask_filter=None
@@ -493,6 +502,9 @@ class ClusterPipeline:
                 centre=self.bcg_pos,
             )
         )
+
+        if not self.keep_temp_files:
+            bkgsub_image_filename.unlink()
 
         flux_outfile = self.cluster_output_dir / f"{label}-profile_measurements.csv"
         flux_measurements.to_csv(flux_outfile, index=False)

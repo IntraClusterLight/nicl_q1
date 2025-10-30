@@ -12,6 +12,7 @@ __all__ = ['ICL_NSIGMA', 'ICL_INITIAL_SMOOTH_SIGMA', 'ICL_BKG_BOX_SIZE', 'ICL_BK
 # %% ../../nbs/euclid/mask.ipynb 4
 import logging
 from pathlib import Path
+import shutil
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -256,6 +257,7 @@ def create_combined_nir_mask(
     centre_pos=None,
     icl_bkg_box_size=300,
     nir_stack_bkg_box_size=300,
+    keep_temp_files=False,
 ):
     """Create a combined NIR mask for use when measuring ICL."""
     logger = logging.getLogger(__name__)
@@ -288,8 +290,9 @@ def create_combined_nir_mask(
             mask_for_background = m["badpixel"] | m["object"]
 
         # Saving temp masks
-        save_temp_image(m["object"], f"object_mask_{band}", wcs=image.wcs)
-        save_temp_image(mask_for_background, f"mask_for_bkg_{band}", wcs=image.wcs)
+        if keep_temp_files:
+            save_temp_image(m["object"], f"object_mask_{band}", wcs=image.wcs)
+            save_temp_image(mask_for_background, f"mask_for_bkg_{band}", wcs=image.wcs)
 
         logger.info(f"Estimating background for {band} band...")
         bkg = get_background(
@@ -300,7 +303,8 @@ def create_combined_nir_mask(
         )
 
         # Saving temp background
-        save_temp_image(bkg.background, f"bkg_{band}", wcs=image.wcs)
+        if keep_temp_files:
+            save_temp_image(bkg.background, f"bkg_{band}", wcs=image.wcs)
 
         logger.info(f"Subtracting background for {band} band...")
         image_bkg_sub = image.data - bkg.background
@@ -348,7 +352,12 @@ def create_combined_nir_mask(
 
     logger.info("Masks are generated...")
 
-    save_temp_image(masks["object"], "object_mask_YJH")
+    if keep_temp_files:
+        save_temp_image(masks["object"], "object_mask_YJH")
+    else:
+        temp_dir = output_dir / "tmp/nir_mask"
+        if temp_dir.exists() and temp_dir.is_dir():
+            shutil.rmtree(temp_dir)
 
     if output_dir:
         fits.writeto(
