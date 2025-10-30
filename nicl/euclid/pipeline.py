@@ -342,7 +342,9 @@ class Pipeline:
     def create_vis_skyflats(self):
         self._create_skyflats(instrument="VIS")
 
-    def _try_correct_persistence(self, obs_id, path, processed_path, **kwargs):
+    def _try_correct_persistence(
+        self, obs_id, path, processed_path, output_path=None, **kwargs
+    ):
         self.logger.info(f"Processing {obs_id}...")
         if kwargs.get("correct_persistence", True):
             label = "persistence"
@@ -353,7 +355,9 @@ class Pipeline:
         if not kwargs.get("correct_banding", True):
             label += "_no_tartan"
         self.logger.info(f"Processing {obs_id} with {label}...")
-        outpath = processed_path / f"{label}/NIR/{obs_id}/"
+        if output_path is None:
+            output_path = processed_path
+        outpath = output_path / f"{label}/NIR/{obs_id}/"
         skyflat_path = processed_path / "skyflat/NIR/"
         correct_persistence(
             obs_id, path, outpath=outpath, skyflat_path=skyflat_path, **kwargs
