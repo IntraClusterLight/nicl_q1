@@ -83,9 +83,3 @@ python submit_measure.py --variant no_persistence
 python submit_measure.py --variant no_bkg_match
 python submit_measure.py --variant no_processing
 ```
-
-
-## Notes
-
-The stacking of the no_processing variants of the Y, J, and H images for cluster 6 was
-unsuccessful, so the measurement also failed.
