@@ -17,6 +17,7 @@ from astropy.coordinates import SkyCoord
 
 from nicl import configure_logging
 from nicl.euclid.combine import combine
+from nicl.euclid.data_access import DataAccess
 from nicl.euclid.utilities import default_data_path
 
 cutout_size = 11 * u.arcmin
@@ -64,7 +65,7 @@ def combine_nir(ra, dec, name, out_dir, filter, variant="standard"):
         bkg_match = False
         bkg_sub = True
     else:
-        in_dir = default_data_path("Q1_R1_processed_illustration/ablation")
+        in_dir = default_data_path("Q1_R1_processed_illustrations/ablation")
         if variant == "standard":
             in_dir = in_dir / "persistence"
         elif variant == "no_persistence":
@@ -94,6 +95,37 @@ def combine_nir(ra, dec, name, out_dir, filter, variant="standard"):
     )
 
 
+def combine_mer(ra, dec, name, out_dir, filter):
+    cutout_cen = SkyCoord(ra, dec, unit=u.deg)
+    mer_filter = dict(I="VIS", Y="NIR-Y", J="NIR-J", H="NIR-H")[filter]
+    instrument = "VIS" if mer_filter == "VIS" else "NISP"
+    da = DataAccess(release_name="Q1_R1")
+    outpath = default_data_path("Q1_R1")
+    for mer_file_type in ("STK", "BKG"):
+        da.download_files_for_target(
+            ra,
+            dec,
+            radius=cutout_size,
+            fully_contained=False,
+            instrument=instrument,
+            outpath=outpath,
+            file_type="MER",
+            mer_file_type=mer_file_type,
+        )
+    combine(
+        in_dir=default_data_path("Q1_R1", "MER"),
+        out_dir=out_dir,
+        filters=mer_filter,
+        add_bkg_mod=True,
+        cutout_cen=cutout_cen,
+        cutout_size=cutout_size,
+        name=name,
+        pixel_scale=0.3,
+        overwrite=True,
+        nthreads=nthreads,
+    )
+
+
 if __name__ == "__main__":
     configure_logging(level="DEBUG")
     configure_logging(name="nicl.mask", level="WARNING")
@@ -116,6 +148,7 @@ if __name__ == "__main__":
             "no_tartan",
             "no_processing",
             "no_bkg_match",
+            "mer",
         ],
         default="standard",
         help="Variant of the data processing to be stacked.",
@@ -123,12 +156,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     out_dir = default_data_path(
-        "Q1_R1_processed_illustration", "ablation/cluster", args.variant
+        "Q1_R1_processed_illustrations", "ablation/cluster", args.variant
     )
     name = "MCXCJ1754.6+6803"
     ra = 268.662 * u.deg
     dec = 68.058 * u.deg
     if args.filter in ["Y", "J", "H"]:
-        combine_nir(ra, dec, name, out_dir, args.filter, variant=args.variant)
+        if args.variant == "mer":
+            combine_mer(ra, dec, name, out_dir, args.filter)
+        else:
+            combine_nir(ra, dec, name, out_dir, args.filter, variant=args.variant)
     elif args.filter == "I":
-        combine_vis(ra, dec, name, out_dir, variant=args.variant)
+        if args.variant == "mer":
+            combine_mer(ra, dec, name, out_dir, args.filter)
+        else:
+            combine_vis(ra, dec, name, out_dir, variant=args.variant)
