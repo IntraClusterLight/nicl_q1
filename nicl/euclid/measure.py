@@ -306,8 +306,7 @@ class ClusterPipeline:
     def _create_nir_mask(self, filter):
         mask_name = self._get_mask_name()
         self.logger.info(f"Creating new NIR masks for {mask_name}...")
-        image_filename = self._get_nir_image_filenames()
-        image_filename = image_filename[filter]
+        image_filename = self._get_nir_image_filenames(filter)
         create_nir_mask(
             image_filename,
             filter=filter,
@@ -318,10 +317,13 @@ class ClusterPipeline:
         )
         self.logger.info("Created NIR masks.")
 
-    def _get_nir_image_filenames(self):
-        image_filenames = {}
-        for filter in ["H", "J", "Y"]:
-            image_filenames[filter] = self._get_image_filename(filter)
+    def _get_nir_image_filenames(self, filter=None):
+        if filter is None:
+            image_filenames = {}
+            for filter in ["H", "J", "Y"]:
+                image_filenames[filter] = self._get_image_filename(filter)
+        else:
+            image_filenames = self._get_image_filename(filter)
         return image_filenames
 
     def _get_vis_image_filenames(self):
