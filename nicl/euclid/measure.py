@@ -76,6 +76,7 @@ class ClusterPipeline:
         | None = None,  # use the noise estimates in this directory
         noise_field: str
         | None = None,  # use the noise properties for this field, e.g. EDFS, EDFF or EDFN
+        keep_temp_files: bool = False,  # whether to keep temporary files
     ):
         self.valid_filters = ["H", "J", "Y", "YJH", "VIS"]
         self.valid_mask_filters = self.valid_filters + [None]
@@ -105,6 +106,7 @@ class ClusterPipeline:
         self.noise_field = noise_field
         self._set_box_size(box_size)
         self.cluster_output_dir = self.outdir / self.cluster_id
+        self.keep_temp_files = keep_temp_files
 
     def _validate_filters(self, filters):
         filters = [filters] if isinstance(filters, str) else filters
