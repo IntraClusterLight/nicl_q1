@@ -469,8 +469,6 @@ class ClusterPipeline:
         temp_dir = self.cluster_output_dir / "tmp/sb_profile"
         if isophotes_filter is None:
             isophotes_filter = filter
-        if isophotes_mask_filter is None:
-            isophotes_mask_filter = "VIS" if isophotes_filter == "VIS" else "YJH"
         isophotes_name = self._get_isophotes_name(
             isophotes_filter, mask_filter=isophotes_mask_filter
         )
