@@ -2,7 +2,7 @@
 # fmt: off
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=4g
+#SBATCH --mem=8g
 #SBATCH --time=0:20:00
 #SBATCH --job-name=illustration_stack
 #SBATCH --output=logs/%x_%j.out
