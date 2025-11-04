@@ -14,7 +14,7 @@ import xarray as xr
 from .xarray import xr_fast_mask
 from ..filter import sampled_median_filter
 
-# %% ../../nbs/euclid/debanding.ipynb 8
+# %% ../../nbs/euclid/debanding.ipynb 10
 def filter_and_mask_data(data, scale=200):
     """Filter the data to remove large scale variations.
 
@@ -36,7 +36,7 @@ def filter_and_mask_data(data, scale=200):
     filtered_data = filtered_data.where(~mask)
     return filtered_data
 
-# %% ../../nbs/euclid/debanding.ipynb 21
+# %% ../../nbs/euclid/debanding.ipynb 26
 def banding_correction(data, rows=True, cols=True, max_size=200):
     if isinstance(data, np.ndarray):
         data = xr.DataArray(data, dims=["y", "x"])
