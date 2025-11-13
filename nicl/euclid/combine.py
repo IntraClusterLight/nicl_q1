@@ -489,9 +489,10 @@ class DithersMixin:
         print(f"Preparing science and weight images took {elapsed_mins:.1f} mins.")
         return True
 
-    def _prepare_resampled_for_stack(self, tmpdir):
+    def _prepare_resampled_for_stack(self, tmpdir, min_coverage_fraction=0.01):
         """Background matching and/or subtraction before stacking."""
         resamp_sci_images = list(tmpdir.glob("*resamp.fits"))
+        resamp_sci_images_to_stack = []
         if self.bkg_match:
             start_time = datetime.now()
             resamp_imgs_not_corrected = bkg_match_corr(
@@ -545,25 +546,30 @@ class DithersMixin:
                     coverage_mask = (weight_img == 0) & (sci_img == 0)
                     # remove blank pixels from the bad pixel mask
                     bad_pix_mask[coverage_mask] = False
-                    sci_img = sub_bkg(
-                        sci_img,
-                        dq_mask=bad_pix_mask,
-                        obj_mask="fast_mask",
-                        coverage_mask=coverage_mask,
-                        mesh_size=bkg_mesh_size_pix,
-                        filter_size=(
-                            self.bkg_filter_size,
-                            self.bkg_filter_size,
-                        ),
-                        exclude_percentile=90.0,
-                    )
-                    sci_hdul[0].data = sci_img
-                    sci_hdul.flush()
+                    try:
+                        sci_img = sub_bkg(
+                            sci_img,
+                            dq_mask=bad_pix_mask,
+                            obj_mask="fast_mask",
+                            coverage_mask=coverage_mask,
+                            mesh_size=bkg_mesh_size_pix,
+                            filter_size=(
+                                self.bkg_filter_size,
+                                self.bkg_filter_size,
+                            ),
+                            exclude_percentile=90.0,
+                        )
+                        sci_hdul[0].data = sci_img
+                        sci_hdul.flush()
+                    except ValueError as e:
+                        print(f"{sci_image} is not used for stacking because {e}")
+                    else:
+                        resamp_sci_images_to_stack.append(sci_image)
             end_time = datetime.now()
             elapsed_mins = (end_time - start_time).total_seconds() / 60
             print(f"Background subtraction took {elapsed_mins:.1f} mins.")
         with open(tmpdir / "resamp_images.list", "w") as f:
-            for fn in resamp_sci_images:
+            for fn in resamp_sci_images_to_stack:
                 f.write(f"{fn}\n")
         return True
 
