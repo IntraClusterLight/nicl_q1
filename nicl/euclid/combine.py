@@ -570,9 +570,6 @@ class DithersMixin:
     def _post_process_stack_and_weight(self, tmpdir, out_fn):
         """Clean up FITS headers and copy the output to the desired directory."""
         start_time = datetime.now()
-        if self.multi_chip_bkg:
-            # remove the files in the temporary input directory
-            rmtree(self.in_dir)
         with fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights:
             rms_mask = hdul_weights[0].data == 0
         with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci:
@@ -702,7 +699,11 @@ class NISPCombiner(DithersMixin, Combiner):
             )
             print("-" * 80)
             try:
-                tmpdir = Path(tempfile.TemporaryDirectory(delete=False).name)
+                tmpdir = Path(
+                    tempfile.TemporaryDirectory(
+                        dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=False
+                    ).name
+                )
                 for id in self.ids:
                     combiner = NISPCombiner(
                         in_dir=self.in_dir,
@@ -742,6 +743,8 @@ class NISPCombiner(DithersMixin, Combiner):
                 )
         else:
             self._combine_images(images, out_fn)
+        if self.multi_chip_bkg:
+            rmtree(tmpdir)
 
     def _combine_images(self, images, out_fn):
         if (self.out_dir / out_fn).exists() and not self.overwrite:
@@ -750,7 +753,7 @@ class NISPCombiner(DithersMixin, Combiner):
             )
             return
         with tempfile.TemporaryDirectory(
-            dir=Path("~").expanduser(), delete=(not self.debug)
+            dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=(not self.debug)
         ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
@@ -799,7 +802,11 @@ class VISCombiner(DithersMixin, Combiner):
             )
             print("-" * 80)
             try:
-                tmpdir = Path(tempfile.TemporaryDirectory(delete=False).name)
+                tmpdir = Path(
+                    tempfile.TemporaryDirectory(
+                        dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=False
+                    ).name
+                )
                 for id in self.ids:
                     combiner = VISCombiner(
                         in_dir=self.in_dir,
@@ -844,6 +851,8 @@ class VISCombiner(DithersMixin, Combiner):
                 )
         else:
             self._combine_images(images, out_fn)
+        if self.multi_chip_bkg:
+            rmtree(tmpdir)
 
     def _combine_images(self, images, out_fn):
         if (self.out_dir / out_fn).exists() and not self.overwrite:
@@ -853,7 +862,7 @@ class VISCombiner(DithersMixin, Combiner):
             return
         # the default temporary directory may not have enough space for VIS
         with tempfile.TemporaryDirectory(
-            dir=Path("~").expanduser(), delete=(not self.debug)
+            dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=(not self.debug)
         ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
@@ -937,7 +946,9 @@ class MerCombiner(Combiner):
                 f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
             )
             return
-        with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
+        with tempfile.TemporaryDirectory(
+            dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=(not self.debug)
+        ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
                 print(f"Intermediate files can be found in {tmpdir}/.")
