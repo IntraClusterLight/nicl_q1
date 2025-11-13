@@ -74,6 +74,7 @@ class Combiner(ABC):
         swarp_config=None,  # default SWarp configuration file content
         overwrite=False,  # overwrite existing combined image files
         debug=False,  # retain intermediate files for checking
+        recurse_symlinks=True,  # if True, recurse into symlinks
         **kwargs,  # command line arguments to pass to SWarp, will override the defaults
     ):
         self.in_dir = in_dir
@@ -90,6 +91,7 @@ class Combiner(ABC):
         self.individual_dithers = individual_dithers
         self.overwrite = overwrite
         self.debug = debug
+        self.recurse_symlinks = recurse_symlinks
         # broaden cutout size for bkg match correction
         if self.bkg_match and self.cutout_size is not None:
             # broaden the cutout size by the maximum dither offset
@@ -337,7 +339,10 @@ class DithersMixin:
         image_paths = []
         for id in np.atleast_1d(self.ids):
             image_paths.extend(
-                self.in_dir.glob(pattern.format(obsid=id, filter=filter))
+                self.in_dir.glob(
+                    pattern.format(obsid=id, filter=filter),
+                    recurse_symlinks=self.recurse_symlinks,
+                )
             )
         n_dithers = len(image_paths)
         n_obs = len(self.ids)
@@ -809,6 +814,7 @@ class VISCombiner(DithersMixin, Combiner):
                         autodark_dir=self.autodark_dir,
                         release_name=self.release_name,
                         debug=self.debug,
+                        recurse_symlinks=self.recurse_symlinks,
                     )
                     combiner.combine()
             except:
@@ -955,13 +961,15 @@ class MerCombiner(Combiner):
             img_tpl = []
             img_tpl.extend(
                 self.in_dir.glob(
-                    f"**/{tile_id}/*/EUC_MER_BGSUB-MOSAIC-{filter}_TILE{tile_id}-*.fits"
+                    f"**/{tile_id}/*/EUC_MER_BGSUB-MOSAIC-{filter}_TILE{tile_id}-*.fits",
+                    recurse_symlinks=self.recurse_symlinks,
                 ),
             )
             if self.add_bkg_mod:
                 img_tpl.extend(
                     self.in_dir.glob(
-                        f"**/{tile_id}/*/EUC_MER_BGMOD*-{filter}_TILE{tile_id}-*.fits"
+                        f"**/{tile_id}/*/EUC_MER_BGMOD*-{filter}_TILE{tile_id}-*.fits",
+                        recurse_symlinks=self.recurse_symlinks,
                     )
                 )
             else:
@@ -1070,6 +1078,7 @@ def combine(
     release_name="Q1_R1",  # the data release name, e.g., "Q1_R1", "DR1"
     overwrite=False,  # overwrite existing combined image files
     debug=False,  # retain intermediate files for checking and more verbose output
+    recurse_symlinks=True,  # if True, recurse into symlinks
     dry_run=False,  # instantiate the classes without actually combining the images
     **kwargs,  # command line arguments to pass to SWarp
 ):
@@ -1146,6 +1155,9 @@ def combine(
     debug : bool, optional
         If True, retain intermediate files for debugging or inspection and
         print SWarp stderr.
+    recurse_symlinks: bool, optional
+        If True (the default), recurse into symlinks. If False, then symlinked
+        folders will not be searched for input images.
     dry_run : bool, optional
         If True, configure the combiners without actually performing the image
         combination.
@@ -1246,6 +1258,7 @@ def combine(
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
+                    recurse_symlinks=recurse_symlinks,
                     **kwargs,
                 )
                 if not dry_run:
@@ -1274,6 +1287,7 @@ def combine(
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
+                recurse_symlinks=recurse_symlinks,
                 **kwargs,
             )
             if not dry_run:
@@ -1302,6 +1316,7 @@ def combine(
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
+                    recurse_symlinks=recurse_symlinks,
                     **kwargs,
                 )
                 if not dry_run:
@@ -1328,6 +1343,7 @@ def combine(
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
+                recurse_symlinks=recurse_symlinks,
                 **kwargs,
             )
             if not dry_run:
@@ -1349,6 +1365,7 @@ def combine(
             release_name=release_name,
             overwrite=overwrite,
             debug=debug,
+            recurse_symlinks=recurse_symlinks,
             **kwargs,
         )
         if not dry_run:
