@@ -60,10 +60,10 @@ class DataAccess:
         self.overwrite = overwrite
         if release_name.startswith("Q1"):
             esac_server_url = "https://eas.esac.esa.int"
-            self.release_condition = f"(release_name='{self.release_name}')"
+            self.release_condition = f"(release_name='{release_name}')"
         else:
             esac_server_url = "https://easidr.esac.esa.int"
-            self.release_condition = f"(environment='{self.release_name}')"
+            self.release_condition = f"(environment='{release_name}')"
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
         self.mer_filename_lookup = self.get_mer_filename_lookup()
