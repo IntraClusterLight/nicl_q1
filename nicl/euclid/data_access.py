@@ -42,6 +42,7 @@ class DataAccess:
         esac_server_url=None,  # ESA server (default is to choose based on release_name)
         dry_run=False,  # if True, do not actually download files
         overwrite=False,  # should existing files be overwritten?
+        science_only=True,  # if True, only return science frames or observations containing them
     ):
         """Create an object for accessing data and log in to the ESA server."""
         credentials = euclid_credentials()
@@ -58,6 +59,7 @@ class DataAccess:
         self.esa_password = esa_password
         self.dry_run = dry_run
         self.overwrite = overwrite
+        self.science_only = science_only
         if release_name.startswith("Q1"):
             esac_server_url = "https://eas.esac.esa.int"
             self.release_condition = f"(release_name='{release_name}')"
@@ -189,11 +191,13 @@ class DataAccess:
     ):  # returns a list of observation_ids
         """Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region."""
         condition = self.build_fov_condition(ra, dec, radius, fully_contained)
-        query = f"""SELECT DISTINCT observation_id
-                    FROM sedm.calibrated_frame
-                    WHERE (product_type like '%Calibrated%')
-                    AND {condition}
-                    ORDER BY observation_id ASC"""
+        query = """SELECT DISTINCT observation_id
+                   FROM sedm.calibrated_frame
+                   WHERE (product_type like '%Calibrated%')\n"""
+        if self.science_only:
+            query += "AND (category = 'SCIENCE')\n"
+        query += f"AND {condition}\n"
+        query += "ORDER BY observation_id ASC"
         results = self.tap_query(query)
         obs_ids = np.unique(list(results["observation_id"])).astype(int)
         return obs_ids
@@ -224,13 +228,15 @@ class DataAccess:
     ):  # returns a table of file information
         """Obtain calibrated file information for obs_id, optionally restricted by instrument or filter."""
         condition = self.build_instrument_condition(instrument, filter)
-        query = f"""SELECT observation_stack.observation_id, observation_stack.file_name,
-                    observation_stack.instrument_name, observation_stack.filter_name, observation_stack.duration
-                    FROM sedm.calibrated_frame
-                    AS observation_stack
-                    WHERE (product_type like '%Calibrated%')
-                    AND {condition}
-                    AND (observation_id = '{obs_id}')"""
+        query = """SELECT observation_stack.observation_id, observation_stack.file_name,
+                   observation_stack.instrument_name, observation_stack.filter_name, observation_stack.duration
+                   FROM sedm.calibrated_frame
+                   AS observation_stack
+                   WHERE (product_type like '%Calibrated%')\n"""
+        if self.science_only:
+            query += "AND (category = 'SCIENCE')\n"
+        query += f"AND {condition}\n"
+        query += f"AND (observation_id = '{obs_id}')"
         file_info = self.tap_query(query)
         return file_info
 
