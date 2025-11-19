@@ -161,6 +161,8 @@ class DataAccess:
         query = """SELECT DISTINCT TOP 1000000 observation_id
                     FROM sedm.calibrated_frame
                     WHERE (product_type like '%Calibrated%')\n"""
+        if self.science_only:
+            query += "AND (category = 'SCIENCE')\n"
         if self.release_condition:
             query += f"AND {self.release_condition}\n"
         query += "ORDER BY observation_id ASC\n"
