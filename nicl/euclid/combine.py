@@ -93,6 +93,7 @@ class Combiner(ABC):
         self.overwrite = overwrite
         self.debug = debug
         self.recurse_symlinks = recurse_symlinks
+        self.kwargs = kwargs
         self.logger = logging.getLogger(__name__)
         # broaden cutout size for bkg match correction
         if self.bkg_match and self.cutout_size is not None:
@@ -581,6 +582,8 @@ class DithersMixin:
             end_time = datetime.now()
             elapsed_mins = (end_time - start_time).total_seconds() / 60
             self.logger.info(f"Background subtraction took {elapsed_mins:.1f} mins.")
+        else:
+            resamp_sci_images_to_stack = resamp_sci_images
         with open(tmpdir / "resamp_images.list", "w") as f:
             for fn in resamp_sci_images_to_stack:
                 f.write(f"{fn}\n")
@@ -735,6 +738,7 @@ class NISPCombiner(DithersMixin, Combiner):
                         bkg_sub=False,
                         release_name=self.release_name,
                         debug=self.debug,
+                        **self.kwargs,
                     )
                     combiner.combine()
             except:
@@ -841,6 +845,7 @@ class VISCombiner(DithersMixin, Combiner):
                         release_name=self.release_name,
                         debug=self.debug,
                         recurse_symlinks=self.recurse_symlinks,
+                        **self.kwargs,
                     )
                     combiner.combine()
             except:
