@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8g
 #SBATCH --time=1:00:00
-#SBATCH --array=1-2
+#SBATCH --array=1-819
 #SBATCH --output=logs/%x_%j.out
 # fmt: on
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     table = Table.read(
         default_data_path("catalogues/Hydrangea_Mocks_Sample.csv"), format="csv"
     )
-    # There are 819 rows in this table, currently just testing on first two rows
+    # There are 819 rows in this table
     task_id = int(os.getenv("SLURM_ARRAY_TASK_ID"))
     row = table[task_id - 1]
     for subfolder in ["with_subhaloes", "without_subhaloes"]:
