@@ -1,6 +1,7 @@
 """Stack Q1 Mock Cluster observations."""
 
 import argparse
+import logging
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -10,7 +11,7 @@ from nicl import configure_logging
 from nicl.euclid.combine import combine
 from nicl.euclid.utilities import default_data_path
 
-cutout_size = 15 * u.arcmin
+cutout_size = 30 * u.arcmin
 # Number of threads/cores to use for swarp, if not specified swarp will spawn 96 threads! (cores in a compute node)
 # maintain consistency with number of cores in the stack_Q1.sh slurm script
 nthreads = 1
@@ -43,6 +44,7 @@ def combine_vis(ra, dec, name, out_dir, variant="standard"):
         pixel_scale=0.3,
         overwrite=True,
         nthreads=nthreads,
+        recurse_symlinks=False,
     )
 
 
@@ -82,12 +84,15 @@ def combine_nir(ra, dec, name, out_dir, filter, variant="standard"):
         name=name,
         nthreads=nthreads,
         overwrite=True,
+        recurse_symlinks=False,
     )
 
 
 if __name__ == "__main__":
     configure_logging(level="DEBUG")
-    configure_logging(name="nicl.mask", level="WARNING")
+    # configure_logging(name="nicl.mask", level="WARNING")
+    log = logging.getLogger(__name__)
+    log.setLevel("INFO")
     parser = argparse.ArgumentParser(
         description="Process Q1 mock cluster stacks for row TASK_ID from PARAM_TABLE."
     )
@@ -135,10 +140,14 @@ if __name__ == "__main__":
         name = str(row[0])
         ra = row[1]
         dec = row[2]
+        log.info(
+            f"Stacking mock cluster {name} in filter {args.filter} for variant {args.variant} (task ID {task_id})"
+        )
         if args.filter in ["Y", "J", "H"]:
             combine_nir(ra, dec, name, out_dir, args.filter, variant=args.variant)
         elif args.filter == "I":
             combine_vis(ra, dec, name, out_dir, variant=args.variant)
     else:
-        print(f"Task ID {task_id} exceeds the number of rows in the table.")
-        print(f"Total rows in table: {len(sample)}")
+        log.warning(
+            f"Task ID {task_id} exceeds the number of rows in the table ({len(sample)})."
+        )

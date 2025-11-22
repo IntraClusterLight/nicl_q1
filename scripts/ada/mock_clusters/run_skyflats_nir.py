@@ -2,8 +2,8 @@
 # fmt: off
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32g
-#SBATCH --time=0:30:00
+#SBATCH --mem=64g
+#SBATCH --time=2:00:00
 #SBATCH --output=logs/%x_%j.out
 # fmt: on
 
@@ -24,6 +24,7 @@ from nicl.main import configure_logging
 from nicl.euclid.pipeline import Pipeline
 
 configure_logging(level="INFO")
+configure_logging(name="nicl.mask", level="WARNING")
 
 release_name = "Q1_R1"
 release_folder_name = "Q1_R1_mock_clusters"
@@ -38,7 +39,7 @@ pipeline = partial(
     processing_version=processing_version,
 )
 
-obs_ids = [3591]
+obs_ids = [3582, 3583, 3590, 3591, 3592, 3593, 3594]
 
 with pipeline(target_obs_ids=obs_ids) as p:
     p.create_nir_skyflats()

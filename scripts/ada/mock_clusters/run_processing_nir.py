@@ -2,8 +2,8 @@
 # fmt: off
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32g
-#SBATCH --time=1:00:00
+#SBATCH --mem=64g
+#SBATCH --time=2:00:00
 #SBATCH --output=logs/%x_%j.out
 # fmt: on
 
@@ -27,12 +27,16 @@ for ablation studies.
 """
 
 import argparse
+import logging
 from functools import partial
 
 from nicl.main import configure_logging
 from nicl.euclid.pipeline import Pipeline
 
 configure_logging(level="INFO")
+configure_logging(name="nicl.mask", level="WARNING")
+log = logging.getLogger(__name__)
+log.setLevel("INFO")
 
 parser = argparse.ArgumentParser(
     description="Process Q1 Mock Cluster NIR observations through the v1.0 pipeline."
@@ -66,17 +70,23 @@ pipeline = partial(
     release_folder_name=release_folder_name,
     esac_server_url=esac_server_url,
     processing_version=processing_version,
+    max_workers=4,
 )
 
-obs_ids = [3591]
+obs_ids = [3590, 3591, 3592, 3593, 3594, 3582, 3583]
+
+log.info(f"Processing mock cluster observations {obs_ids}")
 
 kwargs = {}
 if args.no_skyflat:
     kwargs.update(final_skyflat_correction=False)
+    log.info("Not applying skyflat correction")
 if args.no_tartan:
     kwargs.update(correct_banding=False)
+    log.info("Not applying tartan correction")
 if args.no_persistence:
     kwargs.update(correct_persistence=False)
+    log.info("Not applying persistence correction")
 
 with pipeline(target_obs_ids=obs_ids) as p:
     p.do_persistence_correction(**kwargs)
