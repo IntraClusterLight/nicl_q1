@@ -426,12 +426,15 @@ class DataAccess:
         outpath,  # the base folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
+        include_vis_short=False,  # if True, include VIS short exposure files
         verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter."""
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
+        if not include_vis_short:
+            file_info = file_info[file_info["duration"] > 300]
         if instrument == "NISP":
             instrument_folder = "NIR"
         elif instrument == "VIS":
