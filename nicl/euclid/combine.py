@@ -6,6 +6,7 @@
 __all__ = ['combine']
 
 # %% ../../nbs/euclid/combine.ipynb 2
+import logging
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -74,6 +75,7 @@ class Combiner(ABC):
         swarp_config=None,  # default SWarp configuration file content
         overwrite=False,  # overwrite existing combined image files
         debug=False,  # retain intermediate files for checking
+        recurse_symlinks=True,  # if True, recurse into symlinks
         **kwargs,  # command line arguments to pass to SWarp, will override the defaults
     ):
         self.in_dir = in_dir
@@ -90,6 +92,9 @@ class Combiner(ABC):
         self.individual_dithers = individual_dithers
         self.overwrite = overwrite
         self.debug = debug
+        self.recurse_symlinks = recurse_symlinks
+        self.kwargs = kwargs
+        self.logger = logging.getLogger(__name__)
         # broaden cutout size for bkg match correction
         if self.bkg_match and self.cutout_size is not None:
             # broaden the cutout size by the maximum dither offset
@@ -173,7 +178,7 @@ class Combiner(ABC):
             self.autodark_dir = None
         # assemble command line arguments to pass to SWarp
         self._swarp_extra_args = self._parse_swarp_args(kwargs)
-        print(f"Initialized {self}")
+        self.logger.debug(f"Initialized {self}")
 
     def combine(self):
         for filter in self.filters:
@@ -255,7 +260,7 @@ class Combiner(ABC):
             swarp_cmd.extend(["-COMBINE", "Y"])
         else:
             swarp_cmd.extend(["-COMBINE", "N"])
-        print(f"Running SWarp: {' '.join(swarp_cmd)}")
+        self.logger.info(f"Running SWarp: {' '.join(swarp_cmd)}")
         start_time = datetime.now()
         try:
             run_swarp = subprocess.run(
@@ -266,19 +271,18 @@ class Combiner(ABC):
                 check=True,
             )
             if self.debug:
-                print(run_swarp.stderr)
+                self.logger.debug(f"SWarp stderr:\n{run_swarp.stderr}")
             end_time = datetime.now()
             elapsed_secs = (end_time - start_time).total_seconds()
             elapsed_mins = elapsed_secs / 60
-            print(
+            self.logger.info(
                 f"SWarp finished successfully. Elapsed time: {elapsed_mins:.1f} mins."
             )
             return True
         except subprocess.CalledProcessError as e:
-            print(
-                f"Command '{' '.join(e.cmd)}' returned non-zero exit status, please check its stderr below."
+            self.logger.warning(
+                f"Command '{' '.join(e.cmd)}' returned non-zero exit status, please check its stderr below.\n{e.stderr}"
             )
-            print(e.stderr)
             return False
 
     @abstractmethod
@@ -332,19 +336,28 @@ class DithersMixin:
         )
         return ids
 
-    def _find_dithers(self, pattern, filter):
+    def _find_dithers(self, pattern, filter, check_expected):
         """Find paths to dithers for a given filter."""
         image_paths = []
         for id in np.atleast_1d(self.ids):
             image_paths.extend(
-                self.in_dir.glob(pattern.format(obsid=id, filter=filter))
+                self.in_dir.glob(
+                    pattern.format(obsid=id, filter=filter),
+                    recurse_symlinks=self.recurse_symlinks,
+                )
             )
         n_dithers = len(image_paths)
         n_obs = len(self.ids)
-        # soft checks since some obsid may have more than the usual number of dithers
-        print(
-            f"Found {n_dithers} {filter} dithers for {n_obs} obsids. Expected {n_obs * self.instrument.n_dithers_per_obs} dithers."
-        )
+        if check_expected:
+            n_expected_dithers = n_obs * self.instrument.n_dithers_per_obs
+            if n_dithers != n_expected_dithers:
+                self.logger.warning(
+                    f"Found {n_dithers} {filter} dithers for {n_obs} obsids, but expected {n_expected_dithers} dithers."
+                )
+            else:
+                self.logger.info(
+                    f"Found expected {n_dithers} {filter} dithers for {n_obs} obsids."
+                )
         return image_paths
 
     def _prepare_dithers_for_swarp(self, dithers, tmpdir):
@@ -472,7 +485,7 @@ class DithersMixin:
                         sci_hdul.writeto(tmpdir / sci_fn)
                         weight_hdul.writeto(tmpdir / wt_fn)
         if not sci_fns:
-            print("No valid images preprocessed for SWarp.")
+            self.logger.warning("No valid images preprocessed for SWarp.")
             return False
         # prepare image list for swarp
         with open(tmpdir / "images.list", "w") as f:
@@ -481,12 +494,15 @@ class DithersMixin:
         end_time = datetime.now()
         elapsed_secs = (end_time - start_time).total_seconds()
         elapsed_mins = elapsed_secs / 60
-        print(f"Preparing science and weight images took {elapsed_mins:.1f} mins.")
+        self.logger.info(
+            f"Preparing science and weight images took {elapsed_mins:.1f} mins."
+        )
         return True
 
-    def _prepare_resampled_for_stack(self, tmpdir):
+    def _prepare_resampled_for_stack(self, tmpdir, min_coverage_fraction=0.01):
         """Background matching and/or subtraction before stacking."""
         resamp_sci_images = list(tmpdir.glob("*resamp.fits"))
+        resamp_sci_images_to_stack = []
         if self.bkg_match:
             start_time = datetime.now()
             resamp_imgs_not_corrected = bkg_match_corr(
@@ -503,10 +519,12 @@ class DithersMixin:
                         path.with_suffix("").with_suffix("").with_suffix(path.suffix), 1
                     )
                     if does_image_overlap_with_skyregion(hdr, cutout_reg):
-                        print(f"{path} is not corrected for background matching.")
+                        self.logger.warning(
+                            f"{path} is not corrected for background matching."
+                        )
             end_time = datetime.now()
             elapsed_mins = (end_time - start_time).total_seconds() / 60
-            print(f"Background matching took {elapsed_mins:.1f} mins.")
+            self.logger.info(f"Background matching took {elapsed_mins:.1f} mins.")
         # subtract background if requested
         if self.bkg_sub:
             start_time = datetime.now()
@@ -540,34 +558,40 @@ class DithersMixin:
                     coverage_mask = (weight_img == 0) & (sci_img == 0)
                     # remove blank pixels from the bad pixel mask
                     bad_pix_mask[coverage_mask] = False
-                    sci_img = sub_bkg(
-                        sci_img,
-                        dq_mask=bad_pix_mask,
-                        obj_mask="fast_mask",
-                        coverage_mask=coverage_mask,
-                        mesh_size=bkg_mesh_size_pix,
-                        filter_size=(
-                            self.bkg_filter_size,
-                            self.bkg_filter_size,
-                        ),
-                        exclude_percentile=90.0,
-                    )
-                    sci_hdul[0].data = sci_img
-                    sci_hdul.flush()
+                    try:
+                        sci_img = sub_bkg(
+                            sci_img,
+                            dq_mask=bad_pix_mask,
+                            obj_mask="fast_mask",
+                            coverage_mask=coverage_mask,
+                            mesh_size=bkg_mesh_size_pix,
+                            filter_size=(
+                                self.bkg_filter_size,
+                                self.bkg_filter_size,
+                            ),
+                            exclude_percentile=90.0,
+                        )
+                        sci_hdul[0].data = sci_img
+                        sci_hdul.flush()
+                    except ValueError as e:
+                        self.logger.warning(
+                            f"{sci_image} is not used for stacking because {e}"
+                        )
+                    else:
+                        resamp_sci_images_to_stack.append(sci_image)
             end_time = datetime.now()
             elapsed_mins = (end_time - start_time).total_seconds() / 60
-            print(f"Background subtraction took {elapsed_mins:.1f} mins.")
+            self.logger.info(f"Background subtraction took {elapsed_mins:.1f} mins.")
+        else:
+            resamp_sci_images_to_stack = resamp_sci_images
         with open(tmpdir / "resamp_images.list", "w") as f:
-            for fn in resamp_sci_images:
+            for fn in resamp_sci_images_to_stack:
                 f.write(f"{fn}\n")
         return True
 
     def _post_process_stack_and_weight(self, tmpdir, out_fn):
         """Clean up FITS headers and copy the output to the desired directory."""
         start_time = datetime.now()
-        if self.multi_chip_bkg:
-            # remove the files in the temporary input directory
-            rmtree(self.in_dir)
         with fits.open(tmpdir / "coadd.weight.fits", memmap=True) as hdul_weights:
             rms_mask = hdul_weights[0].data == 0
         with fits.open(tmpdir / "coadd.fits", memmap=True) as hdul_sci:
@@ -606,7 +630,7 @@ class DithersMixin:
             fits.append(self.out_dir / out_fn, rms_data, rms_header)
         end_time = datetime.now()
         elapsed_secs = (end_time - start_time).total_seconds()
-        print(
+        self.logger.info(
             f"Postprocessing took {elapsed_secs:.1f} secs. Output saved to {self.out_dir / out_fn}"
         )
 
@@ -691,13 +715,17 @@ class NISPCombiner(DithersMixin, Combiner):
         )
 
     def combine_per_filter(self, filter):
+        self.logger.info(f"Combining the dithers for filter {filter}.")
         if self.multi_chip_bkg:
-            print(
-                "First combine all chips into a single image for background subtraction."
+            self.logger.info(
+                "Preparing for multi-chip background: first creating a single image for each dither."
             )
-            print("-" * 80)
             try:
-                tmpdir = Path(tempfile.TemporaryDirectory(delete=False).name)
+                tmpdir = Path(
+                    tempfile.TemporaryDirectory(
+                        dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=False
+                    ).name
+                )
                 for id in self.ids:
                     combiner = NISPCombiner(
                         in_dir=self.in_dir,
@@ -710,15 +738,15 @@ class NISPCombiner(DithersMixin, Combiner):
                         bkg_sub=False,
                         release_name=self.release_name,
                         debug=self.debug,
+                        **self.kwargs,
                     )
                     combiner.combine()
             except:
                 rmtree(tmpdir)
                 raise
             self.in_dir = tmpdir
-            print("-" * 80)
-            print("Actually start combining the dithers now.")
-        images = self._find_images(filter)
+            self.logger.info("Now stacking the dithers.")
+        images = self._find_images(filter, check_expected=(not self.multi_chip_bkg))
         if not images:
             return
         if self.individual_dithers:
@@ -737,20 +765,23 @@ class NISPCombiner(DithersMixin, Combiner):
                 )
         else:
             self._combine_images(images, out_fn)
+        if self.multi_chip_bkg:
+            rmtree(tmpdir)
 
     def _combine_images(self, images, out_fn):
         if (self.out_dir / out_fn).exists() and not self.overwrite:
-            print(
+            self.logger.warning(
                 f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
             )
             return
         with tempfile.TemporaryDirectory(
-            dir=Path("~").expanduser(), delete=(not self.debug)
+            dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=(not self.debug)
         ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
-                print(f"Intermediate files can be found in {tmpdir}/.")
-                print("You must delete this folder manually when done.")
+                self.logger.info(
+                    f"Intermediate files kept in {tmpdir}/. You must delete this folder manually when done."
+                )
             if not self._prepare_input_for_swarp(images, tmpdir):
                 return
             if not self._run_swarp(tmpdir, resample=True, stack=False):
@@ -764,11 +795,12 @@ class NISPCombiner(DithersMixin, Combiner):
     def _get_ids(self):
         return super()._get_obsids()
 
-    def _find_images(self, filter):
+    def _find_images(self, filter, check_expected=True):
         """Return a list of paths to the NISP dithers."""
         return super()._find_dithers(
             pattern="**/EUC_NIR_W-CAL-IMAGE_{filter}-{obsid}-*.fits",
             filter=filter,
+            check_expected=check_expected,
         )
 
     def _prepare_input_for_swarp(self, images, tmpdir):
@@ -789,12 +821,15 @@ class VISCombiner(DithersMixin, Combiner):
 
     def combine_per_filter(self, filter):
         if self.multi_chip_bkg:
-            print(
-                "First combine all quads into a single image for background subtraction."
+            self.logger.info(
+                "Preparing for multi-chip background: first creating a single image for each dither."
             )
-            print("-" * 80)
             try:
-                tmpdir = Path(tempfile.TemporaryDirectory(delete=False).name)
+                tmpdir = Path(
+                    tempfile.TemporaryDirectory(
+                        dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=False
+                    ).name
+                )
                 for id in self.ids:
                     combiner = VISCombiner(
                         in_dir=self.in_dir,
@@ -809,6 +844,8 @@ class VISCombiner(DithersMixin, Combiner):
                         autodark_dir=self.autodark_dir,
                         release_name=self.release_name,
                         debug=self.debug,
+                        recurse_symlinks=self.recurse_symlinks,
+                        **self.kwargs,
                     )
                     combiner.combine()
             except:
@@ -818,9 +855,8 @@ class VISCombiner(DithersMixin, Combiner):
             # disable autodark correction for the second pass combining
             self.autodark_corr = False
             self.autodark_dir = None
-            print("-" * 80)
-            print("Actually start combining the dithers now.")
-        images = self._find_images()
+            self.logger.info("Now stacking the dithers.")
+        images = self._find_images(check_expected=(not self.multi_chip_bkg))
         if not images:
             return
         if self.individual_dithers:
@@ -838,21 +874,24 @@ class VISCombiner(DithersMixin, Combiner):
                 )
         else:
             self._combine_images(images, out_fn)
+        if self.multi_chip_bkg:
+            rmtree(tmpdir)
 
     def _combine_images(self, images, out_fn):
         if (self.out_dir / out_fn).exists() and not self.overwrite:
-            print(
+            self.logger.warning(
                 f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
             )
             return
         # the default temporary directory may not have enough space for VIS
         with tempfile.TemporaryDirectory(
-            dir=Path("~").expanduser(), delete=(not self.debug)
+            dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=(not self.debug)
         ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
-                print(f"Intermediate files can be found in {tmpdir}/.")
-                print("You must delete this folder manually when done.")
+                self.logger.info(
+                    f"Intermediate files kept in {tmpdir}/. You must delete this folder manually when done."
+                )
             if not self._prepare_input_for_swarp(images, tmpdir):
                 return
             if not self._run_swarp(tmpdir, resample=True, stack=False):
@@ -863,11 +902,12 @@ class VISCombiner(DithersMixin, Combiner):
                 return
             self._post_process(tmpdir, out_fn)
 
-    def _find_images(self):
+    def _find_images(self, check_expected=True):
         """Return a list of paths to the VIS dithers."""
         return super()._find_dithers(
             pattern="**/EUC_VIS_SWL-DET-*{obsid}-*.fits",
             filter="I",
+            check_expected=check_expected,
         )
 
     def _prepare_input_for_swarp(self, images, tmpdir):
@@ -927,15 +967,18 @@ class MerCombiner(Combiner):
             out_fn += f"_{self.name}"
         out_fn += ".fits"
         if (self.out_dir / out_fn).exists() and not self.overwrite:
-            print(
+            self.logger.warning(
                 f"Output file {out_fn} already exists, but overwrite=False. Skipping combine."
             )
             return
-        with tempfile.TemporaryDirectory(delete=(not self.debug)) as tmpdir:
+        with tempfile.TemporaryDirectory(
+            dir=Path("~").expanduser(), prefix="tmp_nicl_", delete=(not self.debug)
+        ) as tmpdir:
             tmpdir = Path(tmpdir)
             if self.debug:
-                print(f"Intermediate files can be found in {tmpdir}/.")
-                print("You must delete this folder manually when done.")
+                self.logger.info(
+                    f"Intermediate files kept in {tmpdir}/. You must delete this folder manually when done."
+                )
             self._prepare_input_for_swarp(images, tmpdir)
             self._run_swarp(tmpdir)
             self._post_process(tmpdir, out_fn)
@@ -955,13 +998,15 @@ class MerCombiner(Combiner):
             img_tpl = []
             img_tpl.extend(
                 self.in_dir.glob(
-                    f"**/{tile_id}/*/EUC_MER_BGSUB-MOSAIC-{filter}_TILE{tile_id}-*.fits"
+                    f"**/{tile_id}/*/EUC_MER_BGSUB-MOSAIC-{filter}_TILE{tile_id}-*.fits",
+                    recurse_symlinks=self.recurse_symlinks,
                 ),
             )
             if self.add_bkg_mod:
                 img_tpl.extend(
                     self.in_dir.glob(
-                        f"**/{tile_id}/*/EUC_MER_BGMOD*-{filter}_TILE{tile_id}-*.fits"
+                        f"**/{tile_id}/*/EUC_MER_BGMOD*-{filter}_TILE{tile_id}-*.fits",
+                        recurse_symlinks=self.recurse_symlinks,
                     )
                 )
             else:
@@ -970,9 +1015,15 @@ class MerCombiner(Combiner):
         n_images = sum(1 for img in chain.from_iterable(images) if img is not None)
         n_tiles = len(self.ids)
         n_images_per_tile = 2 if self.add_bkg_mod else 1
-        print(
-            f"Found {n_images} {filter} images for {n_tiles} tileids. Expected {n_tiles * n_images_per_tile} images."
-        )
+        n_expected_images = n_tiles * n_images_per_tile
+        if n_images != n_expected_images:
+            self.logger.warning(
+                f"Found {n_images} {filter} images for {n_tiles} tileids, but expected {n_expected_images} images."
+            )
+        else:
+            self.logger.info(
+                f"Found expected {n_images} {filter} images for {n_tiles} tileids."
+            )
         return images
 
     def _prepare_input_for_swarp(self, images, tmpdir):
@@ -1027,7 +1078,7 @@ class MerCombiner(Combiner):
         end_time = datetime.now()
         elapsed_secs = (end_time - start_time).total_seconds()
         elapsed_mins = elapsed_secs / 60
-        print(f"Preparing MER stacks took {elapsed_mins:.1f} mins.")
+        self.logger.info(f"Preparing MER stacks took {elapsed_mins:.1f} mins.")
 
     def _post_process(self, tmpdir, out_fn):
         """Copy the final stack to the desired directory."""
@@ -1040,7 +1091,7 @@ class MerCombiner(Combiner):
         copy2(tmpdir / "coadd.fits", self.out_dir / out_fn)
         end_time = datetime.now()
         elapsed_secs = (end_time - start_time).total_seconds()
-        print(
+        self.logger.info(
             f"Postprocessing took {elapsed_secs:.1f} secs. Output saved to {self.out_dir / out_fn}"
         )
 
@@ -1070,6 +1121,7 @@ def combine(
     release_name="Q1_R1",  # the data release name, e.g., "Q1_R1", "DR1"
     overwrite=False,  # overwrite existing combined image files
     debug=False,  # retain intermediate files for checking and more verbose output
+    recurse_symlinks=True,  # if True, recurse into symlinks
     dry_run=False,  # instantiate the classes without actually combining the images
     **kwargs,  # command line arguments to pass to SWarp
 ):
@@ -1146,6 +1198,9 @@ def combine(
     debug : bool, optional
         If True, retain intermediate files for debugging or inspection and
         print SWarp stderr.
+    recurse_symlinks: bool, optional
+        If True (the default), recurse into symlinks. If False, then symlinked
+        folders will not be searched for input images.
     dry_run : bool, optional
         If True, configure the combiners without actually performing the image
         combination.
@@ -1154,6 +1209,7 @@ def combine(
         Note that they will override the default SWarp configuration.
 
     """
+    logger = logging.getLogger(__name__)
     # check IO designations
     if in_dir is None:
         if release_name is not None:
@@ -1246,13 +1302,14 @@ def combine(
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
+                    recurse_symlinks=recurse_symlinks,
                     **kwargs,
                 )
                 if not dry_run:
                     try:
                         vis_combiner.combine()
                     except ValueError as e:
-                        print(e)
+                        logger.error(f"ValueError: {e}")
         else:
             vis_combiner = VISCombiner(
                 in_dir=in_dir,
@@ -1274,13 +1331,14 @@ def combine(
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
+                recurse_symlinks=recurse_symlinks,
                 **kwargs,
             )
             if not dry_run:
                 try:
                     vis_combiner.combine()
                 except ValueError as e:
-                    print(e)
+                    logger.error(f"ValueError: {e}")
     if nisp_filters is None or nisp_filters:
         if individual_dithers:
             for obs_id in np.atleast_1d(obs_ids):
@@ -1302,13 +1360,14 @@ def combine(
                     release_name=release_name,
                     overwrite=overwrite,
                     debug=debug,
+                    recurse_symlinks=recurse_symlinks,
                     **kwargs,
                 )
                 if not dry_run:
                     try:
                         nisp_combiner.combine()
                     except ValueError as e:
-                        print(e)
+                        logger.error(f"ValueError: {e}")
         else:
             nisp_combiner = NISPCombiner(
                 in_dir=in_dir,
@@ -1328,13 +1387,14 @@ def combine(
                 release_name=release_name,
                 overwrite=overwrite,
                 debug=debug,
+                recurse_symlinks=recurse_symlinks,
                 **kwargs,
             )
             if not dry_run:
                 try:
                     nisp_combiner.combine()
                 except ValueError as e:
-                    print(e)
+                    logger.error(f"ValueError: {e}")
     if mer_filters is None or mer_filters:
         mer_combiner = MerCombiner(
             in_dir=in_dir,
@@ -1349,10 +1409,11 @@ def combine(
             release_name=release_name,
             overwrite=overwrite,
             debug=debug,
+            recurse_symlinks=recurse_symlinks,
             **kwargs,
         )
         if not dry_run:
             try:
                 mer_combiner.combine()
             except ValueError as e:
-                print(e)
+                logger.error(f"ValueError: {e}")

@@ -6,11 +6,13 @@
 __all__ = ['ICL_NSIGMA', 'ICL_INITIAL_SMOOTH_SIGMA', 'ICL_BKG_BOX_SIZE', 'ICL_BKG_FILTER_SIZE', 'ICL_DILATION_FACTOR',
            'ICL_MEDIAN_FILTER', 'REGULAR_DETECTION_PARAMS', 'REGULAR_GROWTH', 'FAINT_DETECTION_PARAMS', 'FAINT_GROWTH',
            'FAINT_BKG_SIGMA_FACTOR', 'NIR_STACK_BKG_BOX_SIZE', 'NIR_STACK_BKG_FILTER_SIZE', 'calc_sb_threshold',
-           'create_masks', 'make_mask_plot', 'stack_nir_bands', 'create_combined_nir_mask', 'create_vis_mask']
+           'create_masks', 'make_mask_plot', 'stack_nir_bands', 'create_combined_nir_mask', 'create_single_band_mask',
+           'create_vis_mask', 'create_nir_mask']
 
 # %% ../../nbs/euclid/mask.ipynb 4
 import logging
 from pathlib import Path
+import shutil
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -255,6 +257,7 @@ def create_combined_nir_mask(
     centre_pos=None,
     icl_bkg_box_size=300,
     nir_stack_bkg_box_size=300,
+    keep_temp_files=False,
 ):
     """Create a combined NIR mask for use when measuring ICL."""
     logger = logging.getLogger(__name__)
@@ -287,8 +290,9 @@ def create_combined_nir_mask(
             mask_for_background = m["badpixel"] | m["object"]
 
         # Saving temp masks
-        save_temp_image(m["object"], f"object_mask_{band}", wcs=image.wcs)
-        save_temp_image(mask_for_background, f"mask_for_bkg_{band}", wcs=image.wcs)
+        if keep_temp_files:
+            save_temp_image(m["object"], f"object_mask_{band}", wcs=image.wcs)
+            save_temp_image(mask_for_background, f"mask_for_bkg_{band}", wcs=image.wcs)
 
         logger.info(f"Estimating background for {band} band...")
         bkg = get_background(
@@ -299,7 +303,8 @@ def create_combined_nir_mask(
         )
 
         # Saving temp background
-        save_temp_image(bkg.background, f"bkg_{band}", wcs=image.wcs)
+        if keep_temp_files:
+            save_temp_image(bkg.background, f"bkg_{band}", wcs=image.wcs)
 
         logger.info(f"Subtracting background for {band} band...")
         image_bkg_sub = image.data - bkg.background
@@ -347,7 +352,12 @@ def create_combined_nir_mask(
 
     logger.info("Masks are generated...")
 
-    save_temp_image(masks["object"], "object_mask_YJH")
+    if keep_temp_files:
+        save_temp_image(masks["object"], "object_mask_YJH")
+    else:
+        temp_dir = output_dir / "tmp/nir_mask"
+        if temp_dir.exists() and temp_dir.is_dir():
+            shutil.rmtree(temp_dir)
 
     if output_dir:
         fits.writeto(
@@ -366,17 +376,17 @@ def create_combined_nir_mask(
     return mask_for_background, mask_for_measurement, combined_ccd.data
 
 
-def create_vis_mask(
-    VIS_filename,
+def create_single_band_mask(
+    image_filename,
+    filter,
     output_dir=None,
     label=None,
     centre_pos=None,
     redshift=None,
-    filter=None,
     icl_bkg_box_size=300,
 ):
     """Create a VIS mask for use when measuring ICL."""
-    image = CCDData.read(VIS_filename, unit="adu")
+    image = CCDData.read(image_filename, unit="adu")
     masks = create_masks(
         image,
         centre_pos=centre_pos,
@@ -402,16 +412,57 @@ def create_vis_mask(
         header = image.wcs.to_header()
 
         fits.writeto(
-            output_dir / f"{prefix}VIS_background_mask.fits",
+            output_dir / f"{prefix}{filter}_background_mask.fits",
             mask_for_background.astype("uint8"),
             header=header,
             overwrite=True,
         )
         fits.writeto(
-            output_dir / f"{prefix}VIS_measurement_mask.fits",
+            output_dir / f"{prefix}{filter}_measurement_mask.fits",
             mask_for_measurement.astype("uint8"),
             header=header,
             overwrite=True,
         )
 
     return mask_for_measurement, mask_for_background
+
+
+def create_vis_mask(
+    VIS_filename,
+    output_dir=None,
+    label=None,
+    centre_pos=None,
+    redshift=None,
+    icl_bkg_box_size=300,
+):
+    """Create a VIS mask for use when measuring ICL."""
+    return create_single_band_mask(
+        VIS_filename,
+        filter="VIS",
+        output_dir=output_dir,
+        label=label,
+        centre_pos=centre_pos,
+        redshift=redshift,
+        icl_bkg_box_size=icl_bkg_box_size,
+    )
+
+
+def create_nir_mask(
+    NIR_filename,
+    filter,
+    output_dir=None,
+    label=None,
+    centre_pos=None,
+    redshift=None,
+    icl_bkg_box_size=300,
+):
+    """Create a NIR mask for use when measuring ICL."""
+    return create_single_band_mask(
+        NIR_filename,
+        filter=filter,
+        output_dir=output_dir,
+        label=label,
+        centre_pos=centre_pos,
+        redshift=redshift,
+        icl_bkg_box_size=icl_bkg_box_size,
+    )

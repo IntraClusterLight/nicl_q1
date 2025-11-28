@@ -24,6 +24,7 @@ from nicl.autoprof import (
 from nicl.euclid.mask import (
     ICL_BKG_FILTER_SIZE,
     create_combined_nir_mask,
+    create_nir_mask,
     create_vis_mask,
 )
 from nicl.main import configure_logging
@@ -75,9 +76,10 @@ class ClusterPipeline:
         | None = None,  # use the noise estimates in this directory
         noise_field: str
         | None = None,  # use the noise properties for this field, e.g. EDFS, EDFF or EDFN
+        keep_temp_files: bool = False,  # whether to keep temporary files
     ):
         self.valid_filters = ["H", "J", "Y", "YJH", "VIS"]
-        self.valid_mask_filters = ["YJH", "VIS", None]
+        self.valid_mask_filters = self.valid_filters + [None]
         self.logger = logging.getLogger(__name__)
         self.image_dir = self._validate_path(image_dir, is_dir=True)
         self.outdir = Path(output_dir)
@@ -104,6 +106,7 @@ class ClusterPipeline:
         self.noise_field = noise_field
         self._set_box_size(box_size)
         self.cluster_output_dir = self.outdir / self.cluster_id
+        self.keep_temp_files = keep_temp_files
 
     def _validate_filters(self, filters):
         filters = [filters] if isinstance(filters, str) else filters
@@ -270,6 +273,8 @@ class ClusterPipeline:
             self._create_combined_nir_image_and_mask()
         elif self.mask_filter == "VIS":
             self._create_vis_mask()
+        else:
+            self._create_nir_mask(self.mask_filter)
 
     def _create_combined_nir_image_and_mask(self):
         mask_name = self._get_mask_name()
@@ -300,10 +305,27 @@ class ClusterPipeline:
         )
         self.logger.info("Created VIS masks.")
 
-    def _get_nir_image_filenames(self):
-        image_filenames = {}
-        for filter in ["H", "J", "Y"]:
-            image_filenames[filter] = self._get_image_filename(filter)
+    def _create_nir_mask(self, filter):
+        mask_name = self._get_mask_name()
+        self.logger.info(f"Creating new NIR masks for {mask_name}...")
+        image_filename = self._get_nir_image_filenames(filter)
+        create_nir_mask(
+            image_filename,
+            filter=filter,
+            centre_pos=self.bcg_pos,
+            label=mask_name,
+            output_dir=self.cluster_output_dir,
+            icl_bkg_box_size=self.box_size,
+        )
+        self.logger.info("Created NIR masks.")
+
+    def _get_nir_image_filenames(self, filter=None):
+        if filter is None:
+            image_filenames = {}
+            for filter in ["H", "J", "Y"]:
+                image_filenames[filter] = self._get_image_filename(filter)
+        else:
+            image_filenames = self._get_image_filename(filter)
         return image_filenames
 
     def _get_vis_image_filenames(self):
@@ -340,12 +362,12 @@ class ClusterPipeline:
     def _create_output_dir(self):
         self.cluster_output_dir.mkdir(parents=True, exist_ok=True)
 
-    def measure_isophotes(self, filter):
+    def measure_isophotes(self, filter, mask_filter=None):
         self.logger.info(
             f"Getting AutoProf isophotes for {self.cluster_id} in {filter} band"
         )
 
-        output_name = self._get_isophotes_name(filter)
+        output_name = self._get_isophotes_name(filter, mask_filter)
         autoprof_results_dir = self.cluster_output_dir / "autoprof_results"
 
         output_filename = autoprof_results_dir / f"{output_name}.prof"
@@ -399,10 +421,12 @@ class ClusterPipeline:
             fixed_centre=fixed_centre,
             regularize_scale=self.isophotes_regularization_scale,
         )
-        self._clean_autoprof_results(autoprof_results_dir)
+        self._clean_autoprof_results(autoprof_results_dir, cleaned_image_filename)
         return output_filename
 
-    def _clean_autoprof_results(self, autoprof_results_dir):
+    def _clean_autoprof_results(
+        self, autoprof_results_dir, cleaned_image_filename=None
+    ):
         always_keep = []
         jpg_keywords_to_keep = [
             "mask_",
@@ -429,14 +453,22 @@ class ClusterPipeline:
                 except Exception as e:
                     self.logger.warning(f"Could not delete {name}: {e}")
 
-    def measure_photometry(self, filter, isophotes_filter=None):
+        if cleaned_image_filename is not None:
+            try:
+                cleaned_image_filename.unlink()
+                self.logger.debug(f"Deleted: {name}")
+            except Exception as e:
+                self.logger.warning(f"Could not delete {cleaned_image_filename}: {e}")
+
+    def measure_photometry(
+        self, filter, isophotes_filter=None, isophotes_mask_filter=None
+    ):
         self.logger.info(f"Subtracting background with box size {self.box_size} pixels")
         image_filename = self._get_image_filename(filter)
         mask_path, bkg_mask_path = self._get_masks()
         temp_dir = self.cluster_output_dir / "tmp/sb_profile"
         if isophotes_filter is None:
             isophotes_filter = filter
-        isophotes_mask_filter = "VIS" if isophotes_filter == "VIS" else "YJH"
         isophotes_name = self._get_isophotes_name(
             isophotes_filter, mask_filter=isophotes_mask_filter
         )
@@ -472,6 +504,9 @@ class ClusterPipeline:
                 centre=self.bcg_pos,
             )
         )
+
+        if not self.keep_temp_files:
+            bkgsub_image_filename.unlink()
 
         flux_outfile = self.cluster_output_dir / f"{label}-profile_measurements.csv"
         flux_measurements.to_csv(flux_outfile, index=False)
@@ -649,12 +684,13 @@ class ClusterPipeline:
         )
         # If we are running on the YJH image, we need to ensure it is created. Currently, this is done when creating
         # the YJH mask, so we need to force this even if no masking is being done.
-        force_YJH = filter == "YJH" and self.mask_filter is None
+        force_YJH = filter == "YJH" and self.mask_filter != "YJH"
         if force_YJH:
+            saved_mask_filter = self.mask_filter
             self.mask_filter = "YJH"
         self.create_masks()
         if force_YJH:
-            self.mask_filter = None
+            self.mask_filter = saved_mask_filter
         self.measure_isophotes(filter)
         if extract_sb_profile:
             profile_df, sb_profile_filename = self.measure_photometry(filter)

@@ -1,3 +1,12 @@
+#!/gpfs01/home/ppzsb1/.conda/envs/icl/bin/python
+# fmt: off
+#SBATCH --partition=defq
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=8g
+#SBATCH --time=0:30:00
+#SBATCH --output=logs/%x_%j.out
+# fmt: on
+
 """Run all the tasks for measuring the surface brightness profile of a cluster.
 
 It is designed to be run on a supercomputer, performing the tasks for different filters and clusters in parallel.
@@ -64,6 +73,13 @@ if __name__ == "__main__":
         help="Filter in which to measure isophotes.",
     )
     parser.add_argument(
+        "--isophotes-mask-filter",
+        type=str,
+        choices=["Y", "J", "H", "YJH", "VIS"],
+        default=None,
+        help="Optional specific filter to use to mask the isophotes measurements.",
+    )
+    parser.add_argument(
         "--photometry-filter",
         type=str,
         choices=["Y", "J", "H", "YJH", "VIS"],
@@ -78,7 +94,7 @@ if __name__ == "__main__":
     process.add_argument(
         "--create-masks",
         type=str,
-        choices=["YJH", "VIS"],
+        choices=["Y", "J", "H", "YJH", "VIS"],
         help="Create masks in the specified filter.",
     )
     process.add_argument(
@@ -171,8 +187,12 @@ if __name__ == "__main__":
         if args.image_label:
             logger.info(f"With image label {args.image_label}")
         logger.info(f"Saving isophotes to {out_path}")
-        pipeline.measure_isophotes(args.isophotes_filter)
+        pipeline.measure_isophotes(
+            args.isophotes_filter, mask_filter=args.isophotes_mask_filter
+        )
     elif args.measure_photometry:
         pipeline.measure_photometry(
-            args.photometry_filter, isophotes_filter=args.isophotes_filter
+            args.photometry_filter,
+            isophotes_filter=args.isophotes_filter,
+            isophotes_mask_filter=args.isophotes_mask_filter,
         )

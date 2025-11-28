@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=4g
+#SBATCH --mem=16g
 #SBATCH --time=0:20:00
-#SBATCH --array=1-9
+#SBATCH --array=1-4
 #SBATCH --job-name=mock_clusters_stack
-#SBATCH --output=logs/%x_%j.out
+#SBATCH --output=logs/%x_%A_%a.out
 
 # Positional parameters:
 # $1 - filter
