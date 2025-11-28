@@ -10,8 +10,8 @@ each element of the processing, in terms of removing artefacts and flattening
 the background.
 
 The standard test cluster image created by `nicl.euclid.testing` is injected
-into observation 3591 at nine positions., listed in `mock_clusters.txt`. This
-observation is then processed through the standard v1.0 pipeline, as well as
+into a set of observations at four positions, listed in `mock_clusters.txt`. The
+observations are then processed through the standard v1.0 pipeline, as well as
 variants in which a single element of the processing is removed, and a variant
 without any processing (other than stacking).
 
@@ -25,11 +25,63 @@ has been convolved with the Euclid ERO PSF (in the `ERO_PSFs` folder).
 ## Data setup
 
 To begin, the data must be prepared. The data in the folder `~/euclid_data/Q1_R1_mock_clusters`
-is symlinked to the original Q1_R1 data, except for observation 3591, which is replaced
-by a version of the original data with the mock clusters injected.
+is symlinked to the original Q1_R1 data, except for observations 3582, 3583, 3590, 3591, 3592,
+3593, 3594, which are replaced by a version of the original data with the mock clusters injected.
 
-To save time, the zarr folder is already created in `Q1_R1_mock_clusters_processed_v1.0`,
-with symlinks to the Q1_R1_processed_v0.7/zarr folder, except for observation 3591.
+```shell
+cd ~/euclid_data
+mkdir Q1_R1_mock_clusters
+cd Q1_R1_mock_clusters
+mkdir SIR
+mkdir NIR
+mkdir VIS_QUAD
+cd SIR
+ln -s ../../Q1_R1/SIR/* .
+cd ..
+cd NIR
+ln -s ../../Q1_R1/NIR/* .
+for obs_id in 3582 3583 3590 3591 3592 3593 3594; do
+    rm -f $obs_id
+    mkdir $obs_id
+    cd $obs_id
+    cp -p ../../../LSB_sim_outputs_4_clusters/*NIR*${obs_id}-*_LSBSim.fits .
+    for f in *_LSBSim*; do mv "$f" "${f/_LSBSim/}"; done
+    cd ..
+done
+cd ..
+cd VIS_QUAD
+ln -s ../../Q1_R1/VIS_QUAD/* .
+for obs_id in 3582 3583 3590 3591 3592 3593 3594; do
+    rm -f $obs_id
+    mkdir $obs_id
+    cd $obs_id
+    cp -p ../../../LSB_sim_outputs_4_clusters/*VIS*${obs_id}-*_LSBSim.fits .
+    for f in *_LSBSim*; do mv "$f" "${f/_LSBSim/}"; done
+    cd ..
+done
+cd ..
+```
+
+To save time, the zarr folder can be created in `Q1_R1_mock_clusters_processed_v1.0`,
+with symlinks to the Q1_R1_processed_v0.7/zarr folder, except for the replaced observations.
+
+```shell
+cd ~/euclid_data
+mkdir Q1_R1_mock_clusters_processed_v1.0
+cd Q1_R1_mock_clusters_processed_v1.0
+mkdir zarr
+cd zarr
+mkdir NIR
+cd NIR
+ln -s ../../../Q1_R1_processed_v0.7/zarr/Q1_R1/NIR/* .
+rm -f 3582 3583 3590 3591 3592 3593 3594
+cd ..
+mkdir VIS
+cd VIS
+ln -s ../../../Q1_R1_processed_v0.7/zarr/Q1_R1/VIS/* .
+rm -f 3582 3583 3590 3591 3592 3593 3594
+cd ../../..
+```
 
 The description below assumes we are submitting SLURM jobs on the Ada supercomputer, but
 the scripts can be run individually by omitting the `sbatch` command.
@@ -39,7 +91,7 @@ the scripts can be run individually by omitting the `sbatch` command.
 
 ### Skyflats
 
-The skyflat for 3591 must first be created. 
+The skyflat for the replaced observations must first be created. 
 ```
 sbatch run_skyflats_nir.py
 sbatch run_skyflats_vis.py
@@ -52,7 +104,7 @@ This takes options to skip various steps of the processing, for ablation studies
 
 The `submit_processing_jobs.sh` script submits the processing jobs for each variant.
 ```
-./submit_processing_jobs.sh
+. submit_processing_jobs.sh
 ```
 
 ### Stacking the clusters
@@ -63,7 +115,7 @@ The script `stack.sh` is used to submit a SLURM job array for a specified filter
 
 The `submit_stack_jobs.sh` script submits the stack jobs for each filter and variant.
 ```
-./submit_stack_jobs.sh
+. submit_stack_jobs.sh
 ```
 
 ### Measuring the profiles

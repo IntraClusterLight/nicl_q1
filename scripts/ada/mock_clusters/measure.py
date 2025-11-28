@@ -154,6 +154,7 @@ if __name__ == "__main__":
         mask_label=mask_label,
         isophotes_label=isophotes_label,
         isophotes_regularization_scale=isophotes_regularization_scale,
+        keep_temp_files=True,
     )
     if args.create_masks:
         logger.info(f"Creating masks for {args.cluster_id} in filter {mask_filter}")
