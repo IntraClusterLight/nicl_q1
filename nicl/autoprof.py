@@ -50,7 +50,7 @@ def create_bkgsub_clean_images(
     else:
         mask = None
 
-    if isinstance(image_filenames, str):
+    if isinstance(image_filenames, (str, Path)):
         image_filenames = [image_filenames]
     output_filenames = []
 
