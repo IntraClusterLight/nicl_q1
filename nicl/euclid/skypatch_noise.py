@@ -133,7 +133,7 @@ def noise_profile_diagnostics(
         radii, np.array(mad_bkg_sub_flux) * 3, label="MAD of Bkg Subtracted Flux"
     )
     ax[0].set_ylabel("3xMAD (Flux / arcsec²)", fontsize=14)
-    ax[0].set_xscale("log")
+    # ax[0].set_xscale("log")
     ax[0].grid(True)
     ax[0].legend()
     ax[0].set_ylim(-0.2, 2)
@@ -157,7 +157,7 @@ def noise_profile_diagnostics(
     )
     ax[1].invert_yaxis()
     ax[1].set_ylabel(r"3×MAD [mag / $\rm arcsec^2$]", fontsize=14)
-    ax[1].set_xscale("log")
+    # ax[1].set_xscale("log")
     ax[1].grid(True)
     ax[1].legend()
 
@@ -191,7 +191,7 @@ def measure_noise_in_circular_annuli(
     log.info(f"Requested rmax={r_max:.1f} pixels.")
     n_annuli = int(np.floor(np.log(r_max) / np.log(1 + gscale))) + 1
     r_max = (1 + gscale) ** (n_annuli)
-    annuli = np.geomspace(1, r_max, n_annuli)
+    annuli = np.geomspace(1, r_max, n_annuli + 1)
     log.info(
         f"Measuring noise in {n_annuli} annuli with rmax={r_max:.1f} pixels and gscale={gscale:.3f}."
     )
@@ -199,7 +199,7 @@ def measure_noise_in_circular_annuli(
     image = fits.getdata(image_path)
     mask = fits.getdata(mask_path).astype(bool)
     image = np.where(mask, np.nan, image)
-    mask = np.isfinite(image)
+    mask = ~np.isfinite(image)
 
     image_height, image_width = image.shape
     valid_points = np.where(~mask)
@@ -210,19 +210,26 @@ def measure_noise_in_circular_annuli(
         & (valid_points[:, 1] > r_max)
         & (valid_points[:, 1] < image_height - r_max)
     ]
+    if valid_points.size < 2:
+        log.error("Not enough valid points found for noise measurement.")
+        return
 
     centres = []
     flux_stats = []
-    while len(flux_stats) < num_points and valid_points.size > 0:
+    np.random.seed(
+        42
+    )  # pick the same random points for consistency between box sizes and bands
+    while len(centres) < num_points:
+        log.debug(f"Centre {len(centres) + 1} of {num_points}")
         centre = valid_points[np.random.choice(len(valid_points))]
-        centre += np.random.uniform(-0.5, 0.5, 2)
+        centre = centre + np.random.uniform(-0.5, 0.5, 2)
         centre = tuple(centre)
         centres.append(centre)
         log.debug(
             f"Extracting noise profile around point: ({centre[0]:.1f}, {centre[1]:.1f})"
         )
 
-        for i in range(len(annuli)):
+        for i in range(len(annuli) - 1):
             r_in, r_out = annuli[i], annuli[i + 1]
             aperture_mask = CircularAnnulus(centre, r_in, r_out).to_mask(
                 method="center"
@@ -240,7 +247,7 @@ def measure_noise_in_circular_annuli(
                 "SMA_annulus_centre_arcsec": sma * pixelscale,
             }
 
-            if len(values) == 1:
+            if len(values) < 2:
                 stats.update(
                     {
                         key: np.nan
@@ -302,7 +309,7 @@ def measure_noise_in_circular_annuli(
     radii = sorted(mad_group.groups.keys())
     noise_measurements = pd.DataFrame(
         {
-            "SMA_annulus_centre_arcsec": [r for r in radii],
+            "SMA_annulus_centre_arcsec": radii,
             "MAD_Median_Clipped_Flux": [
                 median_abs_deviation(
                     mad_group.get_group(r)["Clipped_median_flux_annulus"],
@@ -348,7 +355,7 @@ def measure_noise_in_circular_annuli(
         ax.set_title("Overlay of All Fitted Annuli")
 
         for x, y in centres:
-            for i in range(len(annuli)):
+            for i in range(len(annuli) - 1):
                 r_out = annuli[i + 1]
                 ring = plt.Circle(
                     (x, y),
@@ -373,4 +380,4 @@ def measure_noise_in_circular_annuli(
             zp=zp,
         )
 
-    return extended_measurement_table, noise_measurements, label
+    return extended_measurement_table, noise_measurements
