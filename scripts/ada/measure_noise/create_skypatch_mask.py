@@ -2,8 +2,8 @@
 # fmt: off
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=64g
-#SBATCH --time=1:00:00
+#SBATCH --mem=128g
+#SBATCH --time=4:00:00
 #SBATCH --output=logs/%x_%j.out
 # fmt: on
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     field = args.field
     band = args.band
 
-    data_dir = default_data_path("Q1_R1_clusters_v1.0", "skypatch")
+    data_dir = default_data_path("Q1_R1_clusters_v1.0", "skypatch", "standard")
     output_dir = default_data_path(
         "Q1_R1_clusters_v1.0_measurements", "skypatch", field
     )

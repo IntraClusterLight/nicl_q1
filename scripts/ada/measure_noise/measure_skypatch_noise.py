@@ -4,12 +4,11 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=16g
 #SBATCH --time=2:00:00
-#SBATCH --array=1-80%40
+#SBATCH --array=1-8
 #SBATCH --output=logs/%x_%A_%a.out
 # fmt: on
 
 import argparse
-import itertools
 import logging
 import os
 
@@ -31,50 +30,51 @@ if __name__ == "__main__":
     log.setLevel("DEBUG")
 
     task_id = os.getenv("SLURM_ARRAY_TASK_ID")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("field", type=str)
+    parser.add_argument("band", type=str)
+    parser.add_argument("variant", type=str)
     if task_id is None:
-        parser = argparse.ArgumentParser()
-        parser.add_argument("field", type=str)
         parser.add_argument("box_size", type=int)
-        parser.add_argument("band", type=str)
         args = parser.parse_args()
-        field = args.field
         box_size = args.box_size
-        band = args.band
     else:
+        args = parser.parse_args()
         task_id = int(task_id)
-        tasks = list(itertools.product(fields, box_sizes, bands))
-        field, box_size, band = tasks[task_id - 1]
+        box_size = box_sizes[task_id - 1]
 
     data_dir = default_data_path("Q1_R1_clusters_v1.0", "skypatch")
     output_dir = default_data_path(
-        "Q1_R1_clusters_v1.0_measurements", "skypatch", field
+        "Q1_R1_clusters_v1.0_measurements", "skypatch", args.field, args.variant
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    prefix = f"{field}_Skypatch_bs{box_size}"
+    prefix = f"{args.field}_Skypatch_bs{box_size}"
     tmp_dir = output_dir / "tmp" / prefix
     cleaned_dir = tmp_dir / "cleaned"
     cleaned_dir.mkdir(parents=True, exist_ok=True)
-    log.info(f"Measuring noise in {field} for band {band} with box size {box_size}.")
+    log.info(
+        f"Measuring noise in {args.field} for band {args.band} with box size {box_size}."
+    )
 
     image_paths = {
-        "H": data_dir / f"EUC_NIR_W-STK_H-{field}_sky.fits",
-        "J": data_dir / f"EUC_NIR_W-STK_J-{field}_sky.fits",
-        "Y": data_dir / f"EUC_NIR_W-STK_Y-{field}_sky.fits",
-        "VIS": data_dir / f"EUC_VIS_SWL-STK-{field}_sky.fits",
-        "YJH": output_dir / f"{field}_YJH.fits",
+        "H": data_dir / f"../EUC_NIR_W-STK_H-{args.field}_sky.fits",
+        "J": data_dir / f"../EUC_NIR_W-STK_J-{args.field}_sky.fits",
+        "Y": data_dir / f"../EUC_NIR_W-STK_Y-{args.field}_sky.fits",
+        "VIS": data_dir / f"../EUC_VIS_SWL-STK-{args.field}_sky.fits",
+        "YJH": output_dir / f"{args.field}_YJH.fits",
     }
 
-    if band == "YJH":
-        mask_path = output_dir / f"{field}_YJH_measurement_mask.fits"
-    elif band in ["H", "J", "Y"]:
-        mask_path = output_dir / f"{field}_YJH_measurement_mask.fits"
-    elif band == "VIS":
-        mask_path = output_dir / f"{field}_VIS_measurement_mask.fits"
+    if args.band == "YJH":
+        mask_path = output_dir / f"{args.field}_YJH_measurement_mask.fits"
+    elif args.band in ["H", "J", "Y"]:
+        mask_path = output_dir / f"{args.field}_YJH_measurement_mask.fits"
+    elif args.band == "VIS":
+        mask_path = output_dir / f"{args.field}_VIS_measurement_mask.fits"
 
     log.info("Creating background subtracted image.")
     cleaned_filename = create_bkgsub_clean_images(
-        image_filenames=image_paths[band],
+        image_filenames=image_paths[args.band],
         output_dir=cleaned_dir,
         mask_filename=mask_path,
         output_background_dir=None,
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         num_points=1000,
         pixelscale=0.3,
         output_path=output_dir,
-        label=f"{prefix}_{band}",
+        label=f"{prefix}_{args.band}",
         plot_annuli=False,
         save_diagnostics=True,
     )
