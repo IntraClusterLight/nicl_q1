@@ -2,7 +2,7 @@
 # fmt: off
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=16g
+#SBATCH --mem=32g
 #SBATCH --time=2:00:00
 #SBATCH --array=1-8
 #SBATCH --output=logs/%x_%A_%a.out
@@ -15,7 +15,7 @@ import os
 from nicl import configure_logging
 from nicl.autoprof import create_bkgsub_clean_images
 from nicl.euclid.mask import ICL_BKG_FILTER_SIZE
-from nicl.euclid.skypatch_noise import measure_noise_in_circular_annuli
+from nicl.euclid.skypatch_noise import measure_noise_in_annuli
 from nicl.euclid.utilities import default_data_path
 
 fields = ["EDFS", "EDFF"]
@@ -43,14 +43,15 @@ if __name__ == "__main__":
         task_id = int(task_id)
         box_size = box_sizes[task_id - 1]
 
-    data_dir = default_data_path("Q1_R1_clusters_v1.0", "skypatch")
-    output_dir = default_data_path(
-        "Q1_R1_clusters_v1.0_measurements", "skypatch", args.field, args.variant
+    data_dir = default_data_path("Q1_R1_clusters_v1.0", "skypatch", args.variant)
+    output_field_dir = default_data_path(
+        "Q1_R1_clusters_v1.0_measurements", "skypatch", args.field
     )
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_variant_dir = output_field_dir / args.variant
+    output_variant_dir.mkdir(parents=True, exist_ok=True)
 
     prefix = f"{args.field}_Skypatch_bs{box_size}"
-    tmp_dir = output_dir / "tmp" / prefix
+    tmp_dir = output_variant_dir / "tmp" / prefix
     cleaned_dir = tmp_dir / "cleaned"
     cleaned_dir.mkdir(parents=True, exist_ok=True)
     log.info(
@@ -58,19 +59,19 @@ if __name__ == "__main__":
     )
 
     image_paths = {
-        "H": data_dir / f"../EUC_NIR_W-STK_H-{args.field}_sky.fits",
-        "J": data_dir / f"../EUC_NIR_W-STK_J-{args.field}_sky.fits",
-        "Y": data_dir / f"../EUC_NIR_W-STK_Y-{args.field}_sky.fits",
-        "VIS": data_dir / f"../EUC_VIS_SWL-STK-{args.field}_sky.fits",
-        "YJH": output_dir / f"{args.field}_YJH.fits",
+        "H": next(data_dir.glob(f"EUC*H?{args.field}_sky.fits"), None),
+        "J": next(data_dir.glob(f"EUC*J?{args.field}_sky.fits"), None),
+        "Y": next(data_dir.glob(f"EUC*Y?{args.field}_sky.fits"), None),
+        "VIS": next(data_dir.glob(f"EUC*VIS*{args.field}_sky.fits"), None),
+        "YJH": output_field_dir / f"{args.field}_YJH.fits",
     }
 
     if args.band == "YJH":
-        mask_path = output_dir / f"{args.field}_YJH_measurement_mask.fits"
+        mask_path = output_field_dir / f"{args.field}_YJH_measurement_mask.fits"
     elif args.band in ["H", "J", "Y"]:
-        mask_path = output_dir / f"{args.field}_YJH_measurement_mask.fits"
+        mask_path = output_field_dir / f"{args.field}_YJH_measurement_mask.fits"
     elif args.band == "VIS":
-        mask_path = output_dir / f"{args.field}_VIS_measurement_mask.fits"
+        mask_path = output_field_dir / f"{args.field}_VIS_measurement_mask.fits"
 
     log.info("Creating background subtracted image.")
     cleaned_filename = create_bkgsub_clean_images(
@@ -82,16 +83,19 @@ if __name__ == "__main__":
         filter_size=ICL_BKG_FILTER_SIZE,
     )
 
-    log.info("Measuring noise in circular annuli.")
-    measure_noise_in_circular_annuli(
+    zp = 29.9 if args.variant == "mer" else 23.9
+
+    log.info("Measuring noise in annuli.")
+    measure_noise_in_annuli(
         image_path=cleaned_filename,
         mask_path=mask_path,
         num_points=1000,
         pixelscale=0.3,
-        output_path=output_dir,
+        output_path=output_variant_dir,
         label=f"{prefix}_{args.band}",
         plot_annuli=False,
         save_diagnostics=True,
+        zp=zp,
     )
 
     cleaned_filename.unlink()
