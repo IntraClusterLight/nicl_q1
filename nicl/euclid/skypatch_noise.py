@@ -247,7 +247,7 @@ def measure_noise_in_annuli(
                     b_out=sma_out * ba,
                     b_in=sma_in * ba,
                     theta=theta_rad,
-                ).to_mask(method="center")
+                )
             aperture_mask = aperture.to_mask(method="center")
             values = aperture_mask.get_values(image, mask)
 
