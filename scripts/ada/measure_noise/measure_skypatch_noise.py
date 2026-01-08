@@ -15,7 +15,7 @@ import os
 from nicl import configure_logging
 from nicl.autoprof import create_bkgsub_clean_images
 from nicl.euclid.mask import ICL_BKG_FILTER_SIZE
-from nicl.euclid.skypatch_noise import measure_noise_in_annuli
+from nicl.euclid.skypatch_noise import measure_noise_in_apertures
 from nicl.euclid.utilities import default_data_path
 
 fields = ["EDFS", "EDFF"]
@@ -34,6 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("field", type=str)
     parser.add_argument("band", type=str)
     parser.add_argument("variant", type=str)
+    parser.add_argument("--boxes", action="store_true")
     if task_id is None:
         parser.add_argument("box_size", type=int)
         args = parser.parse_args()
@@ -47,15 +48,16 @@ if __name__ == "__main__":
     output_field_dir = default_data_path(
         "Q1_R1_clusters_v1.0_measurements", "skypatch", args.field
     )
-    output_variant_dir = output_field_dir / args.variant
+    output_variant_dir = output_field_dir / "new" / args.variant
     output_variant_dir.mkdir(parents=True, exist_ok=True)
 
     prefix = f"{args.field}_Skypatch_bs{box_size}"
-    tmp_dir = output_variant_dir / "tmp" / prefix
+    tmp_dir = output_variant_dir / "tmp" / "aperture_type" / prefix
     cleaned_dir = tmp_dir / "cleaned"
     cleaned_dir.mkdir(parents=True, exist_ok=True)
+    shape = "boxes" if args.boxes else "annuli"
     log.info(
-        f"Measuring noise in {args.field} for band {args.band} with box size {box_size}."
+        f"Measuring noise in {shape} in {args.field} for band {args.band} with box size {box_size}."
     )
 
     image_paths = {
@@ -85,15 +87,18 @@ if __name__ == "__main__":
 
     zp = 29.9 if args.variant == "mer" else 23.9
 
-    log.info("Measuring noise in annuli.")
-    measure_noise_in_annuli(
+    aperture_type = "boxes" if args.boxes else "annuli"
+
+    log.info(f"Measuring noise in {aperture_type}.")
+    measure_noise_in_apertures(
         image_path=cleaned_filename,
         mask_path=mask_path,
+        aperture_type=aperture_type,
         num_points=1000,
         pixelscale=0.3,
         output_path=output_variant_dir,
         label=f"{prefix}_{args.band}",
-        plot_annuli=False,
+        plot_overlay=False,
         save_diagnostics=True,
         zp=zp,
     )
