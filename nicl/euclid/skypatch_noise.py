@@ -312,7 +312,7 @@ def measure_noise_in_apertures(
                     }
                 )
 
-            if values is None or len(values) < 2:
+            if values is None or len(values) < 1:
                 stats.update(
                     {
                         key: np.nan
@@ -328,8 +328,11 @@ def measure_noise_in_apertures(
                     }
                 )
             else:
-                clipped = sigma_clip(values, sigma=3, cenfunc="median", maxiters=5)
-                clipped_values = clipped.data[~clipped.mask]
+                if len(values) < 5:
+                    clipped_values = values
+                else:
+                    clipped = sigma_clip(values, sigma=3, cenfunc="median", maxiters=5)
+                    clipped_values = clipped.data[~clipped.mask]
                 # rescale such that it's flux per arcsec^2 for all cases
                 stats.update(
                     {
@@ -379,7 +382,7 @@ def measure_noise_in_apertures(
 
     # Median Absolute Deviation calculation as noise
     mad_group = extended_measurement_table.groupby(arcsec_key)
-    radii = sorted(mad_group.groups.keys())
+    radii = np.array(sorted(mad_group.groups.keys()))
     noise_measurements = pd.DataFrame(
         {
             group_key: radii / pixelscale,

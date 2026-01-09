@@ -18,8 +18,9 @@ from nicl.euclid.mask import ICL_BKG_FILTER_SIZE
 from nicl.euclid.skypatch_noise import measure_noise_in_apertures
 from nicl.euclid.utilities import default_data_path
 
-fields = ["EDFS", "EDFF"]
 box_sizes = [450, 500, 550, 650, 750, 1000, 1800, 2350]
+# box_sizes += [300, 850, 1250, 1500, 2000, 2750]
+
 bands = ["VIS", "YJH", "H", "J", "Y"]
 nir_stack_bkg_box_size = 3000
 
@@ -44,6 +45,8 @@ if __name__ == "__main__":
         task_id = int(task_id)
         box_size = box_sizes[task_id - 1]
 
+    aperture_type = "boxes" if args.boxes else "annuli"
+
     data_dir = default_data_path("Q1_R1_clusters_v1.0", "skypatch", args.variant)
     output_field_dir = default_data_path(
         "Q1_R1_clusters_v1.0_measurements", "skypatch", args.field
@@ -52,12 +55,11 @@ if __name__ == "__main__":
     output_variant_dir.mkdir(parents=True, exist_ok=True)
 
     prefix = f"{args.field}_Skypatch_bs{box_size}"
-    tmp_dir = output_variant_dir / "tmp" / "aperture_type" / prefix
+    tmp_dir = output_variant_dir / "tmp" / aperture_type / prefix
     cleaned_dir = tmp_dir / "cleaned"
     cleaned_dir.mkdir(parents=True, exist_ok=True)
-    shape = "boxes" if args.boxes else "annuli"
     log.info(
-        f"Measuring noise in {shape} in {args.field} for band {args.band} with box size {box_size}."
+        f"Measuring noise in {aperture_type} in {args.field} for band {args.band} with box size {box_size}."
     )
 
     image_paths = {
@@ -85,9 +87,11 @@ if __name__ == "__main__":
         filter_size=ICL_BKG_FILTER_SIZE,
     )
 
-    zp = 29.9 if args.variant == "mer" else 23.9
-
-    aperture_type = "boxes" if args.boxes else "annuli"
+    if args.variant == "mer":
+        mer_zp = {"VIS": 24.6, "Y": 29.8, "J": 30.0, "H": 29.9}
+        zp = mer_zp[args.band]
+    else:
+        zp = 23.9
 
     log.info(f"Measuring noise in {aperture_type}.")
     measure_noise_in_apertures(
@@ -99,7 +103,7 @@ if __name__ == "__main__":
         output_path=output_variant_dir,
         label=f"{prefix}_{args.band}",
         plot_overlay=False,
-        save_diagnostics=True,
+        save_diagnostics=(not args.boxes),
         zp=zp,
     )
 
