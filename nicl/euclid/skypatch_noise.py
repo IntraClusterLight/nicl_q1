@@ -44,13 +44,13 @@ def noise_profile_diagnostics(
         plot_profiles(
             ax[0],
             group["SMA_annulus_centre_arcsec"],
-            group["Clipped_median_flux_annulus"],
+            group["Clipped_median_flux_aperture"],
             "Clipped Median Flux",
         )
         plot_profiles(
             ax[1],
             group["SMA_annulus_centre_arcsec"],
-            group["Clipped_mean_flux_annulus"],
+            group["Clipped_mean_flux_aperture"],
             "Clipped Mean Flux",
         )
     fig.tight_layout()
@@ -100,7 +100,7 @@ def noise_profile_diagnostics(
 
     mad_median_flux = [
         median_abs_deviation(
-            flux_grouped_rad.get_group(r)["Median_flux_annulus"],
+            flux_grouped_rad.get_group(r)["Median_flux_aperture"],
             scale="normal",
             nan_policy="omit",
         )
@@ -108,7 +108,7 @@ def noise_profile_diagnostics(
     ]
     mad_clipped_median_flux = [
         median_abs_deviation(
-            flux_grouped_rad.get_group(r)["Clipped_median_flux_annulus"],
+            flux_grouped_rad.get_group(r)["Clipped_median_flux_aperture"],
             scale="normal",
             nan_policy="omit",
         )
