@@ -259,7 +259,7 @@ MER = Camera(
     filters=("VIS", "NIR-Y", "NIR-J", "NIR-H"),
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.1,
-    zeropoints=VIS.mer_zeropoint | NISP.mer_zeropoint,
+    mer_zeropoint=VIS.mer_zeropoint | NISP.mer_zeropoint,
 )
 
 # %% ../../nbs/euclid/constants.ipynb 4
