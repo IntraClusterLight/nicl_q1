@@ -38,6 +38,7 @@ class Camera:
     # chip_rotations is True if a half-turn rotation is required to align the orientations
     chip_rotations: np.ndarray = None  # 2D array of booleans,
     nominal_zeropoint: float = None
+    mer_zeropoint: float = None
 
     @property
     def extnames(self):
@@ -234,6 +235,7 @@ VIS = Camera(
     ),
     chip_rotations=np.zeros(dtype=bool, shape=(12, 12)),
     nominal_zeropoint=dict(VIS=24.56605),
+    mer_zeropoint=dict(VIS=24.6),
 )
 NISP = Camera(
     name="NISP",
@@ -248,6 +250,7 @@ NISP = Camera(
     chip_layout=np.array([[f"DET{y}{x}" for x in range(1, 5)] for y in range(1, 5)]),
     chip_rotations=np.array([[y > 2 for x in range(1, 5)] for y in range(1, 5)]),
     nominal_zeropoint=dict(H=29.94, J=30.03, Y=29.76),
+    mer_zeropoint=dict(H=29.9, J=30.0, Y=29.8),
 )
 
 MER = Camera(
@@ -256,6 +259,7 @@ MER = Camera(
     filters=("VIS", "NIR-Y", "NIR-J", "NIR-H"),
     bad_pix_bits=(0,),  # 0 is the common flag for all invalid pixels
     pix_scale=0.1,
+    zeropoints=VIS.mer_zeropoint + NISP.mer_zeropoint,
 )
 
 # %% ../../nbs/euclid/constants.ipynb 4

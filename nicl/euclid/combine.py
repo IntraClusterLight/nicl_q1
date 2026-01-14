@@ -1042,13 +1042,13 @@ class MerCombiner(Combiner):
                 else:
                     match filter:
                         case "VIS":
-                            expected_mag_zp = 24.6
+                            expected_mag_zp = MER.zeropoints["VIS"]
                         case "NIR_Y":
-                            expected_mag_zp = 29.8
+                            expected_mag_zp = MER.zeropoints["Y"]
                         case "NIR_J":
-                            expected_mag_zp = 30.0
+                            expected_mag_zp = MER.zeropoints["J"]
                         case "NIR_H":
-                            expected_mag_zp = 29.9
+                            expected_mag_zp = MER.zeropoints["H"]
                         case _:
                             expected_mag_zp = None
                     if mag_zp != expected_mag_zp:
