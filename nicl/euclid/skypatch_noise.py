@@ -521,21 +521,24 @@ def measure_noise_in_boxes(*args, **kwargs):
 # %% ../../nbs/euclid/skypatch_noise.ipynb 6
 def sb_limit_q1(
     r: float | np.ndarray,  # annular aperture radius in arcsec
-    boxsize: float,  # background subtraction boxsize in pixels
-    band: str,  # band
-    field: str,  # field
+    boxsize: float | np.ndarray,  # background subtraction boxsize in pixels
+    band: str | None = None,  # band, if None, must provide params
+    field: str | None = None,  # field, if None, must provide params
+    params: list
+    | None = None,  # if not None, use these params instead of values for the band and field
 ) -> float | np.ndarray:  # 3-sigma surface brightness limit in mag/arcsec^2
     """Calculate the 3-sigma surface brightness limit for a given annulus radius, background subtraction boxsize, band, and field.
 
-    Uses a smooth fit to the measured noise, with an RMS of 0.0023 mag/arcsec^2.
+    Uses a smooth fit to the measured noise, with an RMS of 0.003 mag/arcsec^2.
 
     """
     log = logging.getLogger(__name__)
     r = np.asarray(r)
+    boxsize = np.asarray(boxsize)
     if ((r < 1) | (r > 1000)).any():
         log.warning("r is out of constrained range [1, 1000] arcsec")
-    if (boxsize < 400) | (boxsize > 2400):
-        log.warning("boxsize is out of constrained range [400, 2400] pixels")
+    if ((boxsize < 300) | (boxsize > 2750)).any():
+        log.warning("boxsize is out of constrained range [300, 2750] pixels")
 
     # Two-parameter fit (rms=0.035)
     # noise_function = "((#1 ^ 0.16171958) * 3.6932898) - (((((0.75049275 ^ #1) + (#6 * #6)) * #3) + ((((6.629865 ^ #1) + ((#1 ^ #6) * 3.8938165)) / ((#2 / 1.9729091) + ((((#1 ^ (#6 * 3.4717138)) + (6.124605 ^ #1)) * 3.469273) + (-22.269053 / #3)))) * #5)) + -22.26995)"
@@ -544,28 +547,40 @@ def sb_limit_q1(
     # field_param1 = [-9.638679, -8.59512, -9.013615]
     # field_param2 = [0.7569607, -0.5547611, 0.7604514]
 
-    # Three-parameter fit (rms=0.023)
-    noise_function = "(((#1 - #4) * (#8 ^ 1.3912746)) - ((((-0.00074630475 / #6) + #5) + (#1 * (#1 - (#5 * #4)))) * ((#7 * ((#4 * 0.25506523) + ((#1 + (260.185 / (#2 + ((#1 ^ (#1 ^ (#1 / #8))) - #3)))) - (#2 * 0.00010827427)))) + 1.1077273))) + 26.196531"
-    band_param1 = [-0.00811447, -0.20032445, -3.1353347, 0.08817829]
-    band_param2 = [0.4924656, 0.4457736, -0.5701219, 0.47016442]
-    band_param3 = [-0.017863939, -0.012539046, 0.54210037, 0.04041138]
-    field_param1 = [-0.022179797, -2.4409833, 0.022864059]
-    field_param2 = [-0.25712505, -0.27963218, -0.25830427]
-    field_param3 = [1.7340696, 1.5605289, 1.7003783]
+    # Three-parameter fit to original set of noise curves and missing YJH (rms=0.0023)
+    # noise_function = "(((#1 - #4) * (#8 ^ 1.3912746)) - ((((-0.00074630475 / #6) + #5) + (#1 * (#1 - (#5 * #4)))) * ((#7 * ((#4 * 0.25506523) + ((#1 + (260.185 / (#2 + ((#1 ^ (#1 ^ (#1 / #8))) - #3)))) - (#2 * 0.00010827427)))) + 1.1077273))) + 26.196531"
+    # band_param1 = [-0.00811447, -0.20032445, -3.1353347, 0.08817829]
+    # band_param2 = [0.4924656, 0.4457736, -0.5701219, 0.47016442]
+    # band_param3 = [-0.017863939, -0.012539046, 0.54210037, 0.04041138]
+    # field_param1 = [-0.022179797, -2.4409833, 0.022864059]
+    # field_param2 = [-0.25712505, -0.27963218, -0.25830427]
+    # field_param3 = [1.7340696, 1.5605289, 1.7003783]
 
-    band_param1 = dict(zip(["H", "J", "VIS", "Y"], band_param1))
-    band_param2 = dict(zip(["H", "J", "VIS", "Y"], band_param2))
-    band_param3 = dict(zip(["H", "J", "VIS", "Y"], band_param3))
+    # Three-parameter fit to extended set of noise curves and including YJH (rms=0.0029)
+    noise_function = "#7 + (((#7 + #1) * ((#3 - #6) + (((#5 / #2) + (0.24884821 ^ ((#1 * #1) ^ #8))) ^ 0.39128637))) + ((#4 + #5) * ((((((0.16409773 ^ #1) ^ (#5 / #2)) * 3.6052904) ^ #1) / (#2 + (#5 * #4))) + #8)))"
+    band_param1 = [0.42597696, 0.40886882, 0.21826088, 0.43058214, 0.34954134]
+    band_param2 = [0.64209265, 0.034851216, -1.2052855, 0.010148207, 1.0220108]
+    band_param3 = [24.680067, 25.407665, 28.408003, 25.314537, 24.841537]
+    field_param1 = [-0.48278528, -0.558892, -0.44869965]
+    field_param2 = [0.4612925, 1.174292, 0.5953054]
+    field_param3 = [0.93746895, 0.8562339, 0.92665035]
+
+    band_param1 = dict(zip(["H", "J", "VIS", "Y", "YJH"], band_param1))
+    band_param2 = dict(zip(["H", "J", "VIS", "Y", "YJH"], band_param2))
+    band_param3 = dict(zip(["H", "J", "VIS", "Y", "YJH"], band_param3))
     field_param1 = dict(zip(["EDFF", "EDFN", "EDFS"], field_param1))
     field_param2 = dict(zip(["EDFF", "EDFN", "EDFS"], field_param2))
     field_param3 = dict(zip(["EDFF", "EDFN", "EDFS"], field_param3))
 
-    b1 = band_param1[band]  # noqa: F841
-    b2 = band_param2[band]  # noqa: F841
-    b3 = band_param3[band]  # noqa: F841
-    f1 = field_param1[field]  # noqa: F841
-    f2 = field_param2[field]  # noqa: F841
-    f3 = field_param3[field]  # noqa: F841
+    if params is None:
+        b1 = band_param1[band]  # noqa: F841
+        b2 = band_param2[band]  # noqa: F841
+        b3 = band_param3[band]  # noqa: F841
+        f1 = field_param1[field]  # noqa: F841
+        f2 = field_param2[field]  # noqa: F841
+        f3 = field_param3[field]  # noqa: F841
+    else:
+        b1, b2, b3, f1, f2, f3 = params
 
     r = np.log10(r)  # noqa: F841
     s = boxsize  # noqa: F841
