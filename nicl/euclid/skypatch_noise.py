@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['noise_profile_diagnostics', 'measure_noise_in_apertures', 'measure_noise_in_annuli', 'measure_noise_in_boxes',
-           'sb_limit_q1']
+           'sb_limit_q1', 'bkg_err_q1']
 
 # %% ../../nbs/euclid/skypatch_noise.ipynb 2
 import logging
@@ -524,8 +524,7 @@ def sb_limit_q1(
     boxsize: float | np.ndarray,  # background subtraction boxsize in pixels
     band: str | None = None,  # band, if None, must provide params
     field: str | None = None,  # field, if None, must provide params
-    params: list
-    | None = None,  # if not None, use these params instead of values for the band and field
+    params: list | None = None,  # if not None, use these instead of hardcoded values
 ) -> float | np.ndarray:  # 3-sigma surface brightness limit in mag/arcsec^2
     """Calculate the 3-sigma surface brightness limit for a given annulus radius, background subtraction boxsize, band, and field.
 
@@ -589,4 +588,24 @@ def sb_limit_q1(
         noise_function = noise_function.replace(f"#{i + 1}", variable)
     noise_function = noise_function.replace("^", "**")
     noise = eval(noise_function)
-    return np.squeeze(noise)[()]
+    noise = np.squeeze(noise)[()]
+    return noise
+
+
+def bkg_err_q1(
+    r: float | np.ndarray,  # annular aperture radius in arcsec
+    boxsize: float | np.ndarray,  # background subtraction boxsize in pixels
+    band: str | None = None,  # band, if None, must provide params
+    field: str | None = None,  # field, if None, must provide params
+    params: list | None = None,  # if not None, use these instead of hardcoded values
+    zp=23.9,  # default to the zeropoint used in our combined images
+) -> float | np.ndarray:  # 1-sigma background error in flux/arcsec^2
+    """Calculate the 1-sigma background error for a given annulus radius, background subtraction boxsize, band, and field.
+
+    Uses a smooth fit to the measured 3-sigma surface brightness limit, with an RMS of 0.003 mag/arcsec^2,
+    and converts to the 1-sigma error in the background level in flux/arcsec^2.
+
+    """
+    sb_lim = sb_limit_q1(r, boxsize, band, field, params)
+    flux_err = 10 ** (-0.4 * (sb_lim - zp)) / 3
+    return flux_err
