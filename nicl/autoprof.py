@@ -41,7 +41,7 @@ def create_bkgsub_clean_images(
     | Path
     | None = None,  # optional output directory for background maps
     box_size=None,  #  box size for background estimation; if False or None, no background subtraction is performed
-    filter_size=1,  # filter size for background estimation
+    filter_size=3,  # filter size for background estimation
     clean_nans=False,  # if True, NaNs are set to 99
 ):
     """Prepare background-subtracted and cleaned images for AutoProf."""
