@@ -3,8 +3,8 @@
 #SBATCH --partition=defq
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=32g
-#SBATCH --time=2:00:00
-#SBATCH --array=1-8
+#SBATCH --time=3:00:00
+#SBATCH --array=1-15
 #SBATCH --output=logs/%x_%A_%a.out
 # fmt: on
 
@@ -18,10 +18,11 @@ from nicl.euclid.mask import ICL_BKG_FILTER_SIZE
 from nicl.euclid.skypatch_noise import measure_noise_in_apertures
 from nicl.euclid.utilities import default_data_path
 
-box_sizes = [450, 500, 550, 650, 750, 1000, 1800, 2350]
-# box_sizes += [300, 850, 1250, 1500, 2000, 2750]
+mer_equivalent = int(256 * 0.1 / 0.3)
+box_sizes = [mer_equivalent]
+box_sizes += [450, 500, 550, 650, 750, 1000, 1800, 2350]
+box_sizes += [300, 850, 1250, 1500, 2000, 2750]
 
-bands = ["VIS", "YJH", "H", "J", "Y"]
 nir_stack_bkg_box_size = 3000
 
 if __name__ == "__main__":
