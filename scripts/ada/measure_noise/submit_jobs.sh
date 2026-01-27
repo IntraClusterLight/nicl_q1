@@ -14,6 +14,7 @@ sbatch measure_skypatch_noise.py EDFS VIS no_processing
 sbatch measure_skypatch_noise.py EDFS Y standard
 sbatch measure_skypatch_noise.py EDFS J standard
 sbatch measure_skypatch_noise.py EDFS H standard
+
 sbatch measure_skypatch_noise.py EDFS Y mer
 sbatch measure_skypatch_noise.py EDFS J mer
 sbatch measure_skypatch_noise.py EDFS H mer
@@ -49,6 +50,9 @@ sbatch measure_skypatch_noise.py EDFN Y no_processing
 sbatch measure_skypatch_noise.py EDFN J no_processing
 sbatch measure_skypatch_noise.py EDFN H no_processing
 
+sbatch measure_skypatch_noise.py EDFS YJH standard
+sbatch measure_skypatch_noise.py EDFF YJH standard
+sbatch measure_skypatch_noise.py EDFN YJH standard
 
 # The following jobs measure the noise in boxes.
 
