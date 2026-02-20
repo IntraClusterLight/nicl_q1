@@ -1,7 +1,13 @@
-from pkg_resources import parse_version
 from configparser import ConfigParser
-import setuptools, shlex
-assert parse_version(setuptools.__version__)>=parse_version('36.2')
+import setuptools
+import shlex
+
+
+def _parse_version(v):
+    return tuple(int(x) for x in v.split(".")[:3] if x.isdigit())
+
+
+assert _parse_version(setuptools.__version__) >= _parse_version("36.2")
 
 # note: all settings are in settings.ini; edit there, not here
 config = ConfigParser(delimiters=['='])
