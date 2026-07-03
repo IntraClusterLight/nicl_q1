@@ -10,11 +10,15 @@ import logging
 import os
 import re
 import tempfile
+import time
+from datetime import datetime, timedelta
 from getpass import getpass
+from multiprocessing import Process
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 from astropy import table
 from astropy.io import fits
 from astropy.table import Table
@@ -25,9 +29,12 @@ from nicl.euclid.utilities import (
     euclid_credentials,
     get_dither_id_from_filename,
 )
+from .. import configure_logging
 from ..utilities import maybe_to_value
 
 # %% ../../nbs/euclid/data_access.ipynb #c4de547c
+configure_logging(level="INFO")
+configure_logging(name=__name__, level="INFO")
 logging.getLogger("astroquery").setLevel(logging.WARNING)
 
 # %% ../../nbs/euclid/data_access.ipynb #223f0ca4-9663-43b2-91a6-8b1d682f37b2
@@ -63,26 +70,106 @@ class DataAccess:
         if release_name.startswith("Q1"):
             esac_server_url = "https://eas.esac.esa.int"
             self.release_condition = f"(release_name='{release_name}')"
-        else:
+        elif release_name.startswith("DR1"):
             esac_server_url = "https://easidr.esac.esa.int"
             self.release_condition = f"(environment='{release_name}')"
+        elif release_name.startswith("OTF"):
+            esac_server_url = "https://easotf.esac.esa.int"
+            self.release_condition = None
         self.tap = TapPlus(url=f"{esac_server_url}/tap-server", tap_context="tap")
         self.data_tap = TapPlus(url=f"{esac_server_url}/sas-dd", data_context="data")
         self.mer_filename_lookup = self.get_mer_filename_lookup()
+        self._last_login_time = None
+        self._last_data_login_time = None
         self.logger = logging.getLogger(__name__)
 
+    def try_tap_login(self, tap, n_tries=3):
+        attempt = 0
+        while True:
+            try:
+                tap.login(user=self.esa_username, password=self.esa_password)
+                break
+            except TimeoutError as e:
+                attempt += 1
+                if attempt >= n_tries:
+                    self.logger.warning(f"TAP login failed after {n_tries} attempts")
+                    raise e
+                delay = 5 + 5 * attempt
+                self.logger.warning(f"TAP login timed out; retrying in {delay} seconds")
+                time.sleep(delay)
+
     def tap_login(self):
-        self.tap.login(user=self.esa_username, password=self.esa_password)
+        if self._last_login_time is None or time.time() - self._last_login_time > 60:
+            self.try_tap_login(self.tap)
+            self._last_login_time = time.time()
 
     def data_login(self):
-        self.data_tap.login(user=self.esa_username, password=self.esa_password)
+        if (
+            self._last_data_login_time is None
+            or time.time() - self._last_data_login_time > 60
+        ):
+            self.try_tap_login(self.data_tap)
+            self._last_data_login_time = time.time()
 
-    def tap_query(self, query):
+    def tap_query(
+        self,
+        query: str,  # ADQL query string
+        *,
+        retry_async_on_timeout: bool = True,  # If True, on sync timeout re-launch as async and wait up to 2h
+        async_only: bool = False,  # If True, skip sync and run as async from the start (for long-running queries)
+    ) -> Table:  # Query result table
+        """Run a TAP query. Optionally retry with an async job if sync times out."""
         self.tap_login()
+        if async_only:
+            return self._tap_query_async_wait(query)
+        if retry_async_on_timeout:
+            try:
+                job = self.tap.launch_job(query)
+                results = job.get_results()
+                if len(results) == 2000:
+                    self.logger.warning("Query results may be truncated.")
+                return results
+            except requests.exceptions.Timeout as e:
+                self.logger.warning(
+                    "Synchronous TAP query timed out (%s); re-launching as asynchronous job (max wait 2h).",
+                    e,
+                )
+                return self._tap_query_async_wait(query)
         job = self.tap.launch_job(query)
         results = job.get_results()
         if len(results) == 2000:
-            print("Warning: query results may be truncated.")
+            self.logger.warning("Query results may be truncated.")
+        return results
+
+    def _tap_query_async_wait(self, query, max_wait_seconds=7200):
+        """Run query as async job and wait until finished, polling with decreasing frequency."""
+        job = self.tap.launch_job_async(query, background=True)
+        interval = 5
+        total_waited = 0
+        while total_waited < max_wait_seconds:
+            phase = job.get_phase(update=True).upper().strip()
+            if phase in ("COMPLETED", "ERROR", "ABORTED"):
+                break
+            next_poll_at = datetime.now() + timedelta(seconds=interval)
+            self.logger.info(
+                "TAP async job still running (phase=%s). Next poll in %ds at %s.",
+                phase,
+                interval,
+                next_poll_at.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+            time.sleep(interval)
+            total_waited += interval
+            interval = min(300, interval + 5)
+        if phase == "ERROR" or phase == "ABORTED":
+            err = job.get_error()
+            raise RuntimeError(f"TAP async job ended with phase {phase}: {err}")
+        if total_waited >= max_wait_seconds:
+            raise TimeoutError(
+                f"TAP async job did not complete within {max_wait_seconds}s (2h)."
+            )
+        results = job.get_results()
+        if len(results) == 2000:
+            self.logger.warning("Query results may be truncated.")
         return results
 
     def get_mer_filename_lookup(self):
@@ -293,19 +380,91 @@ class DataAccess:
         self,
         filenames,  #  list of filenames or Table containing "file_name" column
         outpath,  # the folder in which to save the downloaded files
-        verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid filenames to outpath."""
         outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
         if isinstance(filenames, Table):
             filenames = filenames["file_name"]
-        if verbose:
-            print(f"Downloading {len(filenames)} files to {outpath}")
+        self.logger.info(f"Downloading {len(filenames)} files to {outpath}")
         for fn in filenames:
-            if verbose:
-                print(f"Downloading {fn}")
+            self.logger.info(f"Downloading {fn}")
             self.download_file(fn, outpath)
+            self.check_file_size(fn, outpath)
+
+    def check_file_size(self, fn, outpath):
+        "Check the size of a file matches expectations."
+        if fn.startswith("EUC_VIS_SWL-DET"):
+            expected_size = 7315678080
+        elif fn.startswith("EUC_NIR_W-CAL-IMAGE"):
+            expected_size = 799361280
+        elif fn.startswith("EUC_SIR_W-SCIFRM_BKGSUB"):
+            expected_size = 799266240
+        else:
+            expected_size = None
+        actual_size = os.path.getsize(outpath / fn)
+        if expected_size is not None and actual_size != expected_size:
+            self.logger.warning(
+                f"File {fn}: size {actual_size}, but expected {expected_size}"
+            )
+
+    def _download_worker(self, params, output_path):
+        "Download a file; used by _download_file_with_timeout in a separate process."
+        self.data_login()
+        self.data_tap.load_data(params_dict=params, output_file=output_path)
+
+    def _download_file_with_timeout(
+        self,
+        params_dict,
+        outfn,
+        stall_timeout_seconds=3600,  # 1 hour
+        check_interval_seconds=60,
+        max_retries=3,
+    ):
+        """Download a file with a timeout.
+
+        This is a workaround for the fact that the TAP service does not support timeouts on file downloads.
+        If the download stalls, the process is killed and retried.
+
+        """
+        for attempt in range(1, max_retries + 1):
+            if outfn.exists():
+                os.remove(outfn)
+
+            proc = Process(target=self._download_worker, args=(params_dict, outfn))
+            proc.start()
+
+            last_size = outfn.stat().st_size if outfn.exists() else 0
+            last_change = time.monotonic()
+
+            while proc.is_alive():
+                time.sleep(check_interval_seconds)
+                self.logger.debug("Checking download progress")
+                size = outfn.stat().st_size if outfn.exists() else 0
+                self.logger.debug(f"Downloaded {size / 1024 / 1024:.2f} Mb")
+
+                if size > last_size:
+                    last_size = size
+                    last_change = time.monotonic()
+                elif time.monotonic() - last_change > stall_timeout_seconds:
+                    self.logger.warning(
+                        f"Download of {outfn} stalled for {stall_timeout_seconds} s; "
+                        f"killing and retrying (attempt {attempt}/{max_retries})."
+                    )
+                    proc.terminate()
+                    proc.join()
+                    if outfn.exists():
+                        os.remove(outfn)
+                    break  # retry outer loop
+
+            else:
+                # process exited normally
+                proc.join()
+                return
+
+        raise TimeoutError(
+            f"Download of {outfn} stalled and failed after {max_retries} attempts."
+        )
 
     def download_file(
         self,
@@ -323,34 +482,32 @@ class DataAccess:
         if ignore_dry_run or not self.dry_run:
             if not outfn.exists() or self.overwrite:
                 try:
-                    self.data_login()
-                    self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
+                    self._download_file_with_timeout(
+                        params_dict=params_dict, outfn=outfn
+                    )
                 except (Exception, KeyboardInterrupt):
                     if outfn.exists():
                         os.remove(outfn)
                     self.logger.warning(f"Error downloading {filename}")
             else:
-                print(f"File already exists, skipping: {outfn}")
+                self.logger.info(f"File already exists, skipping: {outfn}")
 
     def download_mosaic_files(
         self,
         file_info,  #  Table containing file information
         outpath,  # the folder in which to save the downloaded files
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
-        verbose=True,  # print information to the screen
     ):
         """Download multiple Euclid mosaics to outpath."""
         outpath = Path(outpath).expanduser()
         outpath.mkdir(parents=True, exist_ok=True)
-        print(f"Downloading {len(file_info)} files to {outpath}")
+        self.logger.info(f"Downloading {len(file_info)} files to {outpath}")
         filenames = []
         for info in file_info:
             t = info["tile_index"]
             i = info["instrument_name"]
             f = info["filter_name"]
-            fn = self.download_mosaic_file(
-                t, i, f, outpath, mer_file_type, verbose=verbose
-            )
+            fn = self.download_mosaic_file(t, i, f, outpath, mer_file_type)
             filenames.append(fn)
         return filenames
 
@@ -361,16 +518,20 @@ class DataAccess:
         filter,  # VIS, NIR_Y, NIR_J or NIR_H
         outpath,  # the folder in which to save the downloaded files
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
-        verbose=True,  # print information to the screen
     ):
         """Download Euclid mosaic to outpath, using a workaround method."""
         if self.mer_filename_lookup is None:
             raise FileNotFoundError("MER filename lookup file was not found.")
-        fn = self.mer_filename_lookup.loc[
-            f"{tile_index}", instrument, mer_file_type, filter
-        ]
-        if verbose:
-            print(f"Downloading {fn}")
+        try:
+            fn = self.mer_filename_lookup.loc[
+                f"{tile_index}", instrument, mer_file_type, filter
+            ]
+        except KeyError:
+            self.logger.warning(
+                f"No MER file found in lookup table for tile {tile_index}, instrument {instrument} and filter {filter}."
+            )
+            return ""
+        self.logger.info(f"Downloading {fn}")
         self.download_file(fn, outpath)
         return fn
 
@@ -381,7 +542,6 @@ class DataAccess:
         filter,  # VIS, NIR_Y, NIR_J or NIR_H
         outpath,  # the folder in which to save the downloaded files
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
-        verbose=True,  # print information to the screen
     ):
         """Download Euclid mosaic to outpath, using an alternative method.
 
@@ -407,18 +567,16 @@ class DataAccess:
             raise ValueError(f"Invalid mer_file_type provided: {mer_file_type}.")
         filename = f"EUC_MER_{filename}_TILE{tile_index}.fits"
         outfn = outpath / filename
-        if verbose:
-            print(
-                f"Downloading {mer_file_type} file for tile {tile_index}, instrument {instrument} and filter {filter}"
-            )
-            print(f"Saving as {outfn}")
-            print(params_dict)
+        self.logger.info(
+            f"Downloading {mer_file_type} file for tile {tile_index}, instrument {instrument} and filter {filter}"
+        )
+        self.logger.info(f"Saving as {outfn}")
         if not self.dry_run:
             if not outfn.exists() or self.overwrite:
                 self.data_login()
                 self.data_tap.load_data(params_dict=params_dict, output_file=outfn)
             else:
-                print(f"File already exists, skipping: {outfn}")
+                self.logger.info(f"File already exists, skipping: {outfn}")
 
     def download_calibrated_files_for_observation(
         self,
@@ -427,13 +585,12 @@ class DataAccess:
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         include_vis_short=False,  # if True, include VIS short exposure files
-        verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter."""
         file_info = self.get_calibrated_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
-        if not include_vis_short:
+        if instrument == "VIS" and not include_vis_short:
             file_info = file_info[file_info["duration"] > 300]
         if instrument == "NISP":
             instrument_folder = "NIR"
@@ -442,19 +599,18 @@ class DataAccess:
         else:
             raise ValueError("The instrument must be NISP or VIS.")
         outpath = Path(outpath, instrument_folder, f"{obs_id:n}")
-        self.download_files(file_info, outpath=outpath, verbose=verbose)
+        self.download_files(file_info, outpath=outpath)
         return file_info
 
     def download_sir_files_for_observation(
         self,
         obs_id,
         outpath,  # the base folder in which to save the downloaded files
-        verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all SIR files for a Euclid observation."""
         file_info = self.get_sir_files_for_observation(obs_id)
         outpath = Path(outpath, "SIR", f"{obs_id:n}")
-        self.download_files(file_info, outpath=outpath, verbose=verbose)
+        self.download_files(file_info, outpath=outpath)
         return file_info
 
     def download_raw_files_for_observation(
@@ -463,14 +619,13 @@ class DataAccess:
         outpath,  # the base folder in which to save the downloaded files
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
-        verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter."""
         file_info = self.get_raw_files_for_observation(
             obs_id, instrument=instrument, filter=filter
         )
         outpath = Path(outpath, "RAW", f"{obs_id:n}")
-        self.download_files(file_info, outpath=outpath, verbose=verbose)
+        self.download_files(file_info, outpath=outpath)
         return file_info
 
     def download_files_for_tile(
@@ -480,7 +635,6 @@ class DataAccess:
         instrument=None,  # None, NISP or VIS
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         mer_file_type="STK",  # STK, BKG, RMS or FLAG
-        verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all files for a Euclid MER tile, optionally restricted by instrument or filter.
 
@@ -498,7 +652,7 @@ class DataAccess:
             raise ValueError("The instrument must be NISP or VIS.")
         outpath = Path(outpath, "MER", f"{tile_index:n}", instrument_folder)
         filenames = self.download_mosaic_files(
-            file_info, outpath=outpath, mer_file_type=mer_file_type, verbose=verbose
+            file_info, outpath=outpath, mer_file_type=mer_file_type
         )
         file_info["file_name"] = filenames
         return file_info
@@ -515,7 +669,6 @@ class DataAccess:
         filter=None,  # None, VIS, NIR_Y, NIR_J or NIR_H
         file_type="CAL",  # CAL, MER
         mer_file_type="STK",  # STK, BKG, RMS or FLAG, only for file_type="MER"
-        verbose=True,  # print information to the screen
     ):  #  returns a table of file information
         """Download all calibrated files for Euclid observations covering a target, optionally restricted by instrument or filter."""
         file_info = []
@@ -524,14 +677,12 @@ class DataAccess:
                 ra, dec, radius, fully_contained=fully_contained
             )
             for obs_id in obs_ids:
-                if verbose:
-                    print(f"Downloading files for observation id {obs_id}")
+                self.logger.info(f"Downloading files for observation id {obs_id}")
                 obs_file_info = self.download_calibrated_files_for_observation(
                     obs_id,
                     outpath=outpath,
                     instrument=instrument,
                     filter=filter,
-                    verbose=verbose,
                 )
                 file_info.append(obs_file_info)
         elif file_type == "MER":
@@ -539,15 +690,13 @@ class DataAccess:
                 ra, dec, radius, fully_contained=fully_contained
             )
             for tile_id in tile_ids:
-                if verbose:
-                    print(f"Downloading files for tile index {tile_id}")
+                self.logger.info(f"Downloading files for tile index {tile_id}")
                 tile_file_info = self.download_files_for_tile(
                     tile_id,
                     outpath=outpath,
                     instrument=instrument,
                     filter=filter,
                     mer_file_type=mer_file_type,
-                    verbose=verbose,
                 )
                 file_info.append(tile_file_info)
         if len(file_info) > 0:
