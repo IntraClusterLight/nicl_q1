@@ -12,9 +12,11 @@ on Euclid data. This nicl_q1 repository contains a branch of our main
 development at the time we processed the Euclid Q1 data. The details of
 the processing and measurement approach are presented in Euclid
 Collaboration: Bamford et al. (2026). These measurements have been used
-in the following papers: - Euclid Collaboration: Kolcu et al. (2026) -
-Euclid Collaboration: Golden-Marx et al. (2026) - Euclid Collaboration:
-Gully et al. (2026)
+in the following papers:
+
+- Euclid Collaboration: Kolcu et al. (2026)
+- Euclid Collaboration: Golden-Marx et al. (2026)
+- Euclid Collaboration: Gully et al. (2026)
 
 ## Structure and caveats
 
@@ -27,9 +29,10 @@ folder](https://github.com/IntraClusterLight/nicl_q1/tree/main/nicl).
 The notebooks can therefore use code defined in each other by importing
 the pip-installed library, i.e. `import nicl`. Many notebooks also
 contain examples illustrating the development and usage of the library
-functions. The “nicl” folder can also contain additional python code
-that is not generated from the notebooks; this currently includes a
-modified version of ezgal.
+functions. [Documentation](https://intraclusterlight.github.io/nicl_q1)
+is automatically generated from the notebooks. The “nicl” folder can
+also contain additional python code that is not generated from the
+notebooks; this currently includes a modified version of ezgal.
 
 The root [“nbs”
 folder](https://github.com/IntraClusterLight/nicl/tree/main/nbs)
