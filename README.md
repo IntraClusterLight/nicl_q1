@@ -119,6 +119,12 @@ in the binary folder, as follows:
 
 ### Development install
 
+We do not recommend developing against this repository, since
+significant further work has already taken place on the main (private)
+repository. If you have feedback or would like to contribute, either
+create an issue or contact the team [Nottingham ICL
+team](mailto:icl-group@nottingham.ac.uk).
+
 To install the software for development, first create a clean Python
 (\>= 3.13) environment. This could be a virtualenv or a conda
 environment (e.g. `conda create -n icl python=3.13`). Clone this
@@ -148,18 +154,3 @@ these run:
     pre-commit install
 
 Now, whenever you try to commit to this repo, a set of checks will run.
-
-#### Committing changes to git
-
-Start a commit by doing `git add your_new_or_updated_notebooks.ipynb`.
-Then run `git commit -m "Your informative log message"`. Typically the
-notebook will be reformatted, cleaned and exported, and the checks will
-fail. Next, do `git add your_new_or_updated_notebooks.ipynb` again, and
-also add any new files that have been created in the `nicl` folder. You
-might find `git add -u .` helpful, but be careful not to add any files
-you have changed but don’t want to commit at this stage. Then run
-`git commit -m "Your informative log message"` again. You will likely
-need to go through this routine one more time, then the commit will
-succeed. If it doesn’t, there may be a problem with your code, which you
-will need to fix before commiting. If you get desperate, you can skip
-the checks with `git commit -n`.
