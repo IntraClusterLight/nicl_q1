@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Functionality to access Euclid calibrated frames, mosaic tiles and raw data for specific targets and observations.">
+
+<title>data_access – nicl</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-3d242d70d41cd9edc5ebe4da1d712dc5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+<meta property="og:title" content="data_access – nicl">
+<meta property="og:description" content="Functionality to access Euclid calibrated frames, mosaic tiles and raw data for specific targets and observations.">
+<meta property="og:site_name" content="nicl">
+<meta name="twitter:title" content="data_access – nicl">
+<meta name="twitter:description" content="Functionality to access Euclid calibrated frames, mosaic tiles and raw data for specific targets and observations.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">nicl</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../euclid/index.html">euclid</a></li><li class="breadcrumb-item"><a href="../euclid/data_access.html">data_access</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">nicl_q1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../main.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">main</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../testing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">testing</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../utilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">utilities</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../filter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">filter</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">background</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mask</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../autoprof.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">autoprof</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../measure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">measure</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="../euclid/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">euclid</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/background_stats.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">background_stats</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/combine.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">combine</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/constants.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constants</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/continuity.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">continuity</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/cutout.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cutout</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/data_access.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">data_access</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/debanding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">debanding</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/dq_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">dq_mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/measure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">measure</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/persistence.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">persistence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/pipeline.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">pipeline</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/skyflat.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skyflat</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/skypatch_noise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skypatch_noise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/stars.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">stars</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/testing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">testing</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/utilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">utilities</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/visualise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">visualise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/xarray.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">xarray</span></a>
+  </div>
+</li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text">q1</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/q1/data_processing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Creation of figures for the Q1 data processing paper</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">other</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../other/sky_background_error_estimates.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Sky background error estimates</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#dataaccess" id="toc-dataaccess" class="nav-link active" data-scroll-target="#dataaccess">DataAccess</a></li>
+  <li><a href="#calibrated-files" id="toc-calibrated-files" class="nav-link" data-scroll-target="#calibrated-files">Calibrated files</a></li>
+  <li><a href="#dataaccess.find_observations_for_target" id="toc-dataaccess.find_observations_for_target" class="nav-link" data-scroll-target="#dataaccess.find_observations_for_target">DataAccess.find_observations_for_target</a></li>
+  <li><a href="#dataaccess.get_calibrated_files_for_observation" id="toc-dataaccess.get_calibrated_files_for_observation" class="nav-link" data-scroll-target="#dataaccess.get_calibrated_files_for_observation">DataAccess.get_calibrated_files_for_observation</a></li>
+  <li><a href="#dataaccess.download_calibrated_files_for_observation" id="toc-dataaccess.download_calibrated_files_for_observation" class="nav-link" data-scroll-target="#dataaccess.download_calibrated_files_for_observation">DataAccess.download_calibrated_files_for_observation</a></li>
+  <li><a href="#dataaccess.download_files_for_target" id="toc-dataaccess.download_files_for_target" class="nav-link" data-scroll-target="#dataaccess.download_files_for_target">DataAccess.download_files_for_target</a></li>
+  <li><a href="#mosaic-files" id="toc-mosaic-files" class="nav-link" data-scroll-target="#mosaic-files">Mosaic files</a></li>
+  <li><a href="#dataaccess.find_tiles_for_target" id="toc-dataaccess.find_tiles_for_target" class="nav-link" data-scroll-target="#dataaccess.find_tiles_for_target">DataAccess.find_tiles_for_target</a></li>
+  <li><a href="#dataaccess.get_files_for_tile" id="toc-dataaccess.get_files_for_tile" class="nav-link" data-scroll-target="#dataaccess.get_files_for_tile">DataAccess.get_files_for_tile</a></li>
+  <li><a href="#dataaccess.download_files_for_tile" id="toc-dataaccess.download_files_for_tile" class="nav-link" data-scroll-target="#dataaccess.download_files_for_tile">DataAccess.download_files_for_tile</a></li>
+  <li><a href="#sir-files" id="toc-sir-files" class="nav-link" data-scroll-target="#sir-files">SIR files</a></li>
+  <li><a href="#dataaccess.get_sir_files_for_observation" id="toc-dataaccess.get_sir_files_for_observation" class="nav-link" data-scroll-target="#dataaccess.get_sir_files_for_observation">DataAccess.get_sir_files_for_observation</a></li>
+  <li><a href="#dataaccess.download_sir_files_for_observation" id="toc-dataaccess.download_sir_files_for_observation" class="nav-link" data-scroll-target="#dataaccess.download_sir_files_for_observation">DataAccess.download_sir_files_for_observation</a></li>
+  <li><a href="#raw-files" id="toc-raw-files" class="nav-link" data-scroll-target="#raw-files">Raw files</a></li>
+  <li><a href="#dataaccess.get_raw_files_for_observation" id="toc-dataaccess.get_raw_files_for_observation" class="nav-link" data-scroll-target="#dataaccess.get_raw_files_for_observation">DataAccess.get_raw_files_for_observation</a></li>
+  <li><a href="#dataaccess.download_raw_files_for_observation" id="toc-dataaccess.download_raw_files_for_observation" class="nav-link" data-scroll-target="#dataaccess.download_raw_files_for_observation">DataAccess.download_raw_files_for_observation</a></li>
+  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/IntraClusterLight/nicl/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../euclid/index.html">euclid</a></li><li class="breadcrumb-item"><a href="../euclid/data_access.html">data_access</a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title">data_access</h1>
+</div>
+
+<div>
+  <div class="description">
+    Functionality to access Euclid calibrated frames, mosaic tiles and raw data for specific targets and observations.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L41" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="dataaccess" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess">DataAccess</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> DataAccess(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    esa_username:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># ESA account username (prompts if not supplied)</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    esa_password:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># ESA account password (prompts if not supplied)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    release_name:<span class="bu">str</span><span class="op">=</span><span class="st">'DR1'</span>, <span class="co"># Q1 or DR1</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    esac_server_url:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># ESA server (default is to choose based on release_name)</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    dry_run:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># if True, do not actually download files</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    overwrite:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># should existing files be overwritten?</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    science_only:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if True, only return science frames or observations containing them</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Provides access to Euclid data.</em></p>
+</section>
+<section id="calibrated-files" class="level3">
+<h3 class="anchored" data-anchor-id="calibrated-files">Calibrated files</h3>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L273" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.find_observations_for_target" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.find_observations_for_target">DataAccess.find_observations_for_target</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> find_observations_for_target(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    ra, <span class="co"># RA of the target, as an angular quantity or in decimal degrees</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    dec, <span class="co"># Dec of the target, as an angular quantity or in decimal degrees</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    radius:<span class="bu">float</span><span class="op">=</span><span class="fl">0.016666666666666666</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    fully_contained:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if False, the target region only needs to intersect with the observation footprint</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Obtain a list of survey obs_ids for observations that entirely contain or intersect the specified target region.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L312" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.get_calibrated_files_for_observation" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.get_calibrated_files_for_observation">DataAccess.get_calibrated_files_for_observation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_calibrated_files_for_observation(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    obs_id, <span class="co"># observation_id for which to find files</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, VIS, NIR_Y, NIR_J or NIR_H</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Obtain calibrated file information for obs_id, optionally restricted by instrument or filter.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L581" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.download_calibrated_files_for_observation" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.download_calibrated_files_for_observation">DataAccess.download_calibrated_files_for_observation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> download_calibrated_files_for_observation(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    obs_id, outpath, <span class="co"># the base folder in which to save the downloaded files</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, VIS, NIR_Y, NIR_J or NIR_H</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    include_vis_short:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># if True, include VIS short exposure files</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L660" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.download_files_for_target" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.download_files_for_target">DataAccess.download_files_for_target</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> download_files_for_target(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    ra, <span class="co"># RA of the target, as an angular quantity or in decimal degrees</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    dec, <span class="co"># Dec of the target, as an angular quantity or in decimal degrees</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    radius:<span class="bu">float</span><span class="op">=</span><span class="fl">0.016666666666666666</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    fully_contained:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if False, the target region only needs to intersect with the observation footprint</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    outpath:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># the folder in which to save the downloaded files</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, VIS, NIR_Y, NIR_J or NIR_H</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    file_type:<span class="bu">str</span><span class="op">=</span><span class="st">'CAL'</span>, <span class="co"># CAL, MER</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    mer_file_type:<span class="bu">str</span><span class="op">=</span><span class="st">'STK'</span>, <span class="co"># STK, BKG, RMS or FLAG, only for file_type="MER"</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Download all calibrated files for Euclid observations covering a target, optionally restricted by instrument or filter.</em></p>
+</section>
+<section id="mosaic-files" class="level3">
+<h3 class="anchored" data-anchor-id="mosaic-files">Mosaic files</h3>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L294" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.find_tiles_for_target" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.find_tiles_for_target">DataAccess.find_tiles_for_target</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> find_tiles_for_target(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    ra, <span class="co"># RA of the target, as an angular quantity or in decimal degrees</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    dec, <span class="co"># Dec of the target, as an angular quantity or in decimal degrees</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    radius:<span class="bu">float</span><span class="op">=</span><span class="fl">0.016666666666666666</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    fully_contained:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if False, the target region only needs to intersect with the observation footprint</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Obtain a list of survey MER tile_indexes for tiles that entirely contain or intersect the specified target region.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L362" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.get_files_for_tile" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.get_files_for_tile">DataAccess.get_files_for_tile</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_files_for_tile(</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    tile_index, <span class="co"># tile_index for which to find files</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, VIS, NIR_Y, NIR_J or NIR_H</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Obtain mosaic file information for tile_index, optionally restricted by instrument or filter.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L631" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.download_files_for_tile" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.download_files_for_tile">DataAccess.download_files_for_tile</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> download_files_for_tile(</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    tile_index, outpath, <span class="co"># the base folder in which to save the downloaded files</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, VIS, NIR_Y, NIR_J or NIR_H</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    mer_file_type:<span class="bu">str</span><span class="op">=</span><span class="st">'STK'</span>, <span class="co"># STK, BKG, RMS or FLAG</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Download all files for a Euclid MER tile, optionally restricted by instrument or filter.</em></p>
+<p>By default this gets the background subtracted image, but specifying <code>mer_file_type</code> can download the background model (BKG), RMS or FLAG images.</p>
+</section>
+<section id="sir-files" class="level3">
+<h3 class="anchored" data-anchor-id="sir-files">SIR files</h3>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L332" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.get_sir_files_for_observation" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.get_sir_files_for_observation">DataAccess.get_sir_files_for_observation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_sir_files_for_observation(</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    obs_id, <span class="co"># observation_id for which to find files</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Obtain SIR file information for obs_id.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L605" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.download_sir_files_for_observation" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.download_sir_files_for_observation">DataAccess.download_sir_files_for_observation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> download_sir_files_for_observation(</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    obs_id, outpath, <span class="co"># the base folder in which to save the downloaded files</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Download all SIR files for a Euclid observation.</em></p>
+</section>
+<section id="raw-files" class="level3">
+<h3 class="anchored" data-anchor-id="raw-files">Raw files</h3>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L343" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.get_raw_files_for_observation" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.get_raw_files_for_observation">DataAccess.get_raw_files_for_observation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_raw_files_for_observation(</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    obs_id, <span class="co"># observation_id for which to find files</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, "" for VIS, OPEN for grism, CLOSED for slew dark, Y, J or H</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Obtain raw file information for obs_id, optionally restricted by instrument or filter.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/data_access.py#L616" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="dataaccess.download_raw_files_for_observation" class="level3">
+<h3 class="anchored" data-anchor-id="dataaccess.download_raw_files_for_observation">DataAccess.download_raw_files_for_observation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> download_raw_files_for_observation(</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    obs_id, outpath, <span class="co"># the base folder in which to save the downloaded files</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    instrument:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, NISP or VIS</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span>:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None, VIS, NIR_Y, NIR_J or NIR_H</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Download all calibrated files for a Euclid observation, optionally restricted by instrument or filter.</em></p>
+</section>
+<section id="example" class="level3">
+<h3 class="anchored" data-anchor-id="example">Example</h3>
+<p>The following demonstrates use of the DataAccess class. This would normally first be imported using <code>from nicl.euclid.data_access import DataAccess</code>.</p>
+<p>To actually download files, remove <code>dry_run=True</code>.</p>
+<div id="996ef944-c945-46f4-84ce-ecf33aa01af3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>release_name <span class="op">=</span> <span class="st">"DR1"</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>da <span class="op">=</span> DataAccess(release_name<span class="op">=</span>release_name, dry_run<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>We will download the files into the folder structure at the default location.</p>
+<div id="b7763f21-5562-4797-abee-26ed354d245c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>outpath <span class="op">=</span> default_data_path(release_name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<section id="calibrated-frames" class="level4">
+<h4 class="anchored" data-anchor-id="calibrated-frames">Calibrated frames</h4>
+<div id="a1126b9f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>da.find_all_observations()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([ 10, 100, 101, ...,  97,  98,  99], shape=(6458,))</code></pre>
+</div>
+</div>
+<div id="b12f6c44-6610-424e-8883-9a78242759a4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>da.find_observations_for_target(ra<span class="op">=</span><span class="fl">268.6647</span>, dec<span class="op">=</span><span class="fl">68.0564</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([2036, 2080, 2081, 2195, 2683, 3009, 3318, 5025, 5586, 6149, 6895,
+       7777])</code></pre>
+</div>
+</div>
+<div id="11f258de-51c8-4ca3-974b-d116dec09cac" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>da.find_observations_for_target(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    ra<span class="op">=</span><span class="fl">268.6647</span>, dec<span class="op">=</span><span class="fl">68.0564</span>, radius<span class="op">=</span><span class="fl">1.0</span>, fully_contained<span class="op">=</span><span class="va">False</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([2036, 2037, 2038, 2040, 2041, 2042, 2043, 2045, 2046, 2047, 2079,
+       2080, 2081, 2082, 2083, 2084, 2085, 2090, 2091, 2092, 2194, 2195,
+       2196, 2198, 2199, 2200, 2201, 2205, 2682, 2683, 2684, 2685, 2686,
+       2693, 2694, 2695, 2995, 2996, 3004, 3005, 3006, 3007, 3008, 3009,
+       3010, 3011, 3307, 3308, 3309, 3317, 3318, 3319, 3320, 3321, 3333,
+       5009, 5010, 5014, 5015, 5016, 5017, 5024, 5025, 5026, 5578, 5579,
+       5580, 5585, 5586, 5587, 6142, 6143, 6147, 6148, 6149, 6150, 6151,
+       6152, 6162, 6163, 6694, 6696, 6697, 6879, 6880, 6881, 6882, 6883,
+       6884, 6894, 6895, 6896, 6897, 7770, 7776, 7777, 7778, 7779, 7780,
+       7790, 7791])</code></pre>
+</div>
+</div>
+<div id="2a1d26a2-a647-4a21-95fc-8564d47e44b1" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>da.get_calibrated_files_for_observation(<span class="dv">2683</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=4</i>
+<table id="table140307827537104" class="table-striped table-bordered table-condensed">
+<thead><tr><th>observation_id</th><th>file_name</th><th>instrument_name</th><th>filter_name</th><th>duration</th></tr></thead>
+<thead><tr><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th></tr></thead>
+<tbody><tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-0_20250615T170134.034528Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-1_20250615T170134.639919Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-3_20250615T170133.971277Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-2_20250615T170133.996269Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="9e39bb80-810a-44b6-ae58-a2daa5e417f2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>da.download_calibrated_files_for_observation(</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2683</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>, outpath<span class="op">=</span>outpath</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:57:59 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/2683
+2026-02-27 10:57:59 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-0_20250615T170134.034528Z.fits
+2026-02-27 10:57:59 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-3_20250615T170133.971277Z.fits
+2026-02-27 10:57:59 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-2_20250615T170133.996269Z.fits
+2026-02-27 10:57:59 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-1_20250615T170134.639919Z.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=4</i>
+<table id="table140304515301232" class="table-striped table-bordered table-condensed">
+<thead><tr><th>observation_id</th><th>file_name</th><th>instrument_name</th><th>filter_name</th><th>duration</th></tr></thead>
+<thead><tr><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th></tr></thead>
+<tbody><tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-0_20250615T170134.034528Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-3_20250615T170133.971277Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-2_20250615T170133.996269Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2683</td><td>EUC_NIR_W-CAL-IMAGE_H-2683-1_20250615T170134.639919Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="990e30df-e1bc-4276-b1ff-3189bace1750" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>da.download_files_for_target(</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    ra<span class="op">=</span><span class="fl">268.6647</span>,</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    dec<span class="op">=</span><span class="fl">68.0564</span>,</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    instrument<span class="op">=</span><span class="st">"NISP"</span>,</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>,</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    file_type<span class="op">=</span><span class="st">"CAL"</span>,</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>outpath,</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:00 - __main__.download_files_for_target - INFO - Downloading files for observation id 2036
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/2036
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2036-1_20250615T225801.571332Z.fits
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2036-0_20250615T225801.606367Z.fits
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2036-3_20250615T225801.509846Z.fits
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2036-2_20250615T225801.601566Z.fits
+2026-02-27 10:58:01 - __main__.download_files_for_target - INFO - Downloading files for observation id 2080
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/2080
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2080-0_20250616T100524.064354Z.fits
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2080-2_20250616T100524.458744Z.fits
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2080-3_20250616T100524.084071Z.fits
+2026-02-27 10:58:01 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2080-1_20250616T100524.102918Z.fits
+2026-02-27 10:58:01 - __main__.download_files_for_target - INFO - Downloading files for observation id 2081
+2026-02-27 10:58:02 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/2081
+2026-02-27 10:58:02 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2081-2_20250616T060009.774537Z.fits
+2026-02-27 10:58:02 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2081-1_20250616T060009.742758Z.fits
+2026-02-27 10:58:02 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2081-3_20250616T060009.772046Z.fits
+2026-02-27 10:58:02 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2081-0_20250616T060010.828721Z.fits
+2026-02-27 10:58:02 - __main__.download_files_for_target - INFO - Downloading files for observation id 2195
+2026-02-27 10:58:03 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/2195
+2026-02-27 10:58:03 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2195-1_20250616T080706.139489Z.fits
+2026-02-27 10:58:03 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2195-0_20250616T080705.885635Z.fits
+2026-02-27 10:58:03 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2195-2_20250616T080705.773045Z.fits
+2026-02-27 10:58:03 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2195-3_20250616T080705.742183Z.fits
+2026-02-27 10:58:03 - __main__.download_files_for_target - INFO - Downloading files for observation id 2683
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/2683
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-0_20250615T170134.034528Z.fits
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-1_20250615T170134.639919Z.fits
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-3_20250615T170133.971277Z.fits
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-2683-2_20250615T170133.996269Z.fits
+2026-02-27 10:58:04 - __main__.download_files_for_target - INFO - Downloading files for observation id 3009
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/3009
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3009-1_20250616T040932.633760Z.fits
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3009-2_20250616T040932.632571Z.fits
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3009-3_20250616T040931.304652Z.fits
+2026-02-27 10:58:04 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3009-0_20250616T040931.268013Z.fits
+2026-02-27 10:58:04 - __main__.download_files_for_target - INFO - Downloading files for observation id 3318
+2026-02-27 10:58:05 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/3318
+2026-02-27 10:58:05 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3318-3_20250615T225959.715592Z.fits
+2026-02-27 10:58:05 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3318-2_20250615T225959.520593Z.fits
+2026-02-27 10:58:05 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3318-1_20250615T225959.667868Z.fits
+2026-02-27 10:58:05 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-3318-0_20250615T225959.690576Z.fits
+2026-02-27 10:58:05 - __main__.download_files_for_target - INFO - Downloading files for observation id 5025
+2026-02-27 10:58:06 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/5025
+2026-02-27 10:58:06 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5025-0_20250616T022033.816906Z.fits
+2026-02-27 10:58:06 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5025-2_20250616T022032.734867Z.fits
+2026-02-27 10:58:06 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5025-1_20250616T022032.863267Z.fits
+2026-02-27 10:58:06 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5025-3_20250616T022032.697728Z.fits
+2026-02-27 10:58:06 - __main__.download_files_for_target - INFO - Downloading files for observation id 5586
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/5586
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5586-0_20250614T085608.368005Z.fits
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5586-1_20250614T085608.245326Z.fits
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5586-3_20250614T085608.500020Z.fits
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-5586-2_20250614T085608.344712Z.fits
+2026-02-27 10:58:07 - __main__.download_files_for_target - INFO - Downloading files for observation id 6149
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/6149
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6149-2_20250616T095642.496214Z.fits
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6149-0_20250616T095641.959192Z.fits
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6149-1_20250616T095642.160297Z.fits
+2026-02-27 10:58:07 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6149-3_20250616T095641.783296Z.fits
+2026-02-27 10:58:07 - __main__.download_files_for_target - INFO - Downloading files for observation id 6895
+2026-02-27 10:58:08 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/6895
+2026-02-27 10:58:08 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6895-3_20250614T054035.006646Z.fits
+2026-02-27 10:58:08 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6895-2_20250614T054034.555654Z.fits
+2026-02-27 10:58:08 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6895-0_20250614T054034.560014Z.fits
+2026-02-27 10:58:08 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-6895-1_20250614T054034.553165Z.fits
+2026-02-27 10:58:08 - __main__.download_files_for_target - INFO - Downloading files for observation id 7777
+2026-02-27 10:58:09 - __main__.download_files - INFO - Downloading 4 files to /home/ppzsb1/euclid_data/DR1/NIR/7777
+2026-02-27 10:58:09 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-7777-1_20250613T173936.241275Z.fits
+2026-02-27 10:58:09 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-7777-2_20250613T173936.071783Z.fits
+2026-02-27 10:58:09 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-7777-3_20250613T173935.953882Z.fits
+2026-02-27 10:58:09 - __main__.download_files - INFO - Downloading EUC_NIR_W-CAL-IMAGE_H-7777-0_20250613T173936.180292Z.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=48</i>
+<table id="table140304515293232" class="table-striped table-bordered table-condensed">
+<thead><tr><th>observation_id</th><th>file_name</th><th>instrument_name</th><th>filter_name</th><th>duration</th></tr></thead>
+<thead><tr><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th></tr></thead>
+<tbody><tr><td>2036</td><td>EUC_NIR_W-CAL-IMAGE_H-2036-1_20250615T225801.571332Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2036</td><td>EUC_NIR_W-CAL-IMAGE_H-2036-0_20250615T225801.606367Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2036</td><td>EUC_NIR_W-CAL-IMAGE_H-2036-3_20250615T225801.509846Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2036</td><td>EUC_NIR_W-CAL-IMAGE_H-2036-2_20250615T225801.601566Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2080</td><td>EUC_NIR_W-CAL-IMAGE_H-2080-0_20250616T100524.064354Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2080</td><td>EUC_NIR_W-CAL-IMAGE_H-2080-2_20250616T100524.458744Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2080</td><td>EUC_NIR_W-CAL-IMAGE_H-2080-3_20250616T100524.084071Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2080</td><td>EUC_NIR_W-CAL-IMAGE_H-2080-1_20250616T100524.102918Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>2081</td><td>EUC_NIR_W-CAL-IMAGE_H-2081-2_20250616T060009.774537Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>...</td><td>...</td><td>...</td><td>...</td><td>...</td></tr>
+<tr><td>6149</td><td>EUC_NIR_W-CAL-IMAGE_H-6149-1_20250616T095642.160297Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>6149</td><td>EUC_NIR_W-CAL-IMAGE_H-6149-3_20250616T095641.783296Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>6895</td><td>EUC_NIR_W-CAL-IMAGE_H-6895-3_20250614T054035.006646Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>6895</td><td>EUC_NIR_W-CAL-IMAGE_H-6895-2_20250614T054034.555654Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>6895</td><td>EUC_NIR_W-CAL-IMAGE_H-6895-0_20250614T054034.560014Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>6895</td><td>EUC_NIR_W-CAL-IMAGE_H-6895-1_20250614T054034.553165Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>7777</td><td>EUC_NIR_W-CAL-IMAGE_H-7777-1_20250613T173936.241275Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>7777</td><td>EUC_NIR_W-CAL-IMAGE_H-7777-2_20250613T173936.071783Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>7777</td><td>EUC_NIR_W-CAL-IMAGE_H-7777-3_20250613T173935.953882Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+<tr><td>7777</td><td>EUC_NIR_W-CAL-IMAGE_H-7777-0_20250613T173936.180292Z.fits</td><td>NISP</td><td>NIR_H</td><td>87.2448</td></tr>
+</tbody></table></div>
+</div>
+</div>
+</section>
+<section id="mer-tiles" class="level4">
+<h4 class="anchored" data-anchor-id="mer-tiles">MER tiles</h4>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Note that currently (at December 2024) the documented methods to programatically download the MER auxilliary files (e.g., BKG, RMS, FLAG) are broken. Instead, a workaround has been implemented, which requires a file listing of the data archive to be first obtained. This can be created by running <code>find .</code> in the MER folder in DataLabs.</p>
+</div>
+</div>
+<div id="ac8dfff8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>da.find_all_tiles()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([101271287, 101272183, 101272184, ..., 102165066, 102165078,
+       102165079], shape=(10991,))</code></pre>
+</div>
+</div>
+<div id="889c1b47-7a1c-4d77-b785-28f455945e5b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>da.find_tiles_for_target(ra<span class="op">=</span><span class="fl">268.6647</span>, dec<span class="op">=</span><span class="fl">68.0564</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([101838582, 102160336])</code></pre>
+</div>
+</div>
+<div id="0859e284-536e-48e4-89d0-a6bd37ce1f3b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>da.find_tiles_for_target(ra<span class="op">=</span><span class="fl">268.6647</span>, dec<span class="op">=</span><span class="fl">68.0564</span>, radius<span class="op">=</span><span class="fl">1.0</span>, fully_contained<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([101836356, 101836357, 101836358, 101836359, 101836360, 101836920,
+       101836921, 101836922, 101836923, 101836924, 101836925, 101836926,
+       101837478, 101837479, 101837480, 101837481, 101837482, 101837483,
+       101837484, 101837485, 101838030, 101838031, 101838032, 101838033,
+       101838034, 101838035, 101838036, 101838037, 101838038, 101838578,
+       101838579, 101838580, 101838581, 101838582, 101838583, 101838584,
+       101838585, 101838586, 101839119, 101839120, 101839121, 101839122,
+       101839123, 101839124, 101839125, 101839126, 101839127, 101839128,
+       101839655, 101839656, 101839657, 101839658, 101839659, 101839660,
+       101839661, 101839662, 101839663, 101840185, 101840186, 101840187,
+       101840188, 101840189, 101840190, 101840191, 101840192, 101840710,
+       101840712, 101840713, 101840714, 101840715, 102159773, 102159774,
+       102159775, 102159776, 102160056, 102160057, 102160058, 102160059,
+       102160060, 102160334, 102160335, 102160336, 102160337, 102160338,
+       102160605, 102160606, 102160607, 102160608, 102160609, 102160871,
+       102160872, 102160873, 102160874])</code></pre>
+</div>
+</div>
+<div id="5a48b4e6-c752-47b1-a9c2-ec9c8ff36f91" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>da.get_files_for_tile(<span class="dv">102160336</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=11</i>
+<table id="table140304513975312" class="table-striped table-bordered table-condensed">
+<thead><tr><th>tile_index</th><th>file_name</th><th>mosaic_product_oid</th><th>instrument_name</th><th>filter_name</th><th>category</th><th>second_type</th><th>ra</th><th>dec</th><th>technique</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th></tr></thead>
+<thead><tr><th>int64</th><th>object</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th></tr></thead>
+<tbody><tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-2D014C_20250717T175714.254968Z_00.00.fits</td><td>85012</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-6CDE8D_20250805T041942.325380Z_00.00.fits</td><td>60321</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-120000_20250725T002509.891257Z_00.00.fits</td><td>19220</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-FC75FE_20250711T191834.850629Z_00.00.fits</td><td>76628</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D2D780_20250716T222803.966785Z_00.00.fits</td><td>85538</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-F52D83_20250725T152242.639588Z_00.00.fits</td><td>19473</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-949845_20250720T195656.079240Z_00.00.fits</td><td>13465</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-30E94C_20250705T221901.412670Z_00.00.fits</td><td>8373</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-DC8ED9_20250714T034538.855905Z_00.00.fits</td><td>34609</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-EE8D35_20250724T025205.587935Z_00.00.fits</td><td>18349</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-B4E841_20250630T223704.070945Z_00.00.fits</td><td>6757</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="e7b43803-0809-4e53-9c6a-977ebcc27211" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>da.download_files_for_tile(</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">102160336</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>, outpath<span class="op">=</span>outpath</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:13 - __main__.download_mosaic_files - INFO - Downloading 11 files to /home/ppzsb1/euclid_data/DR1/MER/102160336/NIR
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:13 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=11</i>
+<table id="table140304513976592" class="table-striped table-bordered table-condensed">
+<thead><tr><th>tile_index</th><th>file_name</th><th>mosaic_product_oid</th><th>instrument_name</th><th>filter_name</th><th>category</th><th>second_type</th><th>ra</th><th>dec</th><th>technique</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th></tr></thead>
+<thead><tr><th>int64</th><th>str82</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th></tr></thead>
+<tbody><tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>6757</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>34609</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>85538</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>60321</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>8373</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>76628</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>19473</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>13465</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>18349</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>19220</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>85012</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="42bf3376" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>da.download_files_for_tile(</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">102160336</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>, outpath<span class="op">=</span>outpath, mer_file_type<span class="op">=</span><span class="st">"BKG"</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:14 - __main__.download_mosaic_files - INFO - Downloading 11 files to /home/ppzsb1/euclid_data/DR1/MER/102160336/NIR
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits
+2026-02-27 10:58:14 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=11</i>
+<table id="table140304515293072" class="table-striped table-bordered table-condensed">
+<thead><tr><th>tile_index</th><th>file_name</th><th>mosaic_product_oid</th><th>instrument_name</th><th>filter_name</th><th>category</th><th>second_type</th><th>ra</th><th>dec</th><th>technique</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th></tr></thead>
+<thead><tr><th>int64</th><th>str75</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th></tr></thead>
+<tbody><tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>76628</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>60321</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>34609</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>19220</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>85012</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>8373</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>13465</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>18349</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>6757</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>19473</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGMOD-NIR-H_TILE102160336-2196A9_20241024T223003.109129Z_00.00.fits</td><td>85538</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="a3825154" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>da.download_files_for_tile(</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">102160336</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>, outpath<span class="op">=</span>outpath, mer_file_type<span class="op">=</span><span class="st">"RMS"</span></span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:15 - __main__.download_mosaic_files - INFO - Downloading 11 files to /home/ppzsb1/euclid_data/DR1/MER/102160336/NIR
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits
+2026-02-27 10:58:15 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=11</i>
+<table id="table140304515300592" class="table-striped table-bordered table-condensed">
+<thead><tr><th>tile_index</th><th>file_name</th><th>mosaic_product_oid</th><th>instrument_name</th><th>filter_name</th><th>category</th><th>second_type</th><th>ra</th><th>dec</th><th>technique</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th></tr></thead>
+<thead><tr><th>int64</th><th>str80</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th></tr></thead>
+<tbody><tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>18349</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>34609</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>76628</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>85538</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>6757</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>60321</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>85012</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>19220</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>8373</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>13465</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_MOSAIC-NIR-H-RMS_TILE102160336-43125E_20241024T215349.991747Z_00.00.fits</td><td>19473</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="64bfbbd9-36c0-4f59-a72b-72b946f794ff" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>da.download_files_for_target(</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>    ra<span class="op">=</span><span class="fl">268.6647</span>,</span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>    dec<span class="op">=</span><span class="fl">68.0564</span>,</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>    instrument<span class="op">=</span><span class="st">"NISP"</span>,</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span><span class="op">=</span><span class="st">"NIR_H"</span>,</span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>    file_type<span class="op">=</span><span class="st">"MER"</span>,</span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>outpath,</span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:15 - __main__.download_files_for_target - INFO - Downloading files for tile index 101838582
+2026-02-27 10:58:16 - __main__.download_mosaic_files - INFO - Downloading 1 files to /home/ppzsb1/euclid_data/DR1/MER/101838582/NIR
+2026-02-27 10:58:16 - __main__.download_mosaic_file - WARNING - No MER file found in lookup table for tile 101838582, instrument NISP and filter NIR_H.
+2026-02-27 10:58:16 - __main__.download_files_for_target - INFO - Downloading files for tile index 102160336
+2026-02-27 10:58:17 - __main__.download_mosaic_files - INFO - Downloading 11 files to /home/ppzsb1/euclid_data/DR1/MER/102160336/NIR
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits
+2026-02-27 10:58:17 - __main__.download_mosaic_file - INFO - Downloading EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=12</i>
+<table id="table140304513974352" class="table-striped table-bordered table-condensed">
+<thead><tr><th>tile_index</th><th>file_name</th><th>mosaic_product_oid</th><th>instrument_name</th><th>filter_name</th><th>category</th><th>second_type</th><th>ra</th><th>dec</th><th>technique</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th></tr></thead>
+<thead><tr><th>int64</th><th>str82</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th></tr></thead>
+<tbody><tr><td>101838582</td><td></td><td>131352</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>268.7187945157</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>34609</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>76628</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>19220</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>60321</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>8373</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>19473</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>13465</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>6757</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>18349</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>85538</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+<tr><td>102160336</td><td>EUC_MER_BGSUB-MOSAIC-NIR-H_TILE102160336-D13266_20241024T223003.109308Z_00.00.fits</td><td>85012</td><td>NISP</td><td>NIR_H</td><td>SCIENCE</td><td>SKY</td><td>269.1519708</td><td>68.0</td><td>IMAGE</td></tr>
+</tbody></table></div>
+</div>
+</div>
+</section>
+<section id="sir-frames" class="level4">
+<h4 class="anchored" data-anchor-id="sir-frames">SIR frames</h4>
+<p>These are the calibrated, but not stacked, spectroscopic frames, which are used in the persistence correction.</p>
+<div id="522952fd" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>da.get_sir_files_for_observation(<span class="dv">2683</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=8</i>
+<table id="table140304515298352" class="table-striped table-bordered table-condensed">
+<thead><tr><th>observation_id</th><th>file_name</th></tr></thead>
+<thead><tr><th>object</th><th>object</th></tr></thead>
+<tbody><tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11839_2_RGS000_-4_20250904T031320.229831Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11838_1_RGS180_4_20250904T031206.552356Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11840_3_RGS180_0_20250904T030820.486308Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11837_0_RGS000_0_20250809T054439.972766Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11839_2_RGS000_-4_20250809T054919.927647Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11837_0_RGS000_0_20250904T030826.624500Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11838_1_RGS180_4_20250809T054909.778044Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11840_3_RGS180_0_20250809T054401.638056Z.fits</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="c7351291" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>da.download_sir_files_for_observation(<span class="dv">2683</span>, outpath<span class="op">=</span>outpath)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:18 - __main__.download_files - INFO - Downloading 8 files to /home/ppzsb1/euclid_data/DR1/SIR/2683
+2026-02-27 10:58:18 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11837_0_RGS000_0_20250809T054439.972766Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11839_2_RGS000_-4_20250904T031320.229831Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11837_0_RGS000_0_20250904T030826.624500Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11839_2_RGS000_-4_20250809T054919.927647Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11838_1_RGS180_4_20250904T031206.552356Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11840_3_RGS180_0_20250904T030820.486308Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11838_1_RGS180_4_20250809T054909.778044Z.fits
+2026-02-27 10:58:19 - __main__.download_files - INFO - Downloading EUC_SIR_W-SCIFRM_BKGSUB_2683_11840_3_RGS180_0_20250809T054401.638056Z.fits</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=8</i>
+<table id="table140304515294512" class="table-striped table-bordered table-condensed">
+<thead><tr><th>observation_id</th><th>file_name</th></tr></thead>
+<thead><tr><th>object</th><th>object</th></tr></thead>
+<tbody><tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11837_0_RGS000_0_20250809T054439.972766Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11839_2_RGS000_-4_20250904T031320.229831Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11837_0_RGS000_0_20250904T030826.624500Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11839_2_RGS000_-4_20250809T054919.927647Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11838_1_RGS180_4_20250904T031206.552356Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11840_3_RGS180_0_20250904T030820.486308Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11838_1_RGS180_4_20250809T054909.778044Z.fits</td></tr>
+<tr><td>2683</td><td>EUC_SIR_W-SCIFRM_BKGSUB_2683_11840_3_RGS180_0_20250809T054401.638056Z.fits</td></tr>
+</tbody></table></div>
+</div>
+</div>
+</section>
+<section id="raw-frames" class="level4">
+<h4 class="anchored" data-anchor-id="raw-frames">Raw frames</h4>
+<p>For example, we can download the raw slew darks.</p>
+<div id="5505a124-b084-4525-bb7a-6f99adf938d2" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>da.get_raw_files_for_observation(<span class="dv">2683</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"CLOSED"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=0</i>
+<table id="table140304515299632" class="table-striped table-bordered table-condensed">
+<thead><tr><th>file_name</th><th>rawframe_oid</th><th>observation_id</th><th>instrument_name</th><th>data_set_release</th><th>filter_name</th><th>observation_mode</th><th>grism_wheel_pos</th><th>cal_block_id</th><th>cal_block_variant</th><th>ra</th><th>dec</th><th>obs_time_utc</th><th>exposure_time</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th><th></th></tr></thead>
+<thead><tr><th>object</th><th>int64</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th><th>float64</th></tr></thead>
+</table></div>
+</div>
+</div>
+<div id="e5deb9db-6317-43eb-a570-debc0774959e" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>da.download_raw_files_for_observation(</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2683</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"CLOSED"</span>, outpath<span class="op">=</span>outpath</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 10:58:20 - __main__.download_files - INFO - Downloading 0 files to /home/ppzsb1/euclid_data/DR1/RAW/2683</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=0</i>
+<table id="table140304513976272" class="table-striped table-bordered table-condensed">
+<thead><tr><th>file_name</th><th>rawframe_oid</th><th>observation_id</th><th>instrument_name</th><th>data_set_release</th><th>filter_name</th><th>observation_mode</th><th>grism_wheel_pos</th><th>cal_block_id</th><th>cal_block_variant</th><th>ra</th><th>dec</th><th>obs_time_utc</th><th>exposure_time</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>deg</th><th>deg</th><th></th><th></th></tr></thead>
+<thead><tr><th>object</th><th>int64</th><th>int64</th><th>object</th><th>object</th><th>object</th><th>object</th><th>object</th><th>object</th><th>object</th><th>float64</th><th>float64</th><th>object</th><th>float64</th></tr></thead>
+</table></div>
+</div>
+</div>
+</section>
+<section id="catalogues" class="level4">
+<h4 class="anchored" data-anchor-id="catalogues">Catalogues</h4>
+<div id="b6680ddf" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>catalogue_vis <span class="op">=</span> da.get_catalogues_for_observation(<span class="dv">2683</span>, <span class="bu">filter</span><span class="op">=</span><span class="st">"VIS"</span>, dither<span class="op">=</span><span class="st">"0-1"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="8bf3369c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>catalogue_vis[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=5</i>
+<table id="table140305931441712" class="table-striped table-bordered table-condensed">
+<thead><tr><th>NUMBER</th><th>X_IMAGE</th><th>Y_IMAGE</th><th>XPSF_IMAGE</th><th>YPSF_IMAGE</th><th>X_WORLD</th><th>Y_WORLD</th><th>ERRA_WORLD</th><th>ERRB_WORLD</th><th>ERRTHETA_WORLD</th><th>XPSF_WORLD</th><th>YPSF_WORLD</th><th>ERRAPSF_WORLD</th><th>ERRBPSF_WORLD</th><th>ERRTHETAPSF_WORLD</th><th>A_WORLD</th><th>B_WORLD</th><th>THETA_WORLD</th><th>ERRX2_WORLD</th><th>ERRY2_WORLD</th><th>ALPHA_J2000</th><th>DELTA_J2000</th><th>ERRTHETA_J2000</th><th>THETA_J2000</th><th>XWIN_WORLD</th><th>YWIN_WORLD</th><th>ALPHAPSF_J2000</th><th>DELTAPSF_J2000</th><th>ERRTHETAPSF_J2000</th><th>ALPHAWIN_J2000</th><th>DELTAWIN_J2000</th><th>ERRAWIN_WORLD</th><th>ERRBWIN_WORLD</th><th>ERRTHETAWIN_WORLD</th><th>AWIN_WORLD</th><th>BWIN_WORLD</th><th>THETAWIN_WORLD</th><th>ERRX2WIN_WORLD</th><th>ERRY2WIN_WORLD</th><th>MU_THRESHOLD</th><th>MU_MAX</th><th>MU_MAX_MODEL</th><th>MU_EFF_MODEL</th><th>MU_MEAN_MODEL</th><th>MU_MAX_SPHEROID</th><th>MU_EFF_SPHEROID</th><th>MU_MEAN_SPHEROID</th><th>MU_MAX_DISK</th><th>MU_EFF_DISK</th><th>MU_MEAN_DISK</th><th>ELLIPTICITY</th><th>FLUX_AUTO</th><th>FLUXERR_AUTO</th><th>MAG_AUTO</th><th>MAGERR_AUTO</th><th>BACKGROUND</th><th>MAG_APER</th><th>MAGERR_APER</th><th>FLUX_APER</th><th>FLUXERR_APER</th><th>MAG_PSF</th><th>MAGERR_PSF</th><th>FLUX_RADIUS</th><th>ELONGATION</th><th>FWHM_IMAGE</th><th>SNR_WIN</th><th>SPREAD_MODEL</th><th>FLAGS</th><th>FLAGS_WIN</th><th>FLAGS_MODEL</th><th>ERRAWIN_IMAGE</th><th>ERRBWIN_IMAGE</th><th>ERRTHETAWIN_IMAGE</th><th>VECTOR_MODEL</th><th>VECTOR_MODELERR</th><th>MATRIX_MODELERR</th><th>CHI2_MODEL</th><th>NITER_MODEL</th><th>FLUX_MODEL</th><th>FLUXERR_MODEL</th><th>MAG_MODEL</th><th>MAGERR_MODEL</th><th>XMODEL_IMAGE</th><th>YMODEL_IMAGE</th><th>XMODEL_WORLD</th><th>YMODEL_WORLD</th><th>ELLIP1MODEL_IMAGE</th><th>ELLIP2MODEL_IMAGE</th><th>ELLIP1ERRMODEL_IMAGE</th><th>ELLIP2ERRMODEL_IMAGE</th><th>ELLIPCORRMODEL_IMAGE</th><th>ELLIP1MODEL_WORLD</th><th>ELLIP2MODEL_WORLD</th><th>ELLIP1ERRMODEL_WORLD</th><th>ELLIP2ERRMODEL_WORLD</th><th>ELLIPCORRMODEL_WORLD</th><th>IMAFLAGS_ISO</th><th>NIMAFLAGS_ISO</th><th>XWIN_IMAGE</th><th>YWIN_IMAGE</th><th>MAG_APER_RAW</th><th>MAG_AUTO_RAW</th><th>FLUX_APER_CAL</th><th>FLUXERR_APER_CAL</th><th>FLUX_AUTO_CAL</th><th>FLUXERR_AUTO_CAL</th><th>SNR</th><th>DETECTOR</th></tr></thead>
+<thead><tr><th></th><th>pix</th><th>pix</th><th>pix</th><th>pix</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>pix</th><th>pix</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg2</th><th>deg2</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg2</th><th>deg2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th>mag / arcsec2</th><th></th><th>ct</th><th>ct</th><th>mag</th><th>mag</th><th>ct</th><th>mag</th><th>mag</th><th>ct</th><th>ct</th><th>mag</th><th>mag</th><th>pix</th><th></th><th>pix</th><th></th><th></th><th></th><th></th><th></th><th>pix</th><th>pix</th><th>deg</th><th></th><th></th><th></th><th></th><th></th><th>ct</th><th>ct</th><th>mag</th><th>mag</th><th>pix</th><th>pix</th><th>deg</th><th>deg</th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>pix</th><th>pix</th><th>mag</th><th>mag</th><th>uJy</th><th>uJy</th><th>uJy</th><th>uJy</th><th></th><th></th></tr></thead>
+<thead><tr><th>int32</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float32</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32[4]</th><th>float32[4]</th><th>float32[4]</th><th>float32[4]</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>int16</th><th>int16</th><th>uint8</th><th>float32</th><th>float32</th><th>float32</th><th>float32[10]</th><th>float32[10]</th><th>float32[10,10]</th><th>float32</th><th>int16</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>int32</th><th>int32</th><th>float64</th><th>float64</th><th>float32[4]</th><th>float32</th><th>float32[4]</th><th>float32[4]</th><th>float32</th><th>float32</th><th>float32</th><th>str5</th></tr></thead>
+<tbody><tr><td>1</td><td>667.0519</td><td>127.9629</td><td>666.9959</td><td>126.4908</td><td>2.6808442317e+02</td><td>6.7741106086e+01</td><td>2.261546e-06</td><td>1.743684e-06</td><td>-17.51</td><td>2.6808433347e+02</td><td>6.7741082849e+01</td><td>1.211027e-06</td><td>1.138809e-06</td><td>-79.41</td><td>0.0001964726</td><td>0.0001479031</td><td>-19.12</td><td>4.9267508956e-12</td><td>3.2282754952e-12</td><td>268.0844232</td><td>67.7411061</td><td>-72.49</td><td>-70.88</td><td>2.6808439735e+02</td><td>6.7741102770e+01</td><td>268.0843335</td><td>67.7410828</td><td>-10.59</td><td>268.0843973</td><td>67.7411028</td><td>2.635276e-06</td><td>2.53961e-06</td><td>-26.98</td><td>0.0001534727</td><td>0.0001296107</td><td>-23.41</td><td>6.8427690385e-12</td><td>6.5515334934e-12</td><td>29.8478</td><td>26.7567</td><td>26.9720</td><td>29.7759</td><td>28.5459</td><td>26.7205</td><td>35.0473</td><td>33.6544</td><td>26.9143</td><td>28.7365</td><td>28.0387</td><td>0.394</td><td>10941.67</td><td>153.5101</td><td>21.2902</td><td>0.0152</td><td>23.14396</td><td>23.4905 ..  21.3644</td><td>0.0218 ..   0.0144</td><td>1441.932 ..     10218.57</td><td>28.90709 ..     135.6537</td><td>24.4018</td><td>0.0303</td><td>9.112</td><td>1.650</td><td>22.81</td><td>106.6</td><td>0.029957</td><td>2</td><td>0</td><td>0</td><td>0.09558</td><td>0.08971</td><td>-42.27</td><td>-0.04711 ..       -45.32</td><td>0.07781 ..        1.046</td><td>0.006055 ..        1.095</td><td>0.9294773</td><td>66</td><td>15301.29</td><td>2515.29</td><td>20.9261</td><td>0.1785</td><td>666.9529</td><td>127.6304</td><td>2.6808440627e+02</td><td>6.7741098792e+01</td><td>-0.027190</td><td>0.069484</td><td>0.045421</td><td>0.116359</td><td>-0.980679</td><td>-0.021327</td><td>0.056198</td><td>0.033016</td><td>0.090783</td><td>-0.965327</td><td>16777235</td><td>627</td><td>667.1381</td><td>127.6029</td><td>-7.8973618 .. -10.023476</td><td>-10.09771</td><td>1.4580983 .. 10.333136</td><td>0.029231172 .. 0.13717453</td><td>11.064341</td><td>0.15523113</td><td>75.328384</td><td>1-1.E</td></tr>
+<tr><td>2</td><td>1615.5247</td><td>90.2938</td><td>1615.1601</td><td>89.7841</td><td>2.6804510633e+02</td><td>6.7763004102e+01</td><td>1.813975e-06</td><td>1.227406e-06</td><td>43.71</td><td>2.6804508873e+02</td><td>6.7762987879e+01</td><td>4.120672e-07</td><td>3.866796e-07</td><td>44.35</td><td>0.0002492997</td><td>0.0001536778</td><td>40.02</td><td>2.4385859303e-12</td><td>2.3584429409e-12</td><td>268.0451063</td><td>67.7630041</td><td>46.29</td><td>49.98</td><td>2.6804511133e+02</td><td>6.7762995137e+01</td><td>268.0450887</td><td>67.7629879</td><td>45.65</td><td>268.0451113</td><td>67.7629951</td><td>1.422179e-06</td><td>1.265424e-06</td><td>35.11</td><td>0.0001513175</td><td>0.0001113381</td><td>35.06</td><td>1.8832277579e-12</td><td>1.7406648838e-12</td><td>29.8483</td><td>24.9552</td><td>23.5351</td><td>28.3594</td><td>27.2411</td><td>20.2334</td><td>28.5602</td><td>27.1672</td><td>27.5699</td><td>29.3921</td><td>28.6943</td><td>0.376</td><td>23335.91</td><td>174.721</td><td>20.4678</td><td>0.0081</td><td>23.03845</td><td>22.1554 ..  20.5376</td><td>0.0099 ..   0.0073</td><td>4931.85 ..     21884.12</td><td>44.97105 ..     147.0042</td><td>22.6183</td><td>0.0114</td><td>9.218</td><td>1.603</td><td>5.78</td><td>182.8</td><td>0.022195</td><td>2</td><td>0</td><td>0</td><td>0.05086</td><td>0.04543</td><td>86.97</td><td>-0.8389 ..        81.11</td><td>0.02038 ..        1.891</td><td>0.0004153 ..        3.574</td><td>1.082841</td><td>39</td><td>24498.91</td><td>302.5525</td><td>20.4150</td><td>0.0134</td><td>1615.1611</td><td>89.8727</td><td>2.6804509422e+02</td><td>6.7762989222e+01</td><td>-0.303190</td><td>0.036212</td><td>0.003767</td><td>0.016517</td><td>0.704704</td><td>0.113902</td><td>0.291579</td><td>0.008576</td><td>0.005740</td><td>-0.839176</td><td>16777233</td><td>1185</td><td>1615.2166</td><td>90.1814</td><td>-9.232525 .. -10.850323</td><td>-10.920061</td><td>4.987142 .. 22.129467</td><td>0.045475233 .. 0.14865226</td><td>23.597536</td><td>0.17667979</td><td>148.86734</td><td>1-1.E</td></tr>
+<tr><td>3</td><td>864.3409</td><td>71.5221</td><td>865.2361</td><td>70.9319</td><td>2.6807321533e+02</td><td>6.7744938988e+01</td><td>2.034873e-06</td><td>1.042668e-06</td><td>-63.40</td><td>2.6807314363e+02</td><td>6.7744951402e+01</td><td>5.105762e-07</td><td>4.612195e-07</td><td>-69.18</td><td>0.0002408753</td><td>0.0001249259</td><td>-63.02</td><td>1.6991773412e-12</td><td>3.5286862198e-12</td><td>268.0732153</td><td>67.7449390</td><td>-26.60</td><td>-26.98</td><td>2.6807316244e+02</td><td>6.7744964149e+01</td><td>268.0731436</td><td>67.7449514</td><td>-20.82</td><td>268.0731624</td><td>67.7449641</td><td>1.287311e-06</td><td>1.197247e-06</td><td>-67.60</td><td>0.0001218524</td><td>9.725697e-05</td><td>-64.78</td><td>1.4659055123e-12</td><td>1.6246653499e-12</td><td>29.8472</td><td>25.2940</td><td>23.7589</td><td>28.6701</td><td>27.4505</td><td>20.9760</td><td>29.3027</td><td>27.9098</td><td>27.4812</td><td>29.3035</td><td>28.6056</td><td>0.517</td><td>18744.74</td><td>154.5129</td><td>20.7057</td><td>0.0090</td><td>23.17171</td><td>22.3453 ..  20.7464</td><td>0.0111 ..   0.0086</td><td>4140.419 ..     18055.63</td><td>42.36711 ..     143.3651</td><td>22.9032</td><td>0.0131</td><td>7.702</td><td>2.070</td><td>7.44</td><td>165.8</td><td>0.026005</td><td>0</td><td>0</td><td>0</td><td>0.04632</td><td>0.04266</td><td>11.44</td><td>1.345 ..        3.669</td><td>0.03038 ..        1.055</td><td>0.0009231 ..        1.114</td><td>0.8640738</td><td>48</td><td>23056.91</td><td>319.3847</td><td>20.4809</td><td>0.0150</td><td>865.3446</td><td>71.0074</td><td>2.6807314411e+02</td><td>6.7744955096e+01</td><td>0.168888</td><td>0.119886</td><td>0.012140</td><td>0.009616</td><td>0.801878</td><td>-0.127523</td><td>-0.096375</td><td>0.008639</td><td>0.007637</td><td>0.811012</td><td>16777233</td><td>924</td><td>865.4865</td><td>71.3897</td><td>-9.04261 .. -10.641531</td><td>-10.682198</td><td>4.186838 .. 18.258053</td><td>0.042842094 .. 0.14497244</td><td>18.954887</td><td>0.15624514</td><td>125.94154</td><td>1-1.E</td></tr>
+<tr><td>4</td><td>467.5868</td><td>53.9910</td><td>467.9153</td><td>54.0636</td><td>2.6808757536e+02</td><td>6.7735279617e+01</td><td>1.152268e-05</td><td>2.381012e-06</td><td>-55.32</td><td>2.6808756709e+02</td><td>6.7735288478e+01</td><td>4.082214e-06</td><td>3.377991e-06</td><td>-64.55</td><td>0.0001393775</td><td>3.047257e-05</td><td>-55.58</td><td>4.6811069358e-11</td><td>9.1630375126e-11</td><td>268.0875754</td><td>67.7352796</td><td>-34.68</td><td>-34.42</td><td>2.6808777194e+02</td><td>6.7735357161e+01</td><td>268.0875671</td><td>67.7352885</td><td>-25.45</td><td>268.0877719</td><td>67.7353572</td><td>1.326861e-05</td><td>1.277616e-05</td><td>54.88</td><td>0.0002514096</td><td>0.0002512956</td><td>32.91</td><td>1.6747605687e-10</td><td>1.7181030616e-10</td><td>29.8396</td><td>27.9691</td><td>28.7823</td><td>33.9104</td><td>32.5418</td><td>26.1575</td><td>34.4843</td><td>33.0913</td><td>31.1125</td><td>32.9348</td><td>32.2369</td><td>0.758</td><td>2196.769</td><td>96.65118</td><td>23.0334</td><td>0.0478</td><td>23.10534</td><td>25.4737 ..  22.4035</td><td>0.0917 ..   0.0345</td><td>232.0963 ..     3924.309</td><td>19.59012 ..     124.6286</td><td>26.0139</td><td>0.0966</td><td>11.615</td><td>4.133</td><td>14.66</td><td>29.38</td><td>0.014214</td><td>3</td><td>0</td><td>0</td><td>0.47598</td><td>0.45665</td><td>58.04</td><td>-0.2406 ..       -15.51</td><td>0.268 ..        23.04</td><td>0.07181 ..        530.7</td><td>0.7194365</td><td>59</td><td>19404.25</td><td>3242.252</td><td>20.6682</td><td>0.1815</td><td>467.7594</td><td>54.0471</td><td>2.6808757213e+02</td><td>6.7735284540e+01</td><td>-0.063385</td><td>-0.019337</td><td>0.015656</td><td>0.064121</td><td>-0.925856</td><td>0.034352</td><td>0.050017</td><td>0.022625</td><td>0.041509</td><td>-0.964912</td><td>25165873</td><td>55</td><td>468.5162</td><td>57.7216</td><td>-5.914171 .. -8.984407</td><td>-8.354462</td><td>0.23469836 .. 3.968305</td><td>0.019809747 .. 0.12602587</td><td>2.2213976</td><td>0.09773475</td><td>31.48802</td><td>1-1.E</td></tr>
+<tr><td>5</td><td>126.5272</td><td>20.0711</td><td>126.5272</td><td>20.0711</td><td>2.6809873786e+02</td><td>6.7726693164e+01</td><td>1.85749e-06</td><td>1.046525e-06</td><td>61.95</td><td>2.6809873786e+02</td><td>6.7726693164e+01</td><td>4.083008e-06</td><td>3.378221e-06</td><td>-64.55</td><td>0.0001832303</td><td>0.000101797</td><td>59.54</td><td>1.6160157923e-12</td><td>2.9294682639e-12</td><td>268.0987379</td><td>67.7266932</td><td>28.05</td><td>30.46</td><td>2.6809875222e+02</td><td>6.7726697723e+01</td><td>268.0987379</td><td>67.7266932</td><td>-25.45</td><td>268.0987522</td><td>67.7266977</td><td>1.301143e-06</td><td>1.036678e-06</td><td>51.61</td><td>0.0001074479</td><td>6.832256e-05</td><td>53.30</td><td>1.3131465876e-12</td><td>1.4545270772e-12</td><td>29.8751</td><td>25.7947</td><td>25.1921</td><td>27.5170</td><td>26.5892</td><td>24.3497</td><td>32.6765</td><td>31.2836</td><td>25.2557</td><td>27.0779</td><td>26.3801</td><td>0.612</td><td>11807.59</td><td>103.786</td><td>21.2075</td><td>0.0095</td><td>23.06736</td><td>22.6316 ..  21.1441</td><td>0.0131 ..   0.0117</td><td>3180.644 ..     12517.96</td><td>38.39465 ..     134.6946</td><td>99.0000</td><td>99.0000</td><td>5.790</td><td>2.574</td><td>14.05</td><td>138.3</td><td>0.028706</td><td>24</td><td>0</td><td>0</td><td>0.04731</td><td>0.03617</td><td>59.58</td><td>-0.2793 ..        54.54</td><td>0.04492 ..       0.5187</td><td>0.002018 ..        0.269</td><td>1.326185</td><td>43</td><td>12495.2</td><td>407.2769</td><td>21.1460</td><td>0.0354</td><td>126.7207</td><td>20.6261</td><td>2.6809876495e+02</td><td>6.7726706009e+01</td><td>-0.005450</td><td>0.018219</td><td>0.033032</td><td>0.119547</td><td>-0.989289</td><td>-0.007805</td><td>0.014250</td><td>0.040028</td><td>0.081413</td><td>-0.993404</td><td>25165905</td><td>471</td><td>126.5616</td><td>20.3228</td><td>-8.756287 .. -10.243834</td><td>-10.180403</td><td>3.2163024 .. 12.6582985</td><td>0.038825102 .. 0.13620472</td><td>11.939971</td><td>0.104949616</td><td>92.93583</td><td>1-1.E</td></tr>
+</tbody></table></div>
+</div>
+</div>
+<div id="e65814ff" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>catalogues_nir <span class="op">=</span> da.get_catalogues_for_observation(<span class="dv">2683</span>, instrument<span class="op">=</span><span class="st">"NISP"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="fc9ffb1a" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>catalogues_nir[<span class="st">"NIR_H"</span>][<span class="st">"1"</span>][:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=5</i>
+<table id="table140304505782128" class="table-striped table-bordered table-condensed">
+<thead><tr><th>OBJECT_ID</th><th>XWIN_IMAGE</th><th>YWIN_IMAGE</th><th>XWIN_WORLD</th><th>YWIN_WORLD</th><th>ALPHA_J2000</th><th>DELTA_J2000</th><th>MAG_APER</th><th>MAGERR_APER</th><th>FLUX_APER</th><th>FLUXERR_APER</th><th>MAG_AUTO</th><th>MAGERR_AUTO</th><th>FLUX_AUTO</th><th>FLUXERR_AUTO</th><th>AWIN_WORLD</th><th>BWIN_WORLD</th><th>THETAWIN_WORLD</th><th>ERRAWIN_WORLD</th><th>ERRBWIN_WORLD</th><th>ERRTHETAWIN_WORLD</th><th>KRON_RADIUS</th><th>ELLIPTICITY</th><th>CLASS_STAR</th><th>FWHM_IMAGE</th><th>FLUX_RADIUS</th><th>BACKGROUND</th><th>THRESHOLD</th><th>XPSF_IMAGE</th><th>YPSF_IMAGE</th><th>XPSF_WORLD</th><th>YPSF_WORLD</th><th>ALPHAPSF_J2000</th><th>DELTAPSF_J2000</th><th>MAG_PSF</th><th>MAGERR_PSF</th><th>FLUX_PSF</th><th>FLUXERR_PSF</th><th>ERRAPSF_IMAGE</th><th>ERRBPSF_IMAGE</th><th>ERRTHETAPSF_IMAGE</th><th>CHI2_PSF</th><th>FLAGS</th><th>DETECTOR</th></tr></thead>
+<thead><tr><th></th><th>pix</th><th>pix</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>mag</th><th>mag</th><th>ct</th><th>ct</th><th>mag</th><th>mag</th><th>ct</th><th>ct</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th></th><th></th><th></th><th>pix</th><th>pix</th><th>ct</th><th>ct</th><th>pix</th><th>pix</th><th>deg</th><th>deg</th><th>deg</th><th>deg</th><th>mag</th><th>mag</th><th>ct</th><th>ct</th><th>pix</th><th>pix</th><th>deg</th><th></th><th></th><th></th></tr></thead>
+<thead><tr><th>int32</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float32[5]</th><th>float32[5]</th><th>float32[5]</th><th>float32[5]</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float64</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>float32</th><th>int16</th><th>str2</th></tr></thead>
+<tbody><tr><td>21</td><td>50.5984</td><td>12.6080</td><td>2.6992668317e+02</td><td>6.8131641471e+01</td><td>269.9267695</td><td>68.1316032</td><td>24.7452 ..  23.3146</td><td>0.3059 ..   0.4023</td><td>128.6682 ..     480.5274</td><td>36.2375 ..     178.0027</td><td>24.5335</td><td>0.2846</td><td>156.371</td><td>40.97853</td><td>5.389608e-05</td><td>4.574121e-05</td><td>-67.08</td><td>2.189676e-05</td><td>2.162293e-05</td><td>-77.89</td><td>3.50</td><td>0.355</td><td>0.353</td><td>2.87</td><td>1.050</td><td>68.98931</td><td>0.1208089</td><td>50.0000</td><td>12.5000</td><td>2.6992676951e+02</td><td>6.8131603221e+01</td><td>269.9267695</td><td>68.1316032</td><td>99.0000</td><td>99.0000</td><td>0</td><td>0</td><td>0.00000</td><td>0.00000</td><td>0.00</td><td>0</td><td>0</td><td>11</td></tr>
+<tr><td>24</td><td>328.8609</td><td>10.4722</td><td>2.6989644067e+02</td><td>6.8151595219e+01</td><td>269.8964916</td><td>68.1515914</td><td>24.3336 ..  20.9324</td><td>0.2129 ..   0.0461</td><td>187.9903 ..     4311.135</td><td>36.86229 ..     183.1946</td><td>24.2323</td><td>0.2836</td><td>206.3592</td><td>53.89828</td><td>5.319995e-05</td><td>5.235874e-05</td><td>-48.71</td><td>1.77482e-05</td><td>1.760394e-05</td><td>36.07</td><td>3.50</td><td>0.188</td><td>0.326</td><td>3.93</td><td>1.054</td><td>63.82212</td><td>0.1208089</td><td>328.7049</td><td>10.2949</td><td>2.6989649160e+02</td><td>6.8151591407e+01</td><td>269.8964916</td><td>68.1515914</td><td>99.0000</td><td>99.0000</td><td>0</td><td>0</td><td>0.00000</td><td>0.00000</td><td>0.00</td><td>0</td><td>0</td><td>11</td></tr>
+<tr><td>25</td><td>401.5988</td><td>10.4432</td><td>2.6988841971e+02</td><td>6.8156790518e+01</td><td>269.8884198</td><td>68.1567811</td><td>23.3792 ..  23.1454</td><td>0.0926 ..   0.3445</td><td>452.7687 ..     561.5798</td><td>38.61628 ..     178.1615</td><td>23.0551</td><td>0.1054</td><td>610.2734</td><td>59.222</td><td>6.524716e-05</td><td>5.817264e-05</td><td>-45.68</td><td>9.560273e-06</td><td>9.474173e-06</td><td>-60.29</td><td>3.50</td><td>0.000</td><td>0.941</td><td>2.13</td><td>1.295</td><td>62.89843</td><td>0.1208089</td><td>401.5000</td><td>10.4999</td><td>2.6988841983e+02</td><td>6.8156781121e+01</td><td>269.8884198</td><td>68.1567811</td><td>99.0000</td><td>99.0000</td><td>0</td><td>0</td><td>0.00000</td><td>0.00000</td><td>0.00</td><td>0</td><td>0</td><td>11</td></tr>
+<tr><td>26</td><td>1679.2416</td><td>11.2159</td><td>2.6974630700e+02</td><td>6.8248054931e+01</td><td>269.7463915</td><td>68.2479544</td><td>21.9470 ..  20.4114</td><td>0.0294 ..   0.0291</td><td>1693.342 ..     6966.458</td><td>45.77656 ..     186.8902</td><td>21.7281</td><td>0.0269</td><td>2071.624</td><td>51.35043</td><td>5.387569e-05</td><td>5.351707e-05</td><td>59.35</td><td>2.39664e-06</td><td>2.376038e-06</td><td>-84.50</td><td>3.50</td><td>0.354</td><td>0.935</td><td>3.67</td><td>1.387</td><td>63.65472</td><td>0.1208089</td><td>1678.0000</td><td>11.5000</td><td>2.6974639150e+02</td><td>6.8247954388e+01</td><td>269.7463915</td><td>68.2479544</td><td>99.0000</td><td>99.0000</td><td>0</td><td>0</td><td>0.00000</td><td>0.00000</td><td>0.00</td><td>0</td><td>0</td><td>11</td></tr>
+<tr><td>27</td><td>1979.5024</td><td>10.9728</td><td>2.6971272992e+02</td><td>6.8269532079e+01</td><td>269.7123465</td><td>68.2698011</td><td>23.6846 ..  18.7390</td><td>0.1201 ..   0.0073</td><td>341.7659 ..     32504.41</td><td>37.78506 ..     218.3321</td><td>23.3699</td><td>0.1097</td><td>456.6743</td><td>46.14747</td><td>4.24568e-05</td><td>1.79031e-05</td><td>-59.80</td><td>4.411954e-07</td><td>2.809796e-07</td><td>-59.89</td><td>3.50</td><td>0.163</td><td>0.424</td><td>4.37</td><td>1.427</td><td>62.79366</td><td>0.1208089</td><td>1983.1775</td><td>10.8226</td><td>2.6971234655e+02</td><td>6.8269801079e+01</td><td>269.7123465</td><td>68.2698011</td><td>99.0000</td><td>99.0000</td><td>0</td><td>0</td><td>0.00000</td><td>0.00000</td><td>0.00</td><td>0</td><td>0</td><td>11</td></tr>
+</tbody></table></div>
+</div>
+</div>
+</section>
+<section id="async-queries" class="level4">
+<h4 class="anchored" data-anchor-id="async-queries">Async queries</h4>
+<div id="test-async-query" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>query <span class="op">=</span> <span class="st">"SELECT TOP 1 cat.object_id, phz.object_id FROM catalogue.mer_catalogue_wide_survey as cat JOIN catalogue.phz_photo_z_wide as phz USING (object_id)"</span></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>da.tap_query(query, async_only<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>2026-02-27 11:13:41 - __main__._tap_query_async_wait - INFO - TAP async job still running (phase=EXECUTING). Next poll in 5s at 2026-02-27 11:13:46.
+2026-02-27 11:13:46 - __main__._tap_query_async_wait - INFO - TAP async job still running (phase=EXECUTING). Next poll in 10s at 2026-02-27 11:13:56.
+2026-02-27 11:13:56 - __main__._tap_query_async_wait - INFO - TAP async job still running (phase=EXECUTING). Next poll in 15s at 2026-02-27 11:14:11.
+2026-02-27 11:14:11 - __main__._tap_query_async_wait - INFO - TAP async job still running (phase=EXECUTING). Next poll in 20s at 2026-02-27 11:14:31.</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div><i>Table length=1</i>
+<table id="table140304505775888" class="table-striped table-bordered table-condensed">
+<thead><tr><th>object_id</th><th>object_id_2</th></tr></thead>
+<thead><tr><th>int64</th><th>int64</th></tr></thead>
+<tbody><tr><td>1896880493667911401</td><td>1896880493667911401</td></tr>
+</tbody></table></div>
+</div>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/IntraClusterLight\.github\.io\/nicl");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/IntraClusterLight/nicl/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Calculate statistics to determine the surface brightness and spatial scale of the background variations.">
+
+<title>background_stats – nicl</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-3d242d70d41cd9edc5ebe4da1d712dc5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../styles.css">
+<meta property="og:title" content="background_stats – nicl">
+<meta property="og:description" content="Calculate statistics to determine the surface brightness and spatial scale of the background variations.">
+<meta property="og:image" content="https://IntraClusterLight.github.io/nicl/euclid/background_stats_files/figure-html/cell-13-output-1.png">
+<meta property="og:site_name" content="nicl">
+<meta property="og:image:height" content="861">
+<meta property="og:image:width" content="1770">
+<meta name="twitter:title" content="background_stats – nicl">
+<meta name="twitter:description" content="Calculate statistics to determine the surface brightness and spatial scale of the background variations.">
+<meta name="twitter:image" content="https://IntraClusterLight.github.io/nicl/euclid/background_stats_files/figure-html/cell-13-output-1.png">
+<meta name="twitter:image-height" content="861">
+<meta name="twitter:image-width" content="1770">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">nicl</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../euclid/index.html">euclid</a></li><li class="breadcrumb-item"><a href="../euclid/background_stats.html">background_stats</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">nicl_q1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../main.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">main</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../testing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">testing</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../utilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">utilities</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../filter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">filter</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">background</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mask</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../autoprof.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">autoprof</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../measure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">measure</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="../euclid/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">euclid</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/background_stats.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">background_stats</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/combine.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">combine</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/constants.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constants</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/continuity.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">continuity</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/cutout.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cutout</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/data_access.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">data_access</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/debanding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">debanding</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/dq_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">dq_mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/measure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">measure</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/persistence.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">persistence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/pipeline.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">pipeline</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/skyflat.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skyflat</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/skypatch_noise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skypatch_noise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/stars.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">stars</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/testing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">testing</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/utilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">utilities</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/visualise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">visualise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/xarray.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">xarray</span></a>
+  </div>
+</li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text">q1</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/q1/data_processing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Creation of figures for the Q1 data processing paper</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">other</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../other/sky_background_error_estimates.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Sky background error estimates</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#aperture_stats" id="toc-aperture_stats" class="nav-link active" data-scroll-target="#aperture_stats">aperture_stats</a></li>
+  <li><a href="#measure_aperture_stats" id="toc-measure_aperture_stats" class="nav-link" data-scroll-target="#measure_aperture_stats">measure_aperture_stats</a></li>
+  <li><a href="#stats_versus_size_for_box_fast" id="toc-stats_versus_size_for_box_fast" class="nav-link" data-scroll-target="#stats_versus_size_for_box_fast">stats_versus_size_for_box_fast</a></li>
+  <li><a href="#stats_versus_size" id="toc-stats_versus_size" class="nav-link" data-scroll-target="#stats_versus_size">stats_versus_size</a></li>
+  <li><a href="#convert_to_mag" id="toc-convert_to_mag" class="nav-link" data-scroll-target="#convert_to_mag">convert_to_mag</a></li>
+  <li><a href="#background_stats_plot" id="toc-background_stats_plot" class="nav-link" data-scroll-target="#background_stats_plot">background_stats_plot</a></li>
+  <li><a href="#measure" id="toc-measure" class="nav-link" data-scroll-target="#measure">measure</a></li>
+  <li><a href="#test" id="toc-test" class="nav-link" data-scroll-target="#test">Test</a></li>
+  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/IntraClusterLight/nicl/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../euclid/index.html">euclid</a></li><li class="breadcrumb-item"><a href="../euclid/background_stats.html">background_stats</a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title">background_stats</h1>
+</div>
+
+<div>
+  <div class="description">
+    Calculate statistics to determine the surface brightness and spatial scale of the background variations.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L119" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="aperture_stats" class="level3">
+<h3 class="anchored" data-anchor-id="aperture_stats">aperture_stats</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> aperture_stats(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    data, mask, n_apertures, sqrt_n_pix, aperture_shape, annular_thickness:NoneType<span class="op">=</span><span class="va">None</span>, n_pix_tolerance:<span class="bu">float</span><span class="op">=</span><span class="fl">0.1</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call self as a function.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L40" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="measure_aperture_stats" class="level3">
+<h3 class="anchored" data-anchor-id="measure_aperture_stats">measure_aperture_stats</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> measure_aperture_stats(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    data, mask, n_apertures, sqrt_n_pix, aperture_shape, annular_thickness:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call self as a function.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L240" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="stats_versus_size_for_box_fast" class="level3">
+<h3 class="anchored" data-anchor-id="stats_versus_size_for_box_fast">stats_versus_size_for_box_fast</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> stats_versus_size_for_box_fast(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    data, mask, max_sqrt_n_pix, n_steps:<span class="bu">int</span><span class="op">=</span><span class="dv">20</span>, min_ok_frac:<span class="bu">float</span><span class="op">=</span><span class="fl">0.5</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Measure the background statistics for a range of box aperture sizes.</em></p>
+<p>This is a fast version that uses block_reduce to calculate the mean and median of the data in each box.</p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L196" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="stats_versus_size" class="level3">
+<h3 class="anchored" data-anchor-id="stats_versus_size">stats_versus_size</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> stats_versus_size(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    data, mask, n_apertures, max_sqrt_n_pix, aperture_shape, annular_thickness:NoneType<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    n_pix_tolerance:<span class="bu">float</span><span class="op">=</span><span class="fl">0.1</span>, n_steps:<span class="bu">int</span><span class="op">=</span><span class="dv">20</span>, rms:NoneType<span class="op">=</span><span class="va">None</span>, verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, progress:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call self as a function.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L301" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="convert_to_mag" class="level3">
+<h3 class="anchored" data-anchor-id="convert_to_mag">convert_to_mag</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> convert_to_mag(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    results, zp:<span class="bu">float</span><span class="op">=</span><span class="fl">23.9</span>, pix_scl:<span class="bu">float</span><span class="op">=</span><span class="fl">0.3</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call self as a function.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L334" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="background_stats_plot" class="level3">
+<h3 class="anchored" data-anchor-id="background_stats_plot">background_stats_plot</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> background_stats_plot(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    results, true_bkg_std:NoneType<span class="op">=</span><span class="va">None</span>, errorbars:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, zp_mag:NoneType<span class="op">=</span><span class="va">None</span>, pixel_scale:NoneType<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    filename:NoneType<span class="op">=</span><span class="va">None</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call self as a function.</em></p>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/background_stats.py#L423" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="measure" class="level3">
+<h3 class="anchored" data-anchor-id="measure">measure</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> measure(</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    filename, <span class="co"># the filename to test</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    path, <span class="co"># the folder containing the images</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    mask:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># an optional mask to apply to the image</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    create_mask:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># generate and apply a mask if not supplied</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    estimate_background:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># allow masking to estimate the background from the median of the image</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    bkg_mesh_size:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># size of the background mesh boxes in pixels</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    bkg_filter_size:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># median filter background over `bkg_filter_size` x `bkg_filter_size` boxes</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    plots:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># output plots</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    outpath:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># the folder where all output plots should be placed</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    separate_detectors:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># consider multiple science extensions individually</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    n_apertures:<span class="bu">int</span><span class="op">=</span><span class="dv">1000</span>, <span class="co"># number of apertures per size</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    max_sqrt_n_pix:<span class="bu">int</span><span class="op">=</span><span class="dv">500</span>, <span class="co"># maximum aperture size as sqrt(number of pixels)</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    aperture_shape:<span class="bu">str</span><span class="op">=</span><span class="st">'square'</span>, <span class="co"># square or circle</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>    annular_thickness:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># None for solid apertures, or a number on range (0, 1) to specify relative thickness of annulus</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    n_pix_tolerance:<span class="bu">float</span><span class="op">=</span><span class="fl">0.1</span>, <span class="co"># the largest allowed relative deviation from the requested n_pix</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    n_steps:<span class="bu">int</span><span class="op">=</span><span class="dv">25</span>, <span class="co"># the number of different sqrt_n_pix to measure</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    zp_mag:<span class="bu">float</span><span class="op">=</span><span class="fl">23.9</span>, <span class="co"># convert to magnitudes using this zero point, unless it is None</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    errorbars:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># plot errorbars</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    debug:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># save debug images</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    verbose:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># print verbose output</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Determine statistics of the background.</em></p>
+</section>
+<section id="test" class="level2">
+<h2 class="anchored" data-anchor-id="test">Test</h2>
+<p>Test the performance on images containing random noise and a background varying on a particular spatial scale.</p>
+<div id="0e2d5161-dccb-4582-9104-2eb45ffb71b3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>random, background, random_with_background <span class="op">=</span> create_test_background()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="27ca6aa3-3ddb-4e47-b4fd-af210d2208aa" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>random_convolved <span class="op">=</span> correlate_pixels(random, slope<span class="op">=</span><span class="fl">0.8</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>random_with_background_convolved <span class="op">=</span> random_convolved <span class="op">+</span> background</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Fraction of flux in central pixel is 56%</code></pre>
+</div>
+</div>
+<div id="80d3341d-b516-4a8a-b4e2-0f27d1deb50f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>mask <span class="op">=</span> create_test_mask()</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>no_mask <span class="op">=</span> mask <span class="op">*</span> <span class="va">False</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="b8aeebf5-16e5-4f49-862f-1ec50d9d44f3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_test_images(random, background, random_with_background, mask, circles<span class="op">=</span><span class="va">True</span>):</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    fig, ax <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">4</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">6</span>))</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> a <span class="kw">in</span> ax:</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>        a.set_xticks([])</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>        a.set_yticks([])</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    vmin, vmax <span class="op">=</span> np.percentile(random, (<span class="fl">0.1</span>, <span class="fl">99.9</span>))</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">0</span>].imshow(random, vmin<span class="op">=</span>vmin, vmax<span class="op">=</span>vmax, cmap<span class="op">=</span><span class="st">"seismic"</span>, interpolation<span class="op">=</span><span class="st">"none"</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">1</span>].imshow(background, vmin<span class="op">=</span>vmin, vmax<span class="op">=</span>vmax, cmap<span class="op">=</span><span class="st">"seismic"</span>, interpolation<span class="op">=</span><span class="st">"none"</span>)</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">2</span>].imshow(</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        random_with_background,</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span>vmin,</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span>vmax,</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span><span class="st">"seismic"</span>,</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>        interpolation<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">3</span>].imshow(mask, cmap<span class="op">=</span><span class="st">"seismic"</span>, interpolation<span class="op">=</span><span class="st">"none"</span>)</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> circles:</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>        x <span class="op">=</span> <span class="dv">120</span></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i, radius <span class="kw">in</span> <span class="bu">enumerate</span>((<span class="dv">10</span>, <span class="dv">20</span>, <span class="dv">40</span>, <span class="dv">80</span>)):</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>            circle <span class="op">=</span> plt.Circle((x <span class="op">+</span> radius, <span class="dv">150</span>), radius, ec<span class="op">=</span><span class="st">"w"</span>, fc<span class="op">=</span><span class="st">"none"</span>, lw<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>            ax[<span class="dv">1</span>].add_patch(circle)</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>            circle <span class="op">=</span> plt.Circle((x <span class="op">+</span> radius, <span class="dv">150</span>), radius, ec<span class="op">=</span><span class="st">"k"</span>, fc<span class="op">=</span><span class="st">"none"</span>)</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>            ax[<span class="dv">1</span>].add_patch(circle)</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>            rlabel <span class="op">=</span> <span class="st">"r="</span> <span class="cf">if</span> i <span class="op">==</span> <span class="dv">0</span> <span class="cf">else</span> <span class="st">""</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>            ax[<span class="dv">1</span>].annotate(</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"</span><span class="sc">{</span>rlabel<span class="sc">}{</span>radius<span class="sc">}</span><span class="ss">px"</span>,</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>                (x <span class="op">+</span> radius, <span class="dv">220</span> <span class="op">+</span> radius),</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>                ha<span class="op">=</span><span class="st">"center"</span>,</span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>                color<span class="op">=</span><span class="st">"k"</span>,</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>                path_effects<span class="op">=</span>[pe.withStroke(linewidth<span class="op">=</span><span class="dv">4</span>, foreground<span class="op">=</span><span class="st">"white"</span>)],</span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>            x <span class="op">+=</span> <span class="dv">2</span> <span class="op">*</span> radius <span class="op">+</span> <span class="dv">160</span></span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>    plt.tight_layout()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="8520085f-c0c8-4096-90ab-62fbb2c32eea" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>plot_test_images(random, background, random_with_background, mask, circles<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-13-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Calculate the standard deviation of the average over many apertures of a given size.</p>
+<p>First with no mask and square apertures.</p>
+<div id="bd5882e7-0379-4629-8744-539b32529332" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> aperture_stats(</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    random,</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    no_mask,</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    sqrt_n_pix<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    annular_thickness<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    n_pix_tolerance<span class="op">=</span><span class="fl">0.1</span>,</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> results[<span class="st">"n_ok"</span>] <span class="op">==</span> <span class="dv">100</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>results</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 100,
+ 'std_mean': 0.009536020991178649,
+ 'err_std_mean': 0.000677695502167142,
+ 'err_bs_std_mean': 0.001415343555416849,
+ 'std_median': 0.013607557599693329,
+ 'err_std_median': 0.0009670470093682829,
+ 'err_bs_std_median': 0.0014262443760027338,
+ 'n_ok': 100,
+ 'outer_size': 100.0}</code></pre>
+</div>
+</div>
+<p>Now with a mask, note that <code>n_ok</code> decrease a bit, but the <code>outer_size</code> has increased to compensate for the masking.</p>
+<div id="12e22b44-6ea7-48f2-8b47-6f300ca8682d" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(random, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, sqrt_n_pix<span class="op">=</span><span class="dv">100</span>, aperture_shape<span class="op">=</span><span class="st">"square"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 100,
+ 'std_mean': 0.011925662918417373,
+ 'err_std_mean': 0.0006564861374144307,
+ 'err_bs_std_mean': 0.000993948954867461,
+ 'std_median': 0.013028991154390207,
+ 'err_std_median': 0.0007172223578567745,
+ 'err_bs_std_median': 0.0012580365179107357,
+ 'n_ok': 166,
+ 'outer_size': 103.14212462587935}</code></pre>
+</div>
+</div>
+<p>Let’s compare the processed and convolved images for a single pixel.</p>
+<div id="061c6c0f-4ae1-4400-92a0-edbfe11b2691" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(random, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, sqrt_n_pix<span class="op">=</span><span class="dv">1</span>, aperture_shape<span class="op">=</span><span class="st">"square"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 1,
+ 'std_mean': 0.9931587389273,
+ 'err_std_mean': 0.07282193191096697,
+ 'err_bs_std_mean': 0.15704656183711996,
+ 'std_median': 0.9931587389273,
+ 'err_std_median': 0.07282193191096697,
+ 'err_bs_std_median': 0.15546943637929816,
+ 'n_ok': 94,
+ 'outer_size': 1.0}</code></pre>
+</div>
+</div>
+<div id="5c84e098-2de0-4df1-99c8-361b91f5a86b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    random_convolved, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, sqrt_n_pix<span class="op">=</span><span class="dv">1</span>, aperture_shape<span class="op">=</span><span class="st">"square"</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 1,
+ 'std_mean': 0.7188988823506174,
+ 'err_std_mean': 0.05299792874567214,
+ 'err_bs_std_mean': 0.08597811345310843,
+ 'std_median': 0.7188988823506174,
+ 'err_std_median': 0.05299792874567214,
+ 'err_bs_std_median': 0.08434945047332984,
+ 'n_ok': 93,
+ 'outer_size': 1.0}</code></pre>
+</div>
+</div>
+<p>Try a square annulus. The <code>outer_size</code> has increased to achieve the same number of pixels.</p>
+<div id="ae541b72-fdbf-480b-be98-6f6ecdc87598" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    random,</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    sqrt_n_pix<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    annular_thickness<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 100,
+ 'std_mean': 0.01170577271817315,
+ 'err_std_mean': 0.0006443815802756672,
+ 'err_bs_std_mean': 0.0009705360971256971,
+ 'std_median': 0.0133172371567201,
+ 'err_std_median': 0.0007330897780571615,
+ 'err_bs_std_median': 0.0012341004429097205,
+ 'n_ok': 166,
+ 'outer_size': 118.68861422067508}</code></pre>
+</div>
+</div>
+<p>Try a circle. The <code>outer_size</code> has increased to achieve the same number of pixels as a square.</p>
+<div id="43c08ead-3664-43ae-9b84-0c65780ab04f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(random, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, sqrt_n_pix<span class="op">=</span><span class="dv">100</span>, aperture_shape<span class="op">=</span><span class="st">"circle"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 100,
+ 'std_mean': 0.01004656929633298,
+ 'err_std_mean': 0.0005598734179974864,
+ 'err_bs_std_mean': 0.0009872192120235696,
+ 'std_median': 0.012240448217474305,
+ 'err_std_median': 0.0006821335103755244,
+ 'err_bs_std_median': 0.0013740435924119185,
+ 'n_ok': 162,
+ 'outer_size': 116.43608055668524}</code></pre>
+</div>
+</div>
+<p>Try a circular annulus. Again, the <code>outer_size</code> has increased to achieve the same number of pixels.</p>
+<div id="1a3dce37-b81e-4350-a4b1-405e08261b6f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    random,</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    sqrt_n_pix<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"circle"</span>,</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>    annular_thickness<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 100,
+ 'std_mean': 0.010426841409908691,
+ 'err_std_mean': 0.0005605504669297011,
+ 'err_bs_std_mean': 0.0010827526864482084,
+ 'std_median': 0.011975648231849644,
+ 'err_std_median': 0.0006438148375182733,
+ 'err_bs_std_median': 0.0011628767284151142,
+ 'n_ok': 174,
+ 'outer_size': 134.06038336917868}</code></pre>
+</div>
+</div>
+<p>Now try with a spatially varying background. On small scales, the standard deviations match the processed pixel rms, but on larger scales they match the strength of the background variations.</p>
+<div id="21d926a8-3b38-48d1-b9d5-69c35278e7a3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    random_with_background, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, sqrt_n_pix<span class="op">=</span><span class="dv">1</span>, aperture_shape<span class="op">=</span><span class="st">"square"</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 1,
+ 'std_mean': 1.0893309502367292,
+ 'err_std_mean': 0.08074658224807635,
+ 'err_bs_std_mean': 0.14711198829229252,
+ 'std_median': 1.0893309502367292,
+ 'err_std_median': 0.08074658224807635,
+ 'err_bs_std_median': 0.14081926337212186,
+ 'n_ok': 92,
+ 'outer_size': 1.0}</code></pre>
+</div>
+</div>
+<div id="25606ece-d865-44f1-9d1f-80ecc94ce168" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>aperture_stats(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    random_with_background,</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">1000</span>,</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    sqrt_n_pix<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'sqrt_n_pix': 100,
+ 'std_mean': 0.08994474935064482,
+ 'err_std_mean': 0.0015700248541283802,
+ 'err_bs_std_mean': 0.0034513243764336264,
+ 'std_median': 0.0904953133368859,
+ 'err_std_median': 0.0015796351887885688,
+ 'err_bs_std_median': 0.003337735056337676,
+ 'n_ok': 1642,
+ 'outer_size': 102.78192561973624}</code></pre>
+</div>
+</div>
+<p>Now let’s measure the statistics in apertures of a series of sizes. First with no spatially varying background.</p>
+<div id="d7dd33e0-356c-43f4-ac55-fd2ccefc7c29" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>results_no_bkg <span class="op">=</span> stats_versus_size(</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    random, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>, aperture_shape<span class="op">=</span><span class="st">"square"</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="7a16bbfe-4661-4af5-bb83-54b48d4185ba" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_no_bkg)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-24-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>What about if the pixels are a bit correlated (i.e.&nbsp;by a convolution)?</p>
+<div id="cf7cc6f4-2031-493d-a96f-5a0075120b7d" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>results_no_bkg_convolved <span class="op">=</span> stats_versus_size(</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>    random_convolved, mask, n_apertures<span class="op">=</span><span class="dv">100</span>, max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>, aperture_shape<span class="op">=</span><span class="st">"square"</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="bba4cb6a-1db7-40ec-b58f-3655f38ce64c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_no_bkg_convolved)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-26-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>And now with a spatially varying background.</p>
+<div id="03aa160a-dc09-4ef1-841c-304152c81cd1" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>results_with_bkg <span class="op">=</span> stats_versus_size(</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>    random_with_background,</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="bb2b699f-9dc5-4c2e-a621-ae63798979d9" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_with_bkg, true_bkg_std<span class="op">=</span><span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-28-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>And again, what about if the pixels are a bit correlated (i.e.&nbsp;by a convolution)?</p>
+<div id="07d55ada-3bb5-4c00-9b21-d2965e00814e" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>results_with_bkg_convolved <span class="op">=</span> stats_versus_size(</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>    random_with_background_convolved,</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>    max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="eaa282f4-b12a-4b8c-8f20-065a6618ca14" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_with_bkg_convolved, true_bkg_std<span class="op">=</span><span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-30-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Create a background containing spatial variations with a different rms, to compare.</p>
+<div id="ac8f4b68-e4f7-4583-a4a4-be7def5993e6" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>random, background, random_with_background <span class="op">=</span> create_test_background(background_rms<span class="op">=</span><span class="fl">0.2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="f976dd1e-c144-4b5d-aefa-0a05c3d8f1e0" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>results_with_bkg <span class="op">=</span> stats_versus_size(</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>    random_with_background,</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>    max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="01c4ae1a-5b2a-4953-b571-1652ce8c9811" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_with_bkg, true_bkg_std<span class="op">=</span><span class="fl">0.2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-33-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Create a background containing spatial variations on a different scale, to compare.</p>
+<div id="032627af-3d13-409f-bdb4-ac07b884c4ef" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>random, background, random_with_background <span class="op">=</span> create_test_background(background_scale<span class="op">=</span><span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="1bdc0686-df13-4978-9c48-b27c040f6bda" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>random_convolved <span class="op">=</span> correlate_pixels(random, slope<span class="op">=</span><span class="fl">0.8</span>)</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>random_with_background_convolved <span class="op">=</span> random_convolved <span class="op">+</span> background</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Fraction of flux in central pixel is 56%</code></pre>
+</div>
+</div>
+<div id="505186d7-4e43-48e7-878e-6cc0066d8f3c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>plot_test_images(random, background, random_with_background, mask)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-36-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="595770fa-6a07-4516-8100-1a4850c69729" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>results_with_bkg <span class="op">=</span> stats_versus_size(</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>    random_with_background,</span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>    max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="4772ead0-e554-4975-9712-50b157213996" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_with_bkg, true_bkg_std<span class="op">=</span><span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-38-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="051cc178-f1fb-4c6f-bc37-51cff2da31e5" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>results_with_bkg_convolved <span class="op">=</span> stats_versus_size(</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>    random_with_background_convolved,</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>    mask,</span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>    n_apertures<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a>    max_sqrt_n_pix<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>    aperture_shape<span class="op">=</span><span class="st">"square"</span>,</span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="28461147-d247-41e5-b244-ffad5c59e70b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>background_stats_plot(results_with_bkg_convolved, true_bkg_std<span class="op">=</span><span class="fl">0.1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-40-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="example" class="level2">
+<h2 class="anchored" data-anchor-id="example">Example</h2>
+<p>The following is an example of using <a href="https://IntraClusterLight.github.io/nicl/euclid/background_stats.html#measure"><code>measure</code></a> on an observation.</p>
+<div id="e966c75d-b4a7-4de7-8a86-a8678b42fa16" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>path <span class="op">=</span> default_data_path(<span class="st">"Q1_R1_processed_v0.4"</span>)</span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a>filename <span class="op">=</span> <span class="st">"NIR/2683/EUC_NIR_W-STK_Y_2683.fits"</span></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>results_original, mask_original <span class="op">=</span> measure(</span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>    filename, path <span class="op">/</span> <span class="st">"stacked_original"</span>, debug<span class="op">=</span><span class="va">True</span>, verbose<span class="op">=</span><span class="va">True</span></span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>n_apertures: 1000
+target n_pix: 1
+sqrt_n_pix: 1
+n_ok: 413
+n_nan: 587
+median achieved_n_pix: 1
+trying again after adjusting sqrt_n_pix to 1
+n_ok: 448
+n_nan: 552
+median achieved_n_pix: 1
+trying again after adjusting sqrt_n_pix to 1
+n_ok: 425
+n_nan: 575
+median achieved_n_pix: 1
+total number of valid apertures: 1286
+n_apertures: 1000
+target n_pix: 4
+sqrt_n_pix: 2
+n_ok: 412
+n_nan: 555
+median achieved_n_pix: 4
+trying again after adjusting sqrt_n_pix to 2
+n_ok: 392
+n_nan: 584
+median achieved_n_pix: 4
+trying again after adjusting sqrt_n_pix to 2
+n_ok: 444
+n_nan: 530
+median achieved_n_pix: 4
+total number of valid apertures: 1248
+n_apertures: 1000
+target n_pix: 9
+sqrt_n_pix: 3
+n_ok: 344
+n_nan: 601
+median achieved_n_pix: 9
+trying again after adjusting sqrt_n_pix to 3
+n_ok: 374
+n_nan: 564
+median achieved_n_pix: 9
+trying again after adjusting sqrt_n_pix to 3
+n_ok: 420
+n_nan: 522
+median achieved_n_pix: 9
+total number of valid apertures: 1138
+n_apertures: 1000
+target n_pix: 16
+sqrt_n_pix: 4
+n_ok: 401
+n_nan: 538
+median achieved_n_pix: 16
+trying again after adjusting sqrt_n_pix to 4
+n_ok: 402
+n_nan: 537
+median achieved_n_pix: 16
+trying again after adjusting sqrt_n_pix to 4
+n_ok: 386
+n_nan: 549
+median achieved_n_pix: 16
+total number of valid apertures: 1189
+n_apertures: 1000
+target n_pix: 25
+sqrt_n_pix: 5
+n_ok: 393
+n_nan: 514
+median achieved_n_pix: 25
+trying again after adjusting sqrt_n_pix to 5
+n_ok: 377
+n_nan: 536
+median achieved_n_pix: 25
+trying again after adjusting sqrt_n_pix to 5
+n_ok: 398
+n_nan: 515
+median achieved_n_pix: 25
+total number of valid apertures: 1168
+n_apertures: 1000
+target n_pix: 36
+sqrt_n_pix: 6
+n_ok: 386
+n_nan: 508
+median achieved_n_pix: 36
+trying again after adjusting sqrt_n_pix to 6
+n_ok: 388
+n_nan: 523
+median achieved_n_pix: 36
+trying again after adjusting sqrt_n_pix to 6
+n_ok: 368
+n_nan: 529
+median achieved_n_pix: 36
+total number of valid apertures: 1142
+n_apertures: 1000
+target n_pix: 64
+sqrt_n_pix: 8
+n_ok: 352
+n_nan: 513
+median achieved_n_pix: 64
+trying again after adjusting sqrt_n_pix to 8
+n_ok: 361
+n_nan: 530
+median achieved_n_pix: 64
+trying again after adjusting sqrt_n_pix to 8
+n_ok: 372
+n_nan: 512
+median achieved_n_pix: 64
+total number of valid apertures: 1085
+n_apertures: 1000
+target n_pix: 100
+sqrt_n_pix: 10
+n_ok: 343
+n_nan: 530
+median achieved_n_pix: 100
+trying again after adjusting sqrt_n_pix to 10
+n_ok: 352
+n_nan: 517
+median achieved_n_pix: 100
+trying again after adjusting sqrt_n_pix to 10
+n_ok: 316
+n_nan: 537
+median achieved_n_pix: 100
+total number of valid apertures: 1011
+n_apertures: 1000
+target n_pix: 169
+sqrt_n_pix: 13
+n_ok: 343
+n_nan: 499
+median achieved_n_pix: 169
+trying again after adjusting sqrt_n_pix to 13
+n_ok: 347
+n_nan: 495
+median achieved_n_pix: 169
+trying again after adjusting sqrt_n_pix to 13
+n_ok: 339
+n_nan: 514
+median achieved_n_pix: 168
+total number of valid apertures: 1029
+n_apertures: 1000
+target n_pix: 289
+sqrt_n_pix: 17
+n_ok: 312
+n_nan: 503
+median achieved_n_pix: 280
+trying again after adjusting sqrt_n_pix to 17
+n_ok: 304
+n_nan: 520
+median achieved_n_pix: 289
+trying again after adjusting sqrt_n_pix to 17
+n_ok: 316
+n_nan: 507
+median achieved_n_pix: 286
+total number of valid apertures: 932
+n_apertures: 1000
+target n_pix: 484
+sqrt_n_pix: 22
+n_ok: 304
+n_nan: 484
+median achieved_n_pix: 453
+trying again after adjusting sqrt_n_pix to 23
+n_ok: 332
+n_nan: 526
+median achieved_n_pix: 477
+trying again after adjusting sqrt_n_pix to 23
+n_ok: 374
+n_nan: 506
+median achieved_n_pix: 489
+total number of valid apertures: 1010
+n_apertures: 1000
+target n_pix: 841
+sqrt_n_pix: 29
+n_ok: 262
+n_nan: 505
+median achieved_n_pix: 766
+trying again after adjusting sqrt_n_pix to 30
+n_ok: 297
+n_nan: 516
+median achieved_n_pix: 844
+trying again after adjusting sqrt_n_pix to 30
+n_ok: 328
+n_nan: 489
+median achieved_n_pix: 839
+total number of valid apertures: 887
+n_apertures: 1000
+target n_pix: 1444
+sqrt_n_pix: 38
+n_ok: 265
+n_nan: 492
+median achieved_n_pix: 1316
+trying again after adjusting sqrt_n_pix to 40
+n_ok: 339
+n_nan: 485
+median achieved_n_pix: 1434
+trying again after adjusting sqrt_n_pix to 40
+n_ok: 314
+n_nan: 495
+median achieved_n_pix: 1433
+total number of valid apertures: 918
+n_apertures: 1000
+target n_pix: 2401
+sqrt_n_pix: 49
+n_ok: 275
+n_nan: 473
+median achieved_n_pix: 2174
+trying again after adjusting sqrt_n_pix to 51
+n_ok: 352
+n_nan: 486
+median achieved_n_pix: 2366
+trying again after adjusting sqrt_n_pix to 52
+n_ok: 339
+n_nan: 508
+median achieved_n_pix: 2452
+total number of valid apertures: 966
+n_apertures: 1000
+target n_pix: 3969
+sqrt_n_pix: 63
+n_ok: 228
+n_nan: 517
+median achieved_n_pix: 3539
+trying again after adjusting sqrt_n_pix to 67
+n_ok: 383
+n_nan: 475
+median achieved_n_pix: 3971
+trying again after adjusting sqrt_n_pix to 67
+n_ok: 402
+n_nan: 465
+median achieved_n_pix: 3994
+total number of valid apertures: 1013
+n_apertures: 1000
+target n_pix: 6724
+sqrt_n_pix: 82
+n_ok: 252
+n_nan: 483
+median achieved_n_pix: 6038
+trying again after adjusting sqrt_n_pix to 87
+n_ok: 395
+n_nan: 483
+median achieved_n_pix: 6656
+trying again after adjusting sqrt_n_pix to 87
+n_ok: 378
+n_nan: 493
+median achieved_n_pix: 6810
+total number of valid apertures: 1025
+n_apertures: 1000
+target n_pix: 11236
+sqrt_n_pix: 106
+n_ok: 233
+n_nan: 462
+median achieved_n_pix: 9974
+trying again after adjusting sqrt_n_pix to 113
+n_ok: 443
+n_nan: 458
+median achieved_n_pix: 11310
+trying again after adjusting sqrt_n_pix to 112
+n_ok: 398
+n_nan: 481
+median achieved_n_pix: 11159
+total number of valid apertures: 1074
+n_apertures: 1000
+target n_pix: 18769
+sqrt_n_pix: 137
+n_ok: 217
+n_nan: 471
+median achieved_n_pix: 16599
+trying again after adjusting sqrt_n_pix to 146
+n_ok: 407
+n_nan: 493
+median achieved_n_pix: 18847
+trying again after adjusting sqrt_n_pix to 145
+n_ok: 402
+n_nan: 474
+median achieved_n_pix: 18672
+total number of valid apertures: 1026
+n_apertures: 1000
+target n_pix: 31329
+sqrt_n_pix: 177
+n_ok: 204
+n_nan: 444
+median achieved_n_pix: 27319
+trying again after adjusting sqrt_n_pix to 190
+n_ok: 424
+n_nan: 473
+median achieved_n_pix: 31499
+trying again after adjusting sqrt_n_pix to 189
+n_ok: 412
+n_nan: 462
+median achieved_n_pix: 31334
+total number of valid apertures: 1040
+n_apertures: 1000
+target n_pix: 52900
+sqrt_n_pix: 230
+n_ok: 187
+n_nan: 470
+median achieved_n_pix: 46371
+trying again after adjusting sqrt_n_pix to 246
+n_ok: 412
+n_nan: 464
+median achieved_n_pix: 52494
+trying again after adjusting sqrt_n_pix to 247
+n_ok: 421
+n_nan: 477
+median achieved_n_pix: 52960
+total number of valid apertures: 1020
+n_apertures: 1000
+target n_pix: 88804
+sqrt_n_pix: 298
+n_ok: 173
+n_nan: 441
+median achieved_n_pix: 77370
+trying again after adjusting sqrt_n_pix to 319
+n_ok: 432
+n_nan: 425
+median achieved_n_pix: 88870
+trying again after adjusting sqrt_n_pix to 319
+n_ok: 451
+n_nan: 436
+median achieved_n_pix: 89156
+total number of valid apertures: 1056
+n_apertures: 1000
+target n_pix: 148996
+sqrt_n_pix: 386
+n_ok: 157
+n_nan: 398
+median achieved_n_pix: 129562
+trying again after adjusting sqrt_n_pix to 414
+n_ok: 443
+n_nan: 396
+median achieved_n_pix: 148789
+trying again after adjusting sqrt_n_pix to 414
+n_ok: 462
+n_nan: 399
+median achieved_n_pix: 149827
+total number of valid apertures: 1062
+n_apertures: 1000
+target n_pix: 250000
+sqrt_n_pix: 500
+n_ok: 141
+n_nan: 397
+median achieved_n_pix: 217522
+trying again after adjusting sqrt_n_pix to 536
+n_ok: 433
+n_nan: 397
+median achieved_n_pix: 248287
+trying again after adjusting sqrt_n_pix to 538
+n_ok: 466
+n_nan: 375
+median achieved_n_pix: 251526
+total number of valid apertures: 1040</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-41-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="975ec5cd" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>path <span class="op">=</span> default_data_path(<span class="st">"Q1_R1_processed_v0.4"</span>)</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>filename <span class="op">=</span> <span class="st">"NIR/2683/EUC_NIR_W-STK_Y_2683.fits"</span></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>results_processed, mask_processed <span class="op">=</span> measure(filename, path <span class="op">/</span> <span class="st">"stacked"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-42-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="bf235d0c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>mask <span class="op">=</span> mask_original <span class="op">|</span> mask_processed</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="8f7e873b" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>results_original_remasked, _ <span class="op">=</span> measure(</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>    filename,</span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>    path <span class="op">/</span> <span class="st">"stacked_original"</span>,</span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>    mask<span class="op">=</span>mask,</span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>path <span class="op">/</span> <span class="st">"stacked_original"</span> <span class="op">/</span> <span class="st">"background_stats_remasked"</span>,</span>
+<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-44-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="3fb49855" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>results_processed, _ <span class="op">=</span> measure(</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a>    filename,</span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>    path <span class="op">/</span> <span class="st">"stacked"</span>,</span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a>    mask<span class="op">=</span>mask,</span>
+<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>path <span class="op">/</span> <span class="st">"stacked"</span> <span class="op">/</span> <span class="st">"background_stats_remasked"</span>,</span>
+<span id="cb56-6"><a href="#cb56-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-45-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="b19c4515" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>results_original_bkgsub, _ <span class="op">=</span> measure(</span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a>    filename,</span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a>    path <span class="op">/</span> <span class="st">"stacked_original"</span>,</span>
+<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a>    mask<span class="op">=</span>mask_original,</span>
+<span id="cb57-5"><a href="#cb57-5" aria-hidden="true" tabindex="-1"></a>    bkg_mesh_size<span class="op">=</span><span class="dv">500</span>,</span>
+<span id="cb57-6"><a href="#cb57-6" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>path <span class="op">/</span> <span class="st">"stacked_original"</span> <span class="op">/</span> <span class="st">"background_stats_bkgsub"</span>,</span>
+<span id="cb57-7"><a href="#cb57-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-46-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="26de3c58" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb58"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>results_original_remasked_bkgsub, _ <span class="op">=</span> measure(</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>    filename,</span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a>    path <span class="op">/</span> <span class="st">"stacked_original"</span>,</span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a>    mask<span class="op">=</span>mask,</span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>    bkg_mesh_size<span class="op">=</span><span class="dv">500</span>,</span>
+<span id="cb58-6"><a href="#cb58-6" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>path <span class="op">/</span> <span class="st">"stacked_original"</span> <span class="op">/</span> <span class="st">"background_stats_remasked_bkgsub"</span>,</span>
+<span id="cb58-7"><a href="#cb58-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-47-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="9b662466" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>results_processed_bkgsub, _ <span class="op">=</span> measure(</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>    filename,</span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>    path <span class="op">/</span> <span class="st">"stacked"</span>,</span>
+<span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a>    mask<span class="op">=</span>mask,</span>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a>    bkg_mesh_size<span class="op">=</span><span class="dv">500</span>,</span>
+<span id="cb59-6"><a href="#cb59-6" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>path <span class="op">/</span> <span class="st">"stacked"</span> <span class="op">/</span> <span class="st">"background_stats_bgsub"</span>,</span>
+<span id="cb59-7"><a href="#cb59-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-48-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="2def9b4c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_results(</span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>    results_original,</span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>    results_processed,</span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>    results_original_remasked,</span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>    results_original_remasked_bkgsub,</span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a>    results_processed_bkgsub,</span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a>    zp_mag<span class="op">=</span><span class="fl">23.9</span>,</span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a>    pixel_scale<span class="op">=</span><span class="fl">0.3</span>,</span>
+<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a>    results_original <span class="op">=</span> convert_to_mag(results_original, zp_mag, pixel_scale)</span>
+<span id="cb60-11"><a href="#cb60-11" aria-hidden="true" tabindex="-1"></a>    results_processed <span class="op">=</span> convert_to_mag(results_processed, zp_mag, pixel_scale)</span>
+<span id="cb60-12"><a href="#cb60-12" aria-hidden="true" tabindex="-1"></a>    results_original_remasked <span class="op">=</span> convert_to_mag(</span>
+<span id="cb60-13"><a href="#cb60-13" aria-hidden="true" tabindex="-1"></a>        results_original_remasked, zp_mag, pixel_scale</span>
+<span id="cb60-14"><a href="#cb60-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-15"><a href="#cb60-15" aria-hidden="true" tabindex="-1"></a>    results_original_remasked_bkgsub <span class="op">=</span> convert_to_mag(</span>
+<span id="cb60-16"><a href="#cb60-16" aria-hidden="true" tabindex="-1"></a>        results_original_remasked_bkgsub, zp_mag, pixel_scale</span>
+<span id="cb60-17"><a href="#cb60-17" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-18"><a href="#cb60-18" aria-hidden="true" tabindex="-1"></a>    results_processed_bkgsub <span class="op">=</span> convert_to_mag(</span>
+<span id="cb60-19"><a href="#cb60-19" aria-hidden="true" tabindex="-1"></a>        results_processed_bkgsub, zp_mag, pixel_scale</span>
+<span id="cb60-20"><a href="#cb60-20" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-21"><a href="#cb60-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-22"><a href="#cb60-22" aria-hidden="true" tabindex="-1"></a>    fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb60-23"><a href="#cb60-23" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb60-24"><a href="#cb60-24" aria-hidden="true" tabindex="-1"></a>        <span class="dv">1</span>,</span>
+<span id="cb60-25"><a href="#cb60-25" aria-hidden="true" tabindex="-1"></a>        results_original[<span class="st">"expected_std_from_rms_mean"</span>][<span class="dv">0</span>],</span>
+<span id="cb60-26"><a href="#cb60-26" aria-hidden="true" tabindex="-1"></a>        <span class="st">"*"</span>,</span>
+<span id="cb60-27"><a href="#cb60-27" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"red"</span>,</span>
+<span id="cb60-28"><a href="#cb60-28" aria-hidden="true" tabindex="-1"></a>        mfc<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb60-29"><a href="#cb60-29" aria-hidden="true" tabindex="-1"></a>        markersize<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb60-30"><a href="#cb60-30" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"expected rms"</span>,</span>
+<span id="cb60-31"><a href="#cb60-31" aria-hidden="true" tabindex="-1"></a>        zorder<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb60-32"><a href="#cb60-32" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-33"><a href="#cb60-33" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb60-34"><a href="#cb60-34" aria-hidden="true" tabindex="-1"></a>        results_processed[<span class="st">"sqrt_n_pix"</span>],</span>
+<span id="cb60-35"><a href="#cb60-35" aria-hidden="true" tabindex="-1"></a>        results_original[<span class="st">"expected_std_median"</span>],</span>
+<span id="cb60-36"><a href="#cb60-36" aria-hidden="true" tabindex="-1"></a>        <span class="st">"--"</span>,</span>
+<span id="cb60-37"><a href="#cb60-37" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"ideal"</span>,</span>
+<span id="cb60-38"><a href="#cb60-38" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-39"><a href="#cb60-39" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb60-40"><a href="#cb60-40" aria-hidden="true" tabindex="-1"></a>        results_original_remasked[<span class="st">"sqrt_n_pix"</span>],</span>
+<span id="cb60-41"><a href="#cb60-41" aria-hidden="true" tabindex="-1"></a>        results_original_remasked[<span class="st">"std_median"</span>],</span>
+<span id="cb60-42"><a href="#cb60-42" aria-hidden="true" tabindex="-1"></a>        linestyle<span class="op">=</span><span class="st">"-"</span>,</span>
+<span id="cb60-43"><a href="#cb60-43" aria-hidden="true" tabindex="-1"></a>        marker<span class="op">=</span><span class="st">"s"</span>,</span>
+<span id="cb60-44"><a href="#cb60-44" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"purple"</span>,</span>
+<span id="cb60-45"><a href="#cb60-45" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"original"</span>,</span>
+<span id="cb60-46"><a href="#cb60-46" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-47"><a href="#cb60-47" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb60-48"><a href="#cb60-48" aria-hidden="true" tabindex="-1"></a>        results_original_remasked_bkgsub[<span class="st">"sqrt_n_pix"</span>],</span>
+<span id="cb60-49"><a href="#cb60-49" aria-hidden="true" tabindex="-1"></a>        results_original_remasked_bkgsub[<span class="st">"std_median"</span>],</span>
+<span id="cb60-50"><a href="#cb60-50" aria-hidden="true" tabindex="-1"></a>        linestyle<span class="op">=</span><span class="st">"--"</span>,</span>
+<span id="cb60-51"><a href="#cb60-51" aria-hidden="true" tabindex="-1"></a>        marker<span class="op">=</span><span class="st">"s"</span>,</span>
+<span id="cb60-52"><a href="#cb60-52" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"purple"</span>,</span>
+<span id="cb60-53"><a href="#cb60-53" aria-hidden="true" tabindex="-1"></a>        mfc<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb60-54"><a href="#cb60-54" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"original bkgsub"</span>,</span>
+<span id="cb60-55"><a href="#cb60-55" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-56"><a href="#cb60-56" aria-hidden="true" tabindex="-1"></a>    ax.set_xscale(<span class="st">"log"</span>)</span>
+<span id="cb60-57"><a href="#cb60-57" aria-hidden="true" tabindex="-1"></a>    ax.yaxis.set_major_formatter(FuncFormatter(<span class="kw">lambda</span> y, _: <span class="ss">f"</span><span class="sc">{</span>y<span class="sc">:g}</span><span class="ss">"</span>))</span>
+<span id="cb60-58"><a href="#cb60-58" aria-hidden="true" tabindex="-1"></a>    ax.xaxis.set_ticks(</span>
+<span id="cb60-59"><a href="#cb60-59" aria-hidden="true" tabindex="-1"></a>        results_original[<span class="st">"sqrt_n_pix"</span>][::<span class="dv">2</span>],</span>
+<span id="cb60-60"><a href="#cb60-60" aria-hidden="true" tabindex="-1"></a>        [<span class="ss">f"</span><span class="sc">{</span>x<span class="sc">:.0f}</span><span class="ss">"</span> <span class="cf">for</span> x <span class="kw">in</span> results_original[<span class="st">"sqrt_n_pix"</span>][::<span class="dv">2</span>]],</span>
+<span id="cb60-61"><a href="#cb60-61" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-62"><a href="#cb60-62" aria-hidden="true" tabindex="-1"></a>    ax.xaxis.set_minor_locator(NullLocator())</span>
+<span id="cb60-63"><a href="#cb60-63" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"sqrt(n_pix)"</span>)</span>
+<span id="cb60-64"><a href="#cb60-64" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"std(median) [mag arcsec$^{-2}$]"</span>)</span>
+<span id="cb60-65"><a href="#cb60-65" aria-hidden="true" tabindex="-1"></a>    ax.tick_params(axis<span class="op">=</span><span class="st">"x"</span>, labelrotation<span class="op">=</span><span class="dv">90</span>)</span>
+<span id="cb60-66"><a href="#cb60-66" aria-hidden="true" tabindex="-1"></a>    ax.legend()</span>
+<span id="cb60-67"><a href="#cb60-67" aria-hidden="true" tabindex="-1"></a>    ax.grid(axis<span class="op">=</span><span class="st">"y"</span>)</span>
+<span id="cb60-68"><a href="#cb60-68" aria-hidden="true" tabindex="-1"></a>    ax.yaxis.set_inverted(<span class="va">True</span>)</span>
+<span id="cb60-69"><a href="#cb60-69" aria-hidden="true" tabindex="-1"></a>    ax.set_ylim(<span class="dv">30</span>, <span class="dv">25</span>)</span>
+<span id="cb60-70"><a href="#cb60-70" aria-hidden="true" tabindex="-1"></a>    ax2 <span class="op">=</span> ax.twiny()</span>
+<span id="cb60-71"><a href="#cb60-71" aria-hidden="true" tabindex="-1"></a>    ax2.set_xscale(<span class="st">"log"</span>)</span>
+<span id="cb60-72"><a href="#cb60-72" aria-hidden="true" tabindex="-1"></a>    ax2.set_xlabel(<span class="st">"scale [arcsec]"</span>)</span>
+<span id="cb60-73"><a href="#cb60-73" aria-hidden="true" tabindex="-1"></a>    ax2.xaxis.set_ticks(</span>
+<span id="cb60-74"><a href="#cb60-74" aria-hidden="true" tabindex="-1"></a>        results_original[<span class="st">"sqrt_n_pix"</span>][::<span class="dv">2</span>],</span>
+<span id="cb60-75"><a href="#cb60-75" aria-hidden="true" tabindex="-1"></a>        [<span class="ss">f"</span><span class="sc">{</span>x<span class="sc">:.1f}</span><span class="ss">"</span> <span class="cf">for</span> x <span class="kw">in</span> results_original[<span class="st">"sqrt_n_pix"</span>][::<span class="dv">2</span>] <span class="op">*</span> pixel_scale],</span>
+<span id="cb60-76"><a href="#cb60-76" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-77"><a href="#cb60-77" aria-hidden="true" tabindex="-1"></a>    ax2.xaxis.set_minor_locator(NullLocator())</span>
+<span id="cb60-78"><a href="#cb60-78" aria-hidden="true" tabindex="-1"></a>    ax2.tick_params(axis<span class="op">=</span><span class="st">"x"</span>, labelrotation<span class="op">=</span><span class="dv">90</span>)</span>
+<span id="cb60-79"><a href="#cb60-79" aria-hidden="true" tabindex="-1"></a>    ax2.set_xlim(ax.get_xlim())</span>
+<span id="cb60-80"><a href="#cb60-80" aria-hidden="true" tabindex="-1"></a>    outpath <span class="op">=</span> path <span class="op">/</span> <span class="st">"background_stats"</span></span>
+<span id="cb60-81"><a href="#cb60-81" aria-hidden="true" tabindex="-1"></a>    outpath.mkdir(parents<span class="op">=</span><span class="va">True</span>, exist_ok<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb60-82"><a href="#cb60-82" aria-hidden="true" tabindex="-1"></a>    outfile <span class="op">=</span> outpath <span class="op">/</span> <span class="st">"original.pdf"</span></span>
+<span id="cb60-83"><a href="#cb60-83" aria-hidden="true" tabindex="-1"></a>    fig.savefig(outfile)</span>
+<span id="cb60-84"><a href="#cb60-84" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb60-85"><a href="#cb60-85" aria-hidden="true" tabindex="-1"></a>        results_processed[<span class="st">"sqrt_n_pix"</span>],</span>
+<span id="cb60-86"><a href="#cb60-86" aria-hidden="true" tabindex="-1"></a>        results_processed[<span class="st">"std_median"</span>],</span>
+<span id="cb60-87"><a href="#cb60-87" aria-hidden="true" tabindex="-1"></a>        linestyle<span class="op">=</span><span class="st">"-"</span>,</span>
+<span id="cb60-88"><a href="#cb60-88" aria-hidden="true" tabindex="-1"></a>        marker<span class="op">=</span><span class="st">"o"</span>,</span>
+<span id="cb60-89"><a href="#cb60-89" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"green"</span>,</span>
+<span id="cb60-90"><a href="#cb60-90" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"processed"</span>,</span>
+<span id="cb60-91"><a href="#cb60-91" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-92"><a href="#cb60-92" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb60-93"><a href="#cb60-93" aria-hidden="true" tabindex="-1"></a>        results_processed_bkgsub[<span class="st">"sqrt_n_pix"</span>],</span>
+<span id="cb60-94"><a href="#cb60-94" aria-hidden="true" tabindex="-1"></a>        results_processed_bkgsub[<span class="st">"std_median"</span>],</span>
+<span id="cb60-95"><a href="#cb60-95" aria-hidden="true" tabindex="-1"></a>        linestyle<span class="op">=</span><span class="st">"--"</span>,</span>
+<span id="cb60-96"><a href="#cb60-96" aria-hidden="true" tabindex="-1"></a>        marker<span class="op">=</span><span class="st">"o"</span>,</span>
+<span id="cb60-97"><a href="#cb60-97" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"green"</span>,</span>
+<span id="cb60-98"><a href="#cb60-98" aria-hidden="true" tabindex="-1"></a>        mfc<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb60-99"><a href="#cb60-99" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"processed bkgsub"</span>,</span>
+<span id="cb60-100"><a href="#cb60-100" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb60-101"><a href="#cb60-101" aria-hidden="true" tabindex="-1"></a>    ax.legend()</span>
+<span id="cb60-102"><a href="#cb60-102" aria-hidden="true" tabindex="-1"></a>    ax.yaxis.set_inverted(<span class="va">True</span>)</span>
+<span id="cb60-103"><a href="#cb60-103" aria-hidden="true" tabindex="-1"></a>    outfile <span class="op">=</span> outpath <span class="op">/</span> <span class="st">"original_vs_processed.pdf"</span></span>
+<span id="cb60-104"><a href="#cb60-104" aria-hidden="true" tabindex="-1"></a>    fig.savefig(outfile)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="e0c2026a" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb61"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>plot_results(</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a>    results_original,</span>
+<span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a>    results_processed,</span>
+<span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a>    results_original_remasked,</span>
+<span id="cb61-5"><a href="#cb61-5" aria-hidden="true" tabindex="-1"></a>    results_original_remasked_bkgsub,</span>
+<span id="cb61-6"><a href="#cb61-6" aria-hidden="true" tabindex="-1"></a>    results_processed_bkgsub,</span>
+<span id="cb61-7"><a href="#cb61-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="background_stats_files/figure-html/cell-50-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/IntraClusterLight\.github\.io\/nicl");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/IntraClusterLight/nicl/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

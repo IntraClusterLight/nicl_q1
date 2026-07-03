@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Removal persistence features from calibrated Euclid images.">
+
+<title>persistence – nicl</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-3d242d70d41cd9edc5ebe4da1d712dc5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles.css">
+<meta property="og:title" content="persistence – nicl">
+<meta property="og:description" content="Removal persistence features from calibrated Euclid images.">
+<meta property="og:site_name" content="nicl">
+<meta name="twitter:title" content="persistence – nicl">
+<meta name="twitter:description" content="Removal persistence features from calibrated Euclid images.">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">nicl</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../euclid/index.html">euclid</a></li><li class="breadcrumb-item"><a href="../euclid/persistence.html">persistence</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">nicl_q1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../main.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">main</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../testing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">testing</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../utilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">utilities</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../filter.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">filter</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">background</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mask</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../autoprof.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">autoprof</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../measure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">measure</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a href="../euclid/index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">euclid</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/background_stats.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">background_stats</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/combine.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">combine</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/constants.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">constants</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/continuity.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">continuity</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/cutout.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">cutout</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/data_access.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">data_access</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/debanding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">debanding</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/dq_mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">dq_mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/mask.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">mask</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/measure.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">measure</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/persistence.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">persistence</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/pipeline.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">pipeline</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/skyflat.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skyflat</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/skypatch_noise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">skypatch_noise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/stars.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">stars</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/testing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">testing</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/utilities.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">utilities</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/visualise.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">visualise</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/xarray.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">xarray</span></a>
+  </div>
+</li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text">q1</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth2 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../euclid/q1/data_processing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Creation of figures for the Q1 data processing paper</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">other</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../other/sky_background_error_estimates.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Sky background error estimates</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#approach" id="toc-approach" class="nav-link active" data-scroll-target="#approach">Approach</a>
+  <ul class="collapse">
+  <li><a href="#decay-models" id="toc-decay-models" class="nav-link" data-scroll-target="#decay-models">Decay models</a></li>
+  <li><a href="#potential-improvements" id="toc-potential-improvements" class="nav-link" data-scroll-target="#potential-improvements">Potential improvements</a></li>
+  <li><a href="#correct_persistence" id="toc-correct_persistence" class="nav-link" data-scroll-target="#correct_persistence">correct_persistence</a></li>
+  </ul></li>
+  <li><a href="#examples" id="toc-examples" class="nav-link" data-scroll-target="#examples">Examples</a>
+  <ul class="collapse">
+  <li><a href="#example-images-including-intermediate-steps" id="toc-example-images-including-intermediate-steps" class="nav-link" data-scroll-target="#example-images-including-intermediate-steps">Example images including intermediate steps</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/IntraClusterLight/nicl/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../euclid/index.html">euclid</a></li><li class="breadcrumb-item"><a href="../euclid/persistence.html">persistence</a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title">persistence</h1>
+</div>
+
+<div>
+  <div class="description">
+    Removal persistence features from calibrated Euclid images.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="approach" class="level2">
+<h2 class="anchored" data-anchor-id="approach">Approach</h2>
+<p>Persistence is an effect whereby the observation of a bright source produces an artefact in subsequent exposures. The most obvious persistence features in Euclid NISP images are near-vertical streaks, due to bright sources in the grism-dispersed (SIR) images that are interleaved with the dithered JHY exposures. The appearance of those bright sources in the un-dispersed exposures also produces roughly circular persistence features.</p>
+<p>This approach attempts to identify and remove persistence features using only the calibrated J-, H-, Y-band and SIR exposures available in the science archive, i.e.&nbsp;with no access to calibrations. It uses the idea that persistence signals (from the current and previous observation ROSs) should be present in each exposure, but with some decay over time. The sky sources move between dithers, so taking the minimum value over a stack of sequential dithers (which can extend across multiple observation ROSs), produces an estimate of the persistence. Since the persistence features are decaying, the minimum will typically correspond to the time of the last image in the sequence, but to be more precise we use the time corresponding to the minimum flux for each pixel. We only stack images for a single filter at a time, as each JHY sequence is taken with (almost) the same pointing (so they do not help with rejecting sky sources).</p>
+<p>If no persistence features were created during the exposure sequence, then the above approach would suffice. However, if a feature is created in the middle of a stack, then the minimum flux will occur <em>before</em> the persistence appeared, and hence not provide any information about the persistence. Conversely, if a persistence feature does not appear until after the target image (which we want to correct), then we do not want to include the persistence feature. We therefore need to mask pixels in the stack depending on when the persistence feature is created. To do so, we identify recently-formed persistence features. This was originally done using the persistence flag in the DQ image, but now the images themselves are thresholded. We record the latest time a persistence feature is flagged for each pixel in the image. If that time is equal to or prior to the target image, then we mask pixels earlier in the stack. If it is after the target image, then we mask pixels later in the stack. Finally, we need to completely mask any pixels where there are fewer than four unmasked pixels remaining in the stack, since the minimum may be contaminated by sky sources.</p>
+<p>Above we have referred to the ‘minumum’ for simplicity, but in practice we actually take the 2nd lowest value over the masked sequence of exposures, as this is a bit more robust. Note that taking the median might seem like a more obvious choice, but this is more likely to be contaminated by a sky source for a short sequence.</p>
+<p>At this point we have, for each pixel, an estimate for the persistence flux, the time since the last persistence feature was created (if it occurred within the sequence), and the time between the target exposure (which we want to correct) and our persistence estimate.</p>
+<p>The persistence estimate is lower than the true persistence in the target image, since the persistence has decayed in the intervening time. Simply subtracting the persistence estimate from the target image actually works well for old persistence features (e.g.&nbsp;formed before the prevous ROS). For more recent features, this approach would still be an improvement, but would not remove all of the persistence flux. However, if we can model the decay, then we can rescale the persistence estimate to the time of the target image.</p>
+<p>To determine a suitable model, we combine all the persistence estimates and run source detection to find the bright features. We then plot the log(flux) of each feature against the time since the persistence feature was created. These results show that the flux decay is well modelled by a power-law. The slope (power-law index) varies somewhat by feature and detector. This may reflect different decay rates depending on detector, position on the detector, brightness of the originating source, etc. This warrants further attention and could improve the correction. However, as a simple first approach, we take a rough median slope. This actually works suprisingly well.</p>
+<p>After applying the scaling to reverse the decay, we have an improved persistence estimate for each target image, which is subtracted from each original image.</p>
+<p>We also create an estimate of the uncertainty introduced by the persistence correction, and add this in quadrature to the RMS image. Very strong persistence features are difficult to correct, partly due to the uncertainty of the decay scaling and the Poisson error on the correction. However, even a perfect subtraction would leave strong Poisson errors behind. We therefore mask persistence features for which the correction uncertainties are large.</p>
+<p>All the above steps operate on a single extension at a time, reducing memory usage, or potentially allowing multiple extensions to be processed in parallel.</p>
+<section id="decay-models" class="level3">
+<h3 class="anchored" data-anchor-id="decay-models">Decay models</h3>
+<p>For a power law decay:</p>
+<p><span class="math display">\[
+\log_{10}(f) = a \log_{10}(t) + b
+\]</span></p>
+<p><span class="math display">\[
+\frac{f_1}{f_0} = \left(\frac{t_1}{t_0}\right)^a
+\]</span></p>
+<p>So, the correction factor depends on the ratio between the times. The time when <span class="math inline">\(t=0\)</span> is important, even if the initial persistence flux is not. Above, <span class="math inline">\(t\)</span> is the time since the persistence signal was created. How well do we know this? In principle we could include an offset:</p>
+<p><span class="math display">\[
+\log_{10}(f) = a \log_{10}(t + c) + b
+\]</span></p>
+<p><span class="math display">\[
+\frac{f_1}{f_0} = \left(\frac{t_1 + c}{t_0 + c}\right)^a
+\]</span></p>
+<p>We could then fit to obtain <span class="math inline">\(a\)</span> and <span class="math inline">\(c\)</span>. However, this has proven challenging.</p>
+<p>An alternative model could be an exponential decay:</p>
+<p><span class="math display">\[\log_{10}(f) = a t + b\]</span> <span class="math display">\[\frac{f_1}{f_0} = 10^{a (t_1 - t_0)}\]</span></p>
+<p>Here, the correction factor only depends on the elapsed time. The initial time is irrelevant. However, this is found to under-correct recently formed persistence features.</p>
+</section>
+<section id="potential-improvements" class="level3">
+<h3 class="anchored" data-anchor-id="potential-improvements">Potential improvements</h3>
+<section id="decay-model" class="level4">
+<h4 class="anchored" data-anchor-id="decay-model">Decay model</h4>
+<p>Currently, a single decay slope is assumed for all pixels. This actually seems to work remarkably well, since we are measuring the persistence fairly close in time to the target image. However, it appears (from the analysis below and the ERO reduction paper) that the slope varies from chip to chip as well as with position in the chip. There are a few potential avenues for improvement:</p>
+<ul>
+<li>Each time, measure the median decay slope in each chip (already implemented) and use that rather than a single value (potentially noisy in cases where there are few persistence features).</li>
+<li>Use the decay slope measured for individual detected persistence features to correct the pixels in each feature, and an average value for pixels that are not flagged</li>
+<li>Create a database of detector_id, x, y, persistence_slope by running the correction for many observation ids (implemented), then analyse to create a model for the persistence slope.</li>
+</ul>
+</section>
+<section id="speed" class="level4">
+<h4 class="anchored" data-anchor-id="speed">Speed</h4>
+<p>The current implementation is a bit slow. There is potential to speed it up by coding more efficiently (possibly using dask) and/or simply by parallelising the processing of each extension. The later should be fairly straightforward, but would require locks to avoid multiple processes simultaneously trying to append to the same fits file.</p>
+<div id="6a4420ac" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_forward_fill():</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    arr <span class="op">=</span> np.array(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>        [</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>            [np.nan, <span class="dv">2</span>, np.nan, <span class="dv">0</span>],</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>            [<span class="dv">3</span>, np.nan, <span class="dv">4</span>, <span class="dv">5</span>],</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>            [<span class="dv">3</span>, np.nan, <span class="dv">4</span>, np.nan],</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>            [np.nan, np.nan, np.nan, <span class="dv">6</span>],</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    expected <span class="op">=</span> np.array(</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>        [[np.nan, <span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">0</span>], [<span class="dv">3</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>], [<span class="dv">3</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">4</span>], [np.nan, np.nan, np.nan, <span class="dv">6</span>]]</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> forward_fill(arr)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    np.testing.assert_array_equal(result, expected)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>test_forward_fill()</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_forward_fill_axis_0():</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    arr <span class="op">=</span> np.array(</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        [</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>            [np.nan, <span class="dv">2</span>, np.nan, <span class="dv">0</span>],</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>            [<span class="dv">3</span>, np.nan, <span class="dv">4</span>, <span class="dv">5</span>],</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>            [<span class="dv">3</span>, np.nan, <span class="dv">4</span>, np.nan],</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>            [np.nan, np.nan, np.nan, <span class="dv">6</span>],</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    expected <span class="op">=</span> np.array(</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>        [[np.nan, <span class="dv">2</span>, np.nan, <span class="dv">0</span>], [<span class="dv">3</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">5</span>], [<span class="dv">3</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">5</span>], [<span class="dv">3</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">6</span>]]</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> forward_fill(arr, axis<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    np.testing.assert_array_equal(result, expected)</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>test_forward_fill_axis_0()</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_forward_fill_no_nan():</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>    arr <span class="op">=</span> np.array([[<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>], [<span class="dv">4</span>, <span class="dv">5</span>, <span class="dv">6</span>]])</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>    expected <span class="op">=</span> arr</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> forward_fill(arr)</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>    np.testing.assert_array_equal(result, expected)</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>test_forward_fill_no_nan()</span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_forward_fill_all_nan():</span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>    arr <span class="op">=</span> np.array([[np.nan, np.nan], [np.nan, np.nan]])</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>    expected <span class="op">=</span> arr</span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> forward_fill(arr)</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>    np.testing.assert_array_equal(result, expected)</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>test_forward_fill_all_nan()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<hr>
+<p><a href="https://github.com/IntraClusterLight/nicl/blob/main/nicl/euclid/persistence.py#L831" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+</section>
+<section id="correct_persistence" class="level3">
+<h3 class="anchored" data-anchor-id="correct_persistence">correct_persistence</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> correct_persistence(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    obs_id, <span class="co"># the observation_id to process</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    path, <span class="co"># the folder containing the downloaded calibrated images</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    outpath:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># the folder where all output files should be placed</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    skyflat_path:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># the folder containing the skyflats (atemporal background)</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    detector:NoneType<span class="op">=</span><span class="va">None</span>, <span class="co"># the detector number to process, e.g. 44; if None processes all detectors</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    decay_form:<span class="bu">str</span><span class="op">=</span><span class="st">'powerlaw'</span>, <span class="co"># the form of the persistence decay to assume</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    estimate_decay:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># print an estimate of the persistence decay slope for each detector</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    use_estimated_decay:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># use the estimated persistence decay slope for each detector</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    debug:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># print debugging information and save intermediate files to `outpath`</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    assumed_decay_slope:<span class="bu">float</span><span class="op">=</span><span class="fl">1.0</span>, <span class="co"># the decay slope to assume, if `use_estimated_decay=False`</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    decay_slope_uncertainty:<span class="bu">float</span><span class="op">=</span><span class="fl">0.2</span>, <span class="co"># the uncertainty on the decay slope to assume</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    per_filter:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if False, then combine the persistence estimates for each filter</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    correct_banding:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if True, then apply banding correction to the images</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    final_skyflat_correction:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if True, then apply the skyflat correction to the final images</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    correct_persistence:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if True, then apply persistence correction to the images</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    correct_sir:<span class="bu">bool</span><span class="op">=</span><span class="va">True</span>, <span class="co"># if True, then apply correction to the SIR images</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    stop_before_applying_correction:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># if True, then stop before applying the correction</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    overwrite:<span class="bu">bool</span><span class="op">=</span><span class="va">False</span>, <span class="co"># if True, then delete and recreate existing files in `outpath`</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><em>Call self as a function.</em></p>
+</section>
+</section>
+<section id="examples" class="level2">
+<h2 class="anchored" data-anchor-id="examples">Examples</h2>
+<p>The following are some examples of using <a href="https://IntraClusterLight.github.io/nicl/euclid/persistence.html#correct_persistence"><code>correct_persistence</code></a> on observations. You can set <code>estimate_decay=True</code> to estimate the persistence decay in each chip and save some diagnostic plots. Using <code>debug=True</code> prints some debug information and saves intermediate files to disk. Running on a single observations_id can take over an hour, especially with <code>estimate_decay=True</code> and <code>debug=True</code>. To quickly try it out, you can specify a single detector chip to process, which takes 16th of the time.</p>
+<div id="e55ff5d5" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>path <span class="op">=</span> default_data_path(<span class="st">"Q1_R1"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>detectors <span class="op">=</span> [<span class="dv">11</span>, <span class="dv">23</span>, <span class="dv">34</span>, <span class="dv">42</span>]</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>obs_id <span class="op">=</span> <span class="dv">2683</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>outpath <span class="op">=</span> default_data_path(<span class="ss">f"Q1_R1_processed_test/persistence/NIR/</span><span class="sc">{</span>obs_id<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>skyflat_path <span class="op">=</span> default_data_path(<span class="st">"Q1_R1_processed_v0.5/skyflat/NIR/"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="cc5bf13f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>get_nisp_images_for_this_observation <span class="op">=</span> partial(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    get_nisp_images_for_observation,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    obs_id,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    path<span class="op">=</span>path,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    include_sir<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    fill_missing<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>image_info <span class="op">=</span> get_nisp_images_for_this_observation(n_prior<span class="op">=</span><span class="dv">1</span>, n_after<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="bd187a15-2094-454f-9a85-7f2a43c92269" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Simply run to correct the observation; to include the skyflat correction, then set skyflat_path</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># correct_persistence(obs_id, path, skyflat_path=skyflat_path, outpath=outpath)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="55cfb810-ab3a-40c3-99b1-3f4ab8027887" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run on all detectors and estimate (but do not use) the persistence decay slope for each</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># correct_persistence(obs_id, path, estimate_decay=True)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="9e932680" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># It is possible to separate the steps of estimating the persistence and applying the correction.</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># detector = 11</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># kwargs = correct_persistence(</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#     obs_id,</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">#     path,</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">#     skyflat_path=skyflat_path,</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">#     estimate_decay=False,</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co">#     detector=detector,</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#     debug=True,</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#     outpath=outpath,</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co">#     overwrite=True,</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co">#     stop_before_applying_correction=True,</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co"># apply_persistence_correction(**kwargs[f"DET{detector}.SCI"])</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="69036ebb" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Produce debug outputs with which to create example plots</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>correct_persistence(</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    obs_id,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    path,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    skyflat_path<span class="op">=</span>skyflat_path,</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    estimate_decay<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    detector<span class="op">=</span>detectors,</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    debug<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>outpath,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    overwrite<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>DET11.SCI
+Calculating rolling minimum for obs 2683 with 48 images
+J 12 EUC_NIR_W-CAL-IMAGE_J-2683-0_20240930T172941.852898Z.fits 60508.7808120037
+H 13 EUC_NIR_W-CAL-IMAGE_H-2683-0_20240930T184607.344746Z.fits 60508.7823629785
+Y 14 EUC_NIR_W-CAL-IMAGE_Y-2683-0_20240930T174927.996060Z.fits 60508.7839138413
+J 15 EUC_NIR_W-CAL-IMAGE_J-2683-1_20240930T172941.702020Z.fits 60508.7931499851
+H 16 EUC_NIR_W-CAL-IMAGE_H-2683-1_20240930T184607.455806Z.fits 60508.794701315
+Y 17 EUC_NIR_W-CAL-IMAGE_Y-2683-1_20240930T174928.133198Z.fits 60508.796252651
+J 18 EUC_NIR_W-CAL-IMAGE_J-2683-2_20240930T172941.856270Z.fits 60508.8054880741
+H 19 EUC_NIR_W-CAL-IMAGE_H-2683-2_20240930T184607.453358Z.fits 60508.8070389538
+Y 20 EUC_NIR_W-CAL-IMAGE_Y-2683-2_20240930T174928.131907Z.fits 60508.8085898139
+J 21 EUC_NIR_W-CAL-IMAGE_J-2683-3_20240930T172941.846371Z.fits 60508.8178259571
+H 22 EUC_NIR_W-CAL-IMAGE_H-2683-3_20240930T184607.529026Z.fits 60508.8193771409
+Y 23 EUC_NIR_W-CAL-IMAGE_Y-2683-3_20240930T174928.130205Z.fits 60508.8209285449
+Estimating persistence decay
+Estimated persistence powerlaw decay slope from 126 features (DET11.SCI): 1.09e+00, with stdev: 2.66e-01
+Calculating persistence correction
+Applying persistence correction
+Applying persistence correction for 2683_0_SIR
+Median rms: 27.59
+Fraction of pixels masked due to persistence: 0.45%
+Fraction of pixels corrected for persistence: 3.38%
+Mean persistence correction: 60.94
+Mean persistence correction error: 34.61
+Applying persistence correction for 2683_0_J
+Median rms: 9.51
+Fraction of pixels masked due to persistence: 0.19%
+Fraction of pixels corrected for persistence: 2.89%
+Mean persistence correction: 15.34
+Mean persistence correction error: 8.38
+Applying persistence correction for 2683_0_H
+Median rms: 8.97
+Fraction of pixels masked due to persistence: 0.13%
+Fraction of pixels corrected for persistence: 2.89%
+Mean persistence correction: 14.86
+Mean persistence correction error: 8.18
+Applying persistence correction for 2683_0_Y
+Median rms: 8.63
+Fraction of pixels masked due to persistence: 0.12%
+Fraction of pixels corrected for persistence: 2.74%
+Mean persistence correction: 16.00
+Mean persistence correction error: 8.91
+Applying persistence correction for 2683_1_SIR
+Median rms: 27.58
+Fraction of pixels masked due to persistence: 0.41%
+Fraction of pixels corrected for persistence: 3.38%
+Mean persistence correction: 65.01
+Mean persistence correction error: 37.30
+Applying persistence correction for 2683_1_J
+Median rms: 9.63
+Fraction of pixels masked due to persistence: 0.17%
+Fraction of pixels corrected for persistence: 2.75%
+Mean persistence correction: 19.31
+Mean persistence correction error: 11.02
+Applying persistence correction for 2683_1_H
+Median rms: 8.93
+Fraction of pixels masked due to persistence: 0.16%
+Fraction of pixels corrected for persistence: 2.78%
+Mean persistence correction: 17.39
+Mean persistence correction error: 9.79
+Applying persistence correction for 2683_1_Y
+Median rms: 8.53
+Fraction of pixels masked due to persistence: 0.16%
+Fraction of pixels corrected for persistence: 2.84%
+Mean persistence correction: 16.49
+Mean persistence correction error: 8.82
+Applying persistence correction for 2683_2_SIR
+Median rms: 27.06
+Fraction of pixels masked due to persistence: 0.28%
+Fraction of pixels corrected for persistence: 3.15%
+Mean persistence correction: 54.56
+Mean persistence correction error: 32.87
+Applying persistence correction for 2683_2_J
+Median rms: 9.59
+Fraction of pixels masked due to persistence: 0.11%
+Fraction of pixels corrected for persistence: 2.41%
+Mean persistence correction: 12.95
+Mean persistence correction error: 7.24
+Applying persistence correction for 2683_2_H
+Median rms: 9.04
+Fraction of pixels masked due to persistence: 0.10%
+Fraction of pixels corrected for persistence: 2.54%
+Mean persistence correction: 13.23
+Mean persistence correction error: 7.63
+Applying persistence correction for 2683_2_Y
+Median rms: 8.47
+Fraction of pixels masked due to persistence: 0.10%
+Fraction of pixels corrected for persistence: 2.64%
+Mean persistence correction: 13.05
+Mean persistence correction error: 7.06
+Applying persistence correction for 2683_3_SIR
+Median rms: 27.40
+Fraction of pixels masked due to persistence: 0.21%
+Fraction of pixels corrected for persistence: 2.98%
+Mean persistence correction: 48.32
+Mean persistence correction error: 30.81
+Applying persistence correction for 2683_3_J
+Median rms: 9.58
+Fraction of pixels masked due to persistence: 0.07%
+Fraction of pixels corrected for persistence: 2.40%
+Mean persistence correction: 10.90
+Mean persistence correction error: 6.32
+Applying persistence correction for 2683_3_H
+Median rms: 9.03
+Fraction of pixels masked due to persistence: 0.05%
+Fraction of pixels corrected for persistence: 2.36%
+Mean persistence correction: 10.36
+Mean persistence correction error: 5.85
+Applying persistence correction for 2683_3_Y
+Median rms: 8.59
+Fraction of pixels masked due to persistence: 0.08%
+Fraction of pixels corrected for persistence: 2.56%
+Mean persistence correction: 12.15
+Mean persistence correction error: 7.21
+DET23.SCI
+Calculating rolling minimum for obs 2683 with 48 images
+J 12 EUC_NIR_W-CAL-IMAGE_J-2683-0_20240930T172941.852898Z.fits 60508.7808120037
+H 13 EUC_NIR_W-CAL-IMAGE_H-2683-0_20240930T184607.344746Z.fits 60508.7823629785
+Y 14 EUC_NIR_W-CAL-IMAGE_Y-2683-0_20240930T174927.996060Z.fits 60508.7839138413
+J 15 EUC_NIR_W-CAL-IMAGE_J-2683-1_20240930T172941.702020Z.fits 60508.7931499851
+H 16 EUC_NIR_W-CAL-IMAGE_H-2683-1_20240930T184607.455806Z.fits 60508.794701315
+Y 17 EUC_NIR_W-CAL-IMAGE_Y-2683-1_20240930T174928.133198Z.fits 60508.796252651
+J 18 EUC_NIR_W-CAL-IMAGE_J-2683-2_20240930T172941.856270Z.fits 60508.8054880741
+H 19 EUC_NIR_W-CAL-IMAGE_H-2683-2_20240930T184607.453358Z.fits 60508.8070389538
+Y 20 EUC_NIR_W-CAL-IMAGE_Y-2683-2_20240930T174928.131907Z.fits 60508.8085898139
+J 21 EUC_NIR_W-CAL-IMAGE_J-2683-3_20240930T172941.846371Z.fits 60508.8178259571
+H 22 EUC_NIR_W-CAL-IMAGE_H-2683-3_20240930T184607.529026Z.fits 60508.8193771409
+Y 23 EUC_NIR_W-CAL-IMAGE_Y-2683-3_20240930T174928.130205Z.fits 60508.8209285449
+Estimating persistence decay
+Estimated persistence powerlaw decay slope from 182 features (DET23.SCI): 1.19e+00, with stdev: 2.30e-01
+Calculating persistence correction
+Applying persistence correction
+Applying persistence correction for 2683_0_SIR
+Median rms: 27.84
+Fraction of pixels masked due to persistence: 0.76%
+Fraction of pixels corrected for persistence: 3.76%
+Mean persistence correction: 74.71
+Mean persistence correction error: 39.40
+Applying persistence correction for 2683_0_J
+Median rms: 9.86
+Fraction of pixels masked due to persistence: 0.30%
+Fraction of pixels corrected for persistence: 3.30%
+Mean persistence correction: 19.35
+Mean persistence correction error: 9.99
+Applying persistence correction for 2683_0_H
+Median rms: 9.24
+Fraction of pixels masked due to persistence: 0.20%
+Fraction of pixels corrected for persistence: 3.18%
+Mean persistence correction: 18.04
+Mean persistence correction error: 9.14
+Applying persistence correction for 2683_0_Y
+Median rms: 8.89
+Fraction of pixels masked due to persistence: 0.17%
+Fraction of pixels corrected for persistence: 3.17%
+Mean persistence correction: 18.08
+Mean persistence correction error: 9.44
+Applying persistence correction for 2683_1_SIR
+Median rms: 27.69
+Fraction of pixels masked due to persistence: 0.46%
+Fraction of pixels corrected for persistence: 3.65%
+Mean persistence correction: 63.60
+Mean persistence correction error: 35.68
+Applying persistence correction for 2683_1_J
+Median rms: 9.76
+Fraction of pixels masked due to persistence: 0.14%
+Fraction of pixels corrected for persistence: 3.17%
+Mean persistence correction: 15.86
+Mean persistence correction error: 8.58
+Applying persistence correction for 2683_1_H
+Median rms: 9.13
+Fraction of pixels masked due to persistence: 0.12%
+Fraction of pixels corrected for persistence: 3.19%
+Mean persistence correction: 15.44
+Mean persistence correction error: 8.33
+Applying persistence correction for 2683_1_Y
+Median rms: 8.82
+Fraction of pixels masked due to persistence: 0.09%
+Fraction of pixels corrected for persistence: 2.99%
+Mean persistence correction: 14.18
+Mean persistence correction error: 7.52
+Applying persistence correction for 2683_2_SIR
+Median rms: 27.80
+Fraction of pixels masked due to persistence: 0.49%
+Fraction of pixels corrected for persistence: 3.69%
+Mean persistence correction: 82.02
+Mean persistence correction error: 43.99
+Applying persistence correction for 2683_2_J
+Median rms: 9.83
+Fraction of pixels masked due to persistence: 0.28%
+Fraction of pixels corrected for persistence: 3.11%
+Mean persistence correction: 29.72
+Mean persistence correction error: 16.77
+Applying persistence correction for 2683_2_H
+Median rms: 9.30
+Fraction of pixels masked due to persistence: 0.27%
+Fraction of pixels corrected for persistence: 3.14%
+Mean persistence correction: 25.27
+Mean persistence correction error: 13.80
+Applying persistence correction for 2683_2_Y
+Median rms: 8.89
+Fraction of pixels masked due to persistence: 0.23%
+Fraction of pixels corrected for persistence: 3.00%
+Mean persistence correction: 21.53
+Mean persistence correction error: 11.13
+Applying persistence correction for 2683_3_SIR
+Median rms: 27.69
+Fraction of pixels masked due to persistence: 0.40%
+Fraction of pixels corrected for persistence: 3.53%
+Mean persistence correction: 63.01
+Mean persistence correction error: 35.96
+Applying persistence correction for 2683_3_J
+Median rms: 9.79
+Fraction of pixels masked due to persistence: 0.22%
+Fraction of pixels corrected for persistence: 2.95%
+Mean persistence correction: 16.27
+Mean persistence correction error: 8.90
+Applying persistence correction for 2683_3_H
+Median rms: 9.13
+Fraction of pixels masked due to persistence: 0.21%
+Fraction of pixels corrected for persistence: 3.01%
+Mean persistence correction: 15.02
+Mean persistence correction error: 7.93
+Applying persistence correction for 2683_3_Y
+Median rms: 8.80
+Fraction of pixels masked due to persistence: 0.17%
+Fraction of pixels corrected for persistence: 2.85%
+Mean persistence correction: 14.95
+Mean persistence correction error: 8.05
+DET34.SCI
+Calculating rolling minimum for obs 2683 with 48 images
+J 12 EUC_NIR_W-CAL-IMAGE_J-2683-0_20240930T172941.852898Z.fits 60508.7808120037
+H 13 EUC_NIR_W-CAL-IMAGE_H-2683-0_20240930T184607.344746Z.fits 60508.7823629785
+Y 14 EUC_NIR_W-CAL-IMAGE_Y-2683-0_20240930T174927.996060Z.fits 60508.7839138413
+J 15 EUC_NIR_W-CAL-IMAGE_J-2683-1_20240930T172941.702020Z.fits 60508.7931499851
+H 16 EUC_NIR_W-CAL-IMAGE_H-2683-1_20240930T184607.455806Z.fits 60508.794701315
+Y 17 EUC_NIR_W-CAL-IMAGE_Y-2683-1_20240930T174928.133198Z.fits 60508.796252651
+J 18 EUC_NIR_W-CAL-IMAGE_J-2683-2_20240930T172941.856270Z.fits 60508.8054880741
+H 19 EUC_NIR_W-CAL-IMAGE_H-2683-2_20240930T184607.453358Z.fits 60508.8070389538
+Y 20 EUC_NIR_W-CAL-IMAGE_Y-2683-2_20240930T174928.131907Z.fits 60508.8085898139
+J 21 EUC_NIR_W-CAL-IMAGE_J-2683-3_20240930T172941.846371Z.fits 60508.8178259571
+H 22 EUC_NIR_W-CAL-IMAGE_H-2683-3_20240930T184607.529026Z.fits 60508.8193771409
+Y 23 EUC_NIR_W-CAL-IMAGE_Y-2683-3_20240930T174928.130205Z.fits 60508.8209285449
+Estimating persistence decay
+Estimated persistence powerlaw decay slope from 67 features (DET34.SCI): 1.04e+00, with stdev: 2.96e-01
+Calculating persistence correction
+Applying persistence correction
+Applying persistence correction for 2683_0_SIR
+Median rms: 27.50
+Fraction of pixels masked due to persistence: 0.38%
+Fraction of pixels corrected for persistence: 1.91%
+Mean persistence correction: 62.66
+Mean persistence correction error: 37.56
+Applying persistence correction for 2683_0_J
+Median rms: 9.70
+Fraction of pixels masked due to persistence: 0.13%
+Fraction of pixels corrected for persistence: 1.44%
+Mean persistence correction: 18.04
+Mean persistence correction error: 9.72
+Applying persistence correction for 2683_0_H
+Median rms: 9.01
+Fraction of pixels masked due to persistence: 0.11%
+Fraction of pixels corrected for persistence: 1.50%
+Mean persistence correction: 16.81
+Mean persistence correction error: 8.97
+Applying persistence correction for 2683_0_Y
+Median rms: 8.74
+Fraction of pixels masked due to persistence: 0.06%
+Fraction of pixels corrected for persistence: 1.34%
+Mean persistence correction: 15.90
+Mean persistence correction error: 8.60
+Applying persistence correction for 2683_1_SIR
+Median rms: 27.58
+Fraction of pixels masked due to persistence: 0.23%
+Fraction of pixels corrected for persistence: 1.79%
+Mean persistence correction: 57.04
+Mean persistence correction error: 35.06
+Applying persistence correction for 2683_1_J
+Median rms: 9.67
+Fraction of pixels masked due to persistence: 0.10%
+Fraction of pixels corrected for persistence: 1.37%
+Mean persistence correction: 16.99
+Mean persistence correction error: 9.64
+Applying persistence correction for 2683_1_H
+Median rms: 9.07
+Fraction of pixels masked due to persistence: 0.09%
+Fraction of pixels corrected for persistence: 1.47%
+Mean persistence correction: 15.47
+Mean persistence correction error: 8.61
+Applying persistence correction for 2683_1_Y
+Median rms: 8.72
+Fraction of pixels masked due to persistence: 0.05%
+Fraction of pixels corrected for persistence: 1.25%
+Mean persistence correction: 13.34
+Mean persistence correction error: 7.37
+Applying persistence correction for 2683_2_SIR
+Median rms: 27.62
+Fraction of pixels masked due to persistence: 0.33%
+Fraction of pixels corrected for persistence: 1.87%
+Mean persistence correction: 72.30
+Mean persistence correction error: 44.65
+Applying persistence correction for 2683_2_J
+Median rms: 9.42
+Fraction of pixels masked due to persistence: 0.27%
+Fraction of pixels corrected for persistence: 1.55%
+Mean persistence correction: 30.88
+Mean persistence correction error: 19.75
+Applying persistence correction for 2683_2_H
+Median rms: 8.96
+Fraction of pixels masked due to persistence: 0.23%
+Fraction of pixels corrected for persistence: 1.56%
+Mean persistence correction: 24.15
+Mean persistence correction error: 14.70
+Applying persistence correction for 2683_2_Y
+Median rms: 8.76
+Fraction of pixels masked due to persistence: 0.17%
+Fraction of pixels corrected for persistence: 1.32%
+Mean persistence correction: 20.64
+Mean persistence correction error: 12.51
+Applying persistence correction for 2683_3_SIR
+Median rms: 27.68
+Fraction of pixels masked due to persistence: 0.45%
+Fraction of pixels corrected for persistence: 2.02%
+Mean persistence correction: 70.99
+Mean persistence correction error: 45.20
+Applying persistence correction for 2683_3_J
+Median rms: 9.45
+Fraction of pixels masked due to persistence: 0.31%
+Fraction of pixels corrected for persistence: 1.60%
+Mean persistence correction: 28.68
+Mean persistence correction error: 18.40
+Applying persistence correction for 2683_3_H
+Median rms: 9.15
+Fraction of pixels masked due to persistence: 0.27%
+Fraction of pixels corrected for persistence: 1.66%
+Mean persistence correction: 22.40
+Mean persistence correction error: 13.48
+Applying persistence correction for 2683_3_Y
+Median rms: 8.69
+Fraction of pixels masked due to persistence: 0.19%
+Fraction of pixels corrected for persistence: 1.44%
+Mean persistence correction: 19.73
+Mean persistence correction error: 12.40
+DET42.SCI
+Calculating rolling minimum for obs 2683 with 48 images
+J 12 EUC_NIR_W-CAL-IMAGE_J-2683-0_20240930T172941.852898Z.fits 60508.7808120037
+H 13 EUC_NIR_W-CAL-IMAGE_H-2683-0_20240930T184607.344746Z.fits 60508.7823629785
+Y 14 EUC_NIR_W-CAL-IMAGE_Y-2683-0_20240930T174927.996060Z.fits 60508.7839138413
+J 15 EUC_NIR_W-CAL-IMAGE_J-2683-1_20240930T172941.702020Z.fits 60508.7931499851
+H 16 EUC_NIR_W-CAL-IMAGE_H-2683-1_20240930T184607.455806Z.fits 60508.794701315
+Y 17 EUC_NIR_W-CAL-IMAGE_Y-2683-1_20240930T174928.133198Z.fits 60508.796252651
+J 18 EUC_NIR_W-CAL-IMAGE_J-2683-2_20240930T172941.856270Z.fits 60508.8054880741
+H 19 EUC_NIR_W-CAL-IMAGE_H-2683-2_20240930T184607.453358Z.fits 60508.8070389538
+Y 20 EUC_NIR_W-CAL-IMAGE_Y-2683-2_20240930T174928.131907Z.fits 60508.8085898139
+J 21 EUC_NIR_W-CAL-IMAGE_J-2683-3_20240930T172941.846371Z.fits 60508.8178259571
+H 22 EUC_NIR_W-CAL-IMAGE_H-2683-3_20240930T184607.529026Z.fits 60508.8193771409
+Y 23 EUC_NIR_W-CAL-IMAGE_Y-2683-3_20240930T174928.130205Z.fits 60508.8209285449
+Estimating persistence decay
+Estimated persistence powerlaw decay slope from 102 features (DET42.SCI): 1.07e+00, with stdev: 2.12e-01
+Calculating persistence correction
+Applying persistence correction
+Applying persistence correction for 2683_0_SIR
+Median rms: 28.33
+Fraction of pixels masked due to persistence: 0.84%
+Fraction of pixels corrected for persistence: 3.33%
+Mean persistence correction: 90.24
+Mean persistence correction error: 42.65
+Applying persistence correction for 2683_0_J
+Median rms: 9.59
+Fraction of pixels masked due to persistence: 0.39%
+Fraction of pixels corrected for persistence: 2.76%
+Mean persistence correction: 24.58
+Mean persistence correction error: 11.71
+Applying persistence correction for 2683_0_H
+Median rms: 9.07
+Fraction of pixels masked due to persistence: 0.29%
+Fraction of pixels corrected for persistence: 2.70%
+Mean persistence correction: 23.00
+Mean persistence correction error: 10.85
+Applying persistence correction for 2683_0_Y
+Median rms: 8.61
+Fraction of pixels masked due to persistence: 0.28%
+Fraction of pixels corrected for persistence: 2.68%
+Mean persistence correction: 24.95
+Mean persistence correction error: 12.11
+Applying persistence correction for 2683_1_SIR
+Median rms: 28.16
+Fraction of pixels masked due to persistence: 0.60%
+Fraction of pixels corrected for persistence: 3.21%
+Mean persistence correction: 83.46
+Mean persistence correction error: 40.54
+Applying persistence correction for 2683_1_J
+Median rms: 9.49
+Fraction of pixels masked due to persistence: 0.23%
+Fraction of pixels corrected for persistence: 2.60%
+Mean persistence correction: 25.28
+Mean persistence correction error: 12.90
+Applying persistence correction for 2683_1_H
+Median rms: 9.17
+Fraction of pixels masked due to persistence: 0.16%
+Fraction of pixels corrected for persistence: 2.60%
+Mean persistence correction: 22.55
+Mean persistence correction error: 11.26
+Applying persistence correction for 2683_1_Y
+Median rms: 8.59
+Fraction of pixels masked due to persistence: 0.16%
+Fraction of pixels corrected for persistence: 2.58%
+Mean persistence correction: 21.73
+Mean persistence correction error: 10.33
+Applying persistence correction for 2683_2_SIR
+Median rms: 28.55
+Fraction of pixels masked due to persistence: 0.42%
+Fraction of pixels corrected for persistence: 3.18%
+Mean persistence correction: 72.06
+Mean persistence correction error: 37.27
+Applying persistence correction for 2683_2_J
+Median rms: 9.55
+Fraction of pixels masked due to persistence: 0.20%
+Fraction of pixels corrected for persistence: 2.50%
+Mean persistence correction: 20.03
+Mean persistence correction error: 10.53
+Applying persistence correction for 2683_2_H
+Median rms: 8.93
+Fraction of pixels masked due to persistence: 0.15%
+Fraction of pixels corrected for persistence: 2.52%
+Mean persistence correction: 19.11
+Mean persistence correction error: 10.19
+Applying persistence correction for 2683_2_Y
+Median rms: 8.55
+Fraction of pixels masked due to persistence: 0.16%
+Fraction of pixels corrected for persistence: 2.58%
+Mean persistence correction: 18.79
+Mean persistence correction error: 9.60
+Applying persistence correction for 2683_3_SIR
+Median rms: 28.68
+Fraction of pixels masked due to persistence: 0.31%
+Fraction of pixels corrected for persistence: 3.08%
+Mean persistence correction: 63.35
+Mean persistence correction error: 34.46
+Applying persistence correction for 2683_3_J
+Median rms: 9.51
+Fraction of pixels masked due to persistence: 0.12%
+Fraction of pixels corrected for persistence: 2.34%
+Mean persistence correction: 16.62
+Mean persistence correction error: 8.54
+Applying persistence correction for 2683_3_H
+Median rms: 9.02
+Fraction of pixels masked due to persistence: 0.09%
+Fraction of pixels corrected for persistence: 2.40%
+Mean persistence correction: 15.18
+Mean persistence correction error: 7.68
+Applying persistence correction for 2683_3_Y
+Median rms: 8.58
+Fraction of pixels masked due to persistence: 0.10%
+Fraction of pixels corrected for persistence: 2.50%
+Mean persistence correction: 16.59
+Mean persistence correction error: 8.87</code></pre>
+</div>
+</div>
+<section id="example-images-including-intermediate-steps" class="level3">
+<h3 class="anchored" data-anchor-id="example-images-including-intermediate-steps">Example images including intermediate steps</h3>
+<div id="aed7834c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> no_ticks(ax):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    ax.set_xticks([])</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    ax.set_yticks([])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="35c0fc5a" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># zoom_limits = ((5, 306), (1730, 2031))</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>zoom_limits <span class="op">=</span> ((<span class="dv">885</span>, <span class="dv">1186</span>), (<span class="dv">1605</span>, <span class="dv">1906</span>))</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_zoom_box(ax, i):</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">0</span>, i].plot(</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        [</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">0</span>][<span class="dv">0</span>],</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">0</span>][<span class="dv">1</span>],</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">0</span>][<span class="dv">1</span>],</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">0</span>][<span class="dv">0</span>],</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">0</span>][<span class="dv">0</span>],</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>        [</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">1</span>][<span class="dv">0</span>],</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">1</span>][<span class="dv">0</span>],</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">1</span>][<span class="dv">1</span>],</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">1</span>][<span class="dv">1</span>],</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">1</span>][<span class="dv">0</span>],</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>        <span class="st">"k-"</span>,</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="018277f4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_dither(ax, i, img, vmin, vmax, cmap, interpolation):</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    aximg <span class="op">=</span> ax[<span class="dv">0</span>, i].imshow(</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>        img,</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span>vmin,</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span>vmax,</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>        origin<span class="op">=</span><span class="st">"lower"</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span>cmap,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>        interpolation<span class="op">=</span>interpolation,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    plot_zoom_box(ax, i)</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">1</span>, i].imshow(</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        img[</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>            zoom_limits[<span class="dv">1</span>][<span class="dv">0</span>] : zoom_limits[<span class="dv">1</span>][<span class="dv">1</span>], zoom_limits[<span class="dv">0</span>][<span class="dv">0</span>] : zoom_limits[<span class="dv">0</span>][<span class="dv">1</span>]</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span>vmin,</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span>vmax,</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>        origin<span class="op">=</span><span class="st">"lower"</span>,</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span>cmap,</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>        interpolation<span class="op">=</span>interpolation,</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>    no_ticks(ax[<span class="dv">0</span>, i])</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>    no_ticks(ax[<span class="dv">1</span>, i])</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> aximg</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="b85c55a0" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_dithers(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    infn,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    outfn,</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    label,</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    detector,</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    vmin<span class="op">=</span><span class="dv">50</span>,</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    vmax<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    cmap<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    interpolation<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    sir_rot<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    outpath<span class="op">=</span>outpath,</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    fig, ax <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">5</span>, figsize<span class="op">=</span>(<span class="dv">24</span>, <span class="dv">11</span>), width_ratios<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="fl">0.05</span>))</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    ext <span class="op">=</span> <span class="ss">f"DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.SCI"</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">4</span>):</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>        fn <span class="op">=</span> os.path.join(outpath, infn.<span class="bu">format</span>(obs_id<span class="op">=</span>obs_id, i<span class="op">=</span>i))</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        fn <span class="op">=</span> glob(fn)[<span class="dv">0</span>]</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        img <span class="op">=</span> fits.getdata(fn, extname<span class="op">=</span>ext)</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> sir_rot:</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>            direction <span class="op">=</span> <span class="op">-</span><span class="dv">1</span> <span class="cf">if</span> ext[<span class="dv">3</span>] <span class="kw">in</span> (<span class="st">"1"</span>, <span class="st">"2"</span>) <span class="cf">else</span> <span class="dv">1</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>            img <span class="op">=</span> np.rot90(img, direction)</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>        aximg <span class="op">=</span> plot_dither(</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>            ax, i, img, vmin<span class="op">=</span>vmin, vmax<span class="op">=</span>vmax, cmap<span class="op">=</span>cmap, interpolation<span class="op">=</span>interpolation</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>    cbar <span class="op">=</span> plt.colorbar(aximg, cax<span class="op">=</span>ax[<span class="dv">0</span>, <span class="op">-</span><span class="dv">1</span>], label<span class="op">=</span>label)</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>    cbar.ax.tick_params(labelsize<span class="op">=</span><span class="dv">18</span>)</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>    cbar.set_label(label, fontsize<span class="op">=</span><span class="dv">18</span>)</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>    ax[<span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>].set_visible(<span class="va">False</span>)</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>    plt.tight_layout()</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    plt.savefig(outpath <span class="op">/</span> outfn)</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>    plt.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<section id="nir" class="level4">
+<h4 class="anchored" data-anchor-id="nir">NIR</h4>
+<div id="0472ad53" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_plots_nir(detector):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"img_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"img_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"original image, ADU"</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"img_masked_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"img_masked_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>        <span class="st">"masked original image, ADU"</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"dt_lp_post_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"dt_lp_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"time since persistence generated, seconds"</span>,</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="fl">0.1</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="fl">0.13</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span><span class="st">"RdBu"</span>,</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>        interpolation<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>        <span class="st">"dt_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"dt_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>        <span class="st">"time since target image, days"</span>,</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="fl">0.05</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="fl">0.03</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span><span class="st">"RdBu"</span>,</span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>        <span class="st">"min_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"min_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>        <span class="st">"minimum over masked sequence, ADU"</span>,</span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">25</span>,</span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">25</span>,</span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corr_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"corr_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pers. estimate, ADU"</span>,</span>
+<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">25</span>,</span>
+<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">25</span>,</span>
+<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-48"><a href="#cb14-48" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-49"><a href="#cb14-49" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-50"><a href="#cb14-50" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corr_err_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-51"><a href="#cb14-51" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"corr_err_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-52"><a href="#cb14-52" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pers. estimate error, ADU"</span>,</span>
+<span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">25</span>,</span>
+<span id="cb14-55"><a href="#cb14-55" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-56"><a href="#cb14-56" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-57"><a href="#cb14-57" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-58"><a href="#cb14-58" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pers_mask_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-59"><a href="#cb14-59" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"pers_mask_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-60"><a href="#cb14-60" aria-hidden="true" tabindex="-1"></a>        <span class="st">"persistence mask, ADU"</span>,</span>
+<span id="cb14-61"><a href="#cb14-61" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb14-62"><a href="#cb14-62" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb14-63"><a href="#cb14-63" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-64"><a href="#cb14-64" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-65"><a href="#cb14-65" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-66"><a href="#cb14-66" aria-hidden="true" tabindex="-1"></a>        <span class="st">"EUC_NIR_W-CAL-IMAGE_J-</span><span class="sc">{obs_id}</span><span class="st">-</span><span class="sc">{i}</span><span class="st">*"</span>,</span>
+<span id="cb14-67"><a href="#cb14-67" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"corrimg_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-68"><a href="#cb14-68" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corrected image, ADU"</span>,</span>
+<span id="cb14-69"><a href="#cb14-69" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">25</span>,</span>
+<span id="cb14-70"><a href="#cb14-70" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">25</span>,</span>
+<span id="cb14-71"><a href="#cb14-71" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-72"><a href="#cb14-72" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-73"><a href="#cb14-73" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb14-74"><a href="#cb14-74" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corrimg_masked_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_0_J.fits"</span>,</span>
+<span id="cb14-75"><a href="#cb14-75" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"corrimg_masked_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb14-76"><a href="#cb14-76" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corrected masked image, ADU"</span>,</span>
+<span id="cb14-77"><a href="#cb14-77" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">25</span>,</span>
+<span id="cb14-78"><a href="#cb14-78" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">25</span>,</span>
+<span id="cb14-79"><a href="#cb14-79" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb14-80"><a href="#cb14-80" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="aae90b77" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> detector <span class="kw">in</span> detectors:</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    make_plots_nir(detector)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="sir" class="level4">
+<h4 class="anchored" data-anchor-id="sir">SIR</h4>
+<div id="dfda9bef" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_plots_sir(detector):</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"img_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_img_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"original image, ADU"</span>,</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">250</span>,</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>        sir_rot<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>        <span class="st">"img_masked_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_img_masked_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"masked original image, ADU"</span>,</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">250</span>,</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>        sir_rot<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>        <span class="st">"dt_lp_combined_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_dt_lp_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>        <span class="st">"time since persistence generated, seconds"</span>,</span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="fl">0.1</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="fl">0.13</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span><span class="st">"RdBu"</span>,</span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>        interpolation<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a>        <span class="st">"dt_combined_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_dt_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-33"><a href="#cb16-33" aria-hidden="true" tabindex="-1"></a>        <span class="st">"time since target image, days"</span>,</span>
+<span id="cb16-34"><a href="#cb16-34" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="fl">0.05</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="fl">0.03</span> <span class="op">*</span> <span class="dv">86400</span>,</span>
+<span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span><span class="st">"RdBu"</span>,</span>
+<span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a>        <span class="st">"min_combined_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_min_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a>        <span class="st">"minimum over masked sequence, ADU"</span>,</span>
+<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">25</span>,</span>
+<span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">25</span>,</span>
+<span id="cb16-45"><a href="#cb16-45" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-46"><a href="#cb16-46" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-47"><a href="#cb16-47" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-48"><a href="#cb16-48" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corr_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-49"><a href="#cb16-49" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_corr_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-50"><a href="#cb16-50" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pers. estimate, ADU"</span>,</span>
+<span id="cb16-51"><a href="#cb16-51" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">250</span>,</span>
+<span id="cb16-52"><a href="#cb16-52" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb16-53"><a href="#cb16-53" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-54"><a href="#cb16-54" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-55"><a href="#cb16-55" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-56"><a href="#cb16-56" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corr_err_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-57"><a href="#cb16-57" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_corr_err_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-58"><a href="#cb16-58" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pers. estimate error, ADU"</span>,</span>
+<span id="cb16-59"><a href="#cb16-59" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb16-60"><a href="#cb16-60" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb16-61"><a href="#cb16-61" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-62"><a href="#cb16-62" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-63"><a href="#cb16-63" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-64"><a href="#cb16-64" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pers_mask_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-65"><a href="#cb16-65" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_pers_mask_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-66"><a href="#cb16-66" aria-hidden="true" tabindex="-1"></a>        <span class="st">"persistence mask, ADU"</span>,</span>
+<span id="cb16-67"><a href="#cb16-67" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb16-68"><a href="#cb16-68" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb16-69"><a href="#cb16-69" aria-hidden="true" tabindex="-1"></a>        sir_rot<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-70"><a href="#cb16-70" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-71"><a href="#cb16-71" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-72"><a href="#cb16-72" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-73"><a href="#cb16-73" aria-hidden="true" tabindex="-1"></a>        <span class="st">"EUC_SIR_W-SCIFRM_BKGSUB_</span><span class="sc">{obs_id}</span><span class="st">_*_</span><span class="sc">{i}</span><span class="st">_RGS*"</span>,</span>
+<span id="cb16-74"><a href="#cb16-74" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_corrimg_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-75"><a href="#cb16-75" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corrected image, ADU"</span>,</span>
+<span id="cb16-76"><a href="#cb16-76" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">250</span>,</span>
+<span id="cb16-77"><a href="#cb16-77" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb16-78"><a href="#cb16-78" aria-hidden="true" tabindex="-1"></a>        sir_rot<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-79"><a href="#cb16-79" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-80"><a href="#cb16-80" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-81"><a href="#cb16-81" aria-hidden="true" tabindex="-1"></a>    plot_dithers(</span>
+<span id="cb16-82"><a href="#cb16-82" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corrimg_masked_</span><span class="sc">{obs_id}</span><span class="st">_</span><span class="sc">{i}</span><span class="st">_SIR.fits"</span>,</span>
+<span id="cb16-83"><a href="#cb16-83" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"sir_corrimg_masked_DET</span><span class="sc">{</span>detector<span class="sc">}</span><span class="ss">.pdf"</span>,</span>
+<span id="cb16-84"><a href="#cb16-84" aria-hidden="true" tabindex="-1"></a>        <span class="st">"corrected masked image, ADU"</span>,</span>
+<span id="cb16-85"><a href="#cb16-85" aria-hidden="true" tabindex="-1"></a>        vmin<span class="op">=-</span><span class="dv">250</span>,</span>
+<span id="cb16-86"><a href="#cb16-86" aria-hidden="true" tabindex="-1"></a>        vmax<span class="op">=</span><span class="dv">250</span>,</span>
+<span id="cb16-87"><a href="#cb16-87" aria-hidden="true" tabindex="-1"></a>        sir_rot<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-88"><a href="#cb16-88" aria-hidden="true" tabindex="-1"></a>        detector<span class="op">=</span>detector,</span>
+<span id="cb16-89"><a href="#cb16-89" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="14c09b7c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> detector <span class="kw">in</span> detectors:</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    make_plots_sir(detector)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+
+
+</section>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/IntraClusterLight\.github\.io\/nicl");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/IntraClusterLight/nicl/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>
