@@ -13,8 +13,11 @@ import xarray as xr
 import dask.array as da
 import warnings
 from astropy.wcs import WCS
-from dask_image.ndfilters import median_filter as dask_median_filter
-from scipy.ndimage import median_filter
+from dask_image.ndfilters import (
+    median_filter as dask_median_filter,
+    gaussian_filter as dask_gaussian_filter,
+)
+from scipy.ndimage import median_filter, gaussian_filter
 
 # %% ../nbs/11_filter.ipynb #67be7871-7d04-44bd-8d9c-a4d3672b812b
 def filter_weights(
@@ -68,7 +71,10 @@ def sampled_median_filter(
     return_mad=False,  # additionally return the MAD
     keep_coarse=False,  # if True, return the coarsened image
     dims=None,  # if data is a DataArray, the dimensions to which to apply the filter
-    verbose=True,
+    post_filter=True,  # if True, apply a smoothing filter after the median filter
+    rng: np.random.Generator
+    | int
+    | None = None,  # optional RNG or seed for deterministic sampling
 ) -> np.ndarray | xr.DataArray:  # the filtered data
     """Perform median filtering in an efficient, but reduced accuracy, method.
 
@@ -97,6 +103,9 @@ def sampled_median_filter(
 
     Optionally also return the median-absolute-deviation (MAD), scaled to match the standard deviation for Gaussian noise.
     """
+    if rng is not None and not isinstance(rng, np.random.Generator):
+        rng = np.random.default_rng(rng)
+
     use_dask = isinstance(data, xr.DataArray) and isinstance(data.data, da.Array)
     if not use_dask:
         data = xr.DataArray(data)
@@ -144,13 +153,17 @@ def sampled_median_filter(
         else:
             nsample = nvalid
     if nsample < nvalid:
-        sample = np.random.choice(
-            np.arange(coarse_size**2), nsample, replace=False, p=weight
-        )
+        choice = np.random.choice if rng is None else rng.choice
+        sample = choice(np.arange(coarse_size**2), nsample, replace=False, p=weight)
     else:
         sample = weight > 0
     footprint = np.zeros((coarse_size, coarse_size), dtype=bool)
     footprint.flat[sample] = True
+    post_sigma = (
+        coarse_size / 16
+        if coarse_gaussian_sigma is None
+        else coarse_gaussian_sigma / 16
+    )
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
         warnings.filterwarnings("ignore", "invalid value encountered in reduce")
@@ -158,8 +171,18 @@ def sampled_median_filter(
             footprint = xr.DataArray(footprint, dims=dims)
             extra_dims = tuple(set(coarse_data.dims) - set(footprint.dims))
             footprint = footprint.expand_dims(extra_dims)
+            filtered = dask_median_filter(
+                coarse_data.data, footprint=footprint, mode=mode
+            )
+            if post_filter:
+                sigma_per_dim = tuple(
+                    post_sigma if d in dims else 0 for d in coarse_data.dims
+                )
+                filtered = dask_gaussian_filter(
+                    filtered, sigma=sigma_per_dim, mode=mode
+                )
             median = xr.DataArray(
-                dask_median_filter(coarse_data.data, footprint=footprint, mode=mode),
+                filtered,
                 coords=coarse_data.coords,
                 dims=coarse_data.dims,
                 attrs=coarse_data.attrs,
@@ -174,6 +197,16 @@ def sampled_median_filter(
                 kwargs=dict(footprint=footprint, mode=mode),
                 keep_attrs=True,
             )
+            if post_filter:
+                median = xr.apply_ufunc(
+                    gaussian_filter,
+                    median,
+                    input_core_dims=[dims],
+                    output_core_dims=[dims],
+                    vectorize=dims != median.dims,
+                    kwargs=dict(sigma=post_sigma, mode=mode),
+                    keep_attrs=True,
+                )
     median = _inf_to_nan(median)
     if coarsening > 1:
         if keep_coarse:
@@ -206,6 +239,8 @@ def sampled_median_filter(
             mask=mask,
             allow_nans=allow_nans,
             return_mad=False,
+            post_filter=post_filter,
+            rng=rng,
         )
         mad *= 1.4826
     if not use_dask:
