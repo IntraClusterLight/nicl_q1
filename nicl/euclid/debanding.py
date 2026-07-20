@@ -5,7 +5,7 @@
 # %% auto #0
 __all__ = ['banding_correction']
 
-# %% ../../nbs/euclid/debanding.ipynb #2d4c95b6
+# %% ../../nbs/euclid/debanding.ipynb #7f8d34d1
 import warnings
 
 import numpy as np
@@ -14,7 +14,7 @@ import xarray as xr
 from .xarray import xr_fast_mask
 from ..filter import sampled_median_filter
 
-# %% ../../nbs/euclid/debanding.ipynb #14541583
+# %% ../../nbs/euclid/debanding.ipynb #31017c95
 def filter_and_mask_data(data, scale=200):
     """Filter the data to remove large scale variations.
 
@@ -36,7 +36,7 @@ def filter_and_mask_data(data, scale=200):
     filtered_data = filtered_data.where(~mask)
     return filtered_data
 
-# %% ../../nbs/euclid/debanding.ipynb #f6a96ca3
+# %% ../../nbs/euclid/debanding.ipynb #249f5212
 def banding_correction(data, rows=True, cols=True, max_size=200):
     if isinstance(data, np.ndarray):
         data = xr.DataArray(data, dims=["y", "x"])
@@ -54,6 +54,7 @@ def banding_correction(data, rows=True, cols=True, max_size=200):
             except NotImplementedError:
                 med_med_x = med_x.as_numpy().median("y")
             med_x -= med_med_x
+            med_x = med_x.fillna(0)
         if cols:
             med_y = filtered_data.median("y")
             try:
@@ -61,6 +62,7 @@ def banding_correction(data, rows=True, cols=True, max_size=200):
             except NotImplementedError:
                 med_med_y = med_y.as_numpy().median("x")
             med_y -= med_med_y
+            med_y = med_y.fillna(0)
     correction = med_x + med_y
     try:
         med_correction = correction.median()

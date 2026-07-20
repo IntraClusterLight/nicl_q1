@@ -8,6 +8,7 @@ __all__ = ['mask_for_coarsening', 'create_coarse_data', 'group_obs_ids', 'normal
            'interpolate_skyflats', 'create_skyflats', 'apply_skyflat']
 
 # %% ../../nbs/euclid/skyflat.ipynb #04164637-e84c-4e28-8d3c-bb436347e488
+import logging
 import shutil
 import warnings
 
@@ -15,9 +16,12 @@ import dask
 import numpy as np
 import xarray as xr
 import astropy.io.fits as fits
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 from scipy.interpolate import interpn
 
 from nicl.euclid.xarray import (
+    open_zarr_ref_as_dataset,
     read_all_zarr_refs,
     write_da_to_fits,
     xr_fast_mask,
@@ -53,6 +57,12 @@ def create_coarse_data(obs_id, zarr_path, instrument, n_pix=51):
 
     Coarse data is computed by taking the median in boxes of size `n_pix` x `n_pix`.
     """
+    log = logging.getLogger(__name__)
+    log.info(f"Starting create_coarse_data for obs_id={obs_id}")
+    obs_dir = zarr_path / str(obs_id)
+    if not obs_dir.exists() or not list(obs_dir.glob("*.json")):
+        log.warning(f"No valid data found for obs_id={obs_id}, skipping")
+        return
     coarse_path = zarr_path / f"{obs_id}/coarse_{n_pix}.zarr"
     if not coarse_path.exists():
         ds, _, _ = read_all_zarr_refs(zarr_path, obs_id)
@@ -76,6 +86,8 @@ def group_obs_ids(
     available_obs_ids,  # list of observation IDs available for grouping
     half_window=3,  # half-window size for grouping
     max_gap_size=2,  # maximum gap size for judging whether a sequence is continuous
+    wcs=None,  # WCS data containing observation positions (RA, Dec)
+    max_position_offset=10.0,  # maximum position offset in degrees for sequence continuity
 ) -> dict[int, list[int]]:  # dict of grouped observation IDs for each observation ID
     """Group the observation IDs around each observation ID.
 
@@ -86,11 +98,54 @@ def group_obs_ids(
     such that it may be truncated for observations close to the edge of a sequence. Where possible, the number
     of observations on the opposing side is increased, to maintain a total group size of `2 * half_window`.
     However, for short sequences, the group may be smaller.
+
+    Sequences are also broken when the positional offset between consecutive observations exceeds
+    `max_position_offset` degrees (if WCS data is provided).
     """
+    log = logging.getLogger(__name__)
     available_obs_ids = sorted(available_obs_ids)
     gaps = np.where(np.diff(available_obs_ids) > 1 + max_gap_size)[0]
-    group_starts = [0] + list(gaps + 1)
-    group_ends = list(gaps) + [len(available_obs_ids)]
+    for i in range(len(gaps)):
+        log.debug(
+            f"Sequence gap between {available_obs_ids[gaps[i]]} and {available_obs_ids[gaps[i] + 1]}"
+        )
+    log.debug(f"Indexes of gaps in available observation ID sequence: {gaps}")
+
+    # Check for large positional offsets if WCS data is provided
+    position_breaks = []
+    if wcs is not None:
+        # Extract RA and Dec for each observation
+        obs_positions = {}
+        for obs_id in available_obs_ids:
+            # Get mean RA and Dec across all detectors and dithers for this observation
+            obs_wcs = wcs.sel(observation_id=obs_id)
+            mean_ra = float(obs_wcs["CRVAL1"].mean().values)
+            mean_dec = float(obs_wcs["CRVAL2"].mean().values)
+            obs_positions[obs_id] = (mean_ra, mean_dec)
+
+        # Check angular separation between consecutive observations
+        for i in range(len(available_obs_ids) - 1):
+            obs_id_1 = available_obs_ids[i]
+            obs_id_2 = available_obs_ids[i + 1]
+            ra1, dec1 = obs_positions[obs_id_1]
+            ra2, dec2 = obs_positions[obs_id_2]
+
+            coord1 = SkyCoord(ra=ra1 * u.degree, dec=dec1 * u.degree)
+            coord2 = SkyCoord(ra=ra2 * u.degree, dec=dec2 * u.degree)
+            separation = coord1.separation(coord2).degree
+
+            if separation > max_position_offset:
+                position_breaks.append(i)
+                log.debug(f"Position break between {obs_id_1} and {obs_id_2}")
+        log.debug(
+            f"Indexes of gaps in available observation positions: {position_breaks}"
+        )
+
+    # Combine observation_id gaps and position breaks
+    all_breaks = sorted(set(gaps.tolist() + position_breaks))
+    log.debug(f"Indexes of all breaks in available observation sequence: {all_breaks}")
+    group_starts = [0] + [b + 1 for b in all_breaks]
+    group_ends = all_breaks + [len(available_obs_ids)]
 
     sequential_groups = [
         available_obs_ids[start : end + 1]
@@ -188,7 +243,8 @@ def write_skyflats(
     label = "-short" if short else ""
     for filt in flats.filter.values:
         flat = flats.sel(filter=filt)
-        flat = flat.compute()
+        # avoid upcasting dtype, set here because of lazy computing
+        flat = flat.compute().astype(flats.dtype)
         write_da_to_fits(
             flat,
             outpath / f"flat-{obs_id}-{filt}{label}.fits",
@@ -211,9 +267,6 @@ def write_skyflats(
 # %% ../../nbs/euclid/skyflat.ipynb #a30add0d
 def read_skyflat(obs_id, filter, detector, skyflat_path, short=False):
     label = "-short" if short else ""
-    instrument = "VIS" if filter == "VIS" else "NIR"
-    if skyflat_path.name != instrument:
-        skyflat_path = skyflat_path / instrument
     skyflat_fn = skyflat_path / f"flat-{obs_id}-{filter}{label}.fits"
     skyflat = fits.getdata(skyflat_fn, extname=detector)
     header = fits.getheader(skyflat_fn)
@@ -225,20 +278,25 @@ def read_skyflat(obs_id, filter, detector, skyflat_path, short=False):
 # %% ../../nbs/euclid/skyflat.ipynb #5d98b2b7
 def correct_for_zp(data, zp):
     """Correct the data for the zero-point variations between detectors."""
-    print(zp.compute())
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Zero-point: {zp.compute()}")
     zp_shift = 10 ** (-0.4 * zp["ZP"])
-    print(zp_shift.compute())
+    logger.debug(f"Zero-point shift: {zp_shift.compute()}")
     zp_shift /= zp_shift.mean(dim=["observation_id", "dither", "filter"])
-    print(zp_shift.compute())
+    logger.debug(f"Normalized zero-point shift: {zp_shift.compute()}")
     return data * zp_shift
 
 # %% ../../nbs/euclid/skyflat.ipynb #43746497
-def interpolate_skyflats(flat, data, method="nearest", coarse_factor=None):
-    """Interpolate the `flat` to the x, y coordinates of the `data`."""
+def interpolate_skyflats(flat, target_shape, method="nearest", coarse_factor=None):
+    """Interpolate the `flat` to the x, y coordinates of the target shape."""
+    target_shape = tuple(target_shape)
+    if len(target_shape) != 2:
+        raise ValueError("target_shape must be of length 2 (y, x)")
     if isinstance(flat, xr.DataArray) or isinstance(flat, xr.Dataset):
+        y, x = target_shape
         skyflat = flat.interp(
-            x=data.x.values,
-            y=data.y.values,
+            x=np.arange(x),
+            y=np.arange(y),
             assume_sorted=True,
             method=method,
             kwargs={"fill_value": "extrapolate"},
@@ -246,7 +304,6 @@ def interpolate_skyflats(flat, data, method="nearest", coarse_factor=None):
     else:
         if coarse_factor is None:
             raise ValueError("coarse_factor must be provided for fits data")
-        pix = [np.arange(s) for s in data.shape]
         coarse_pix = [
             np.linspace(
                 coarse_factor / 2 - 0.5,
@@ -256,11 +313,12 @@ def interpolate_skyflats(flat, data, method="nearest", coarse_factor=None):
             )
             for flat_pixels in flat.shape
         ]
-        for i in range(len(data.shape)):
-            n_extra = data.shape[i] % coarse_factor
+        for i in range(len(target_shape)):
+            n_extra = target_shape[i] % coarse_factor
             if n_extra != 0:
                 extra_pix = coarse_factor * (flat.shape[i] - 1) + n_extra / 2 - 0.5
                 coarse_pix[i][-1] = extra_pix
+        pix = [np.arange(s) for s in target_shape]
         outpix = np.meshgrid(*pix, indexing="ij")
         outpix = np.moveaxis(outpix, 0, -1)
         skyflat = interpn(
@@ -274,6 +332,34 @@ def interpolate_skyflats(flat, data, method="nearest", coarse_factor=None):
     return skyflat
 
 # %% ../../nbs/euclid/skyflat.ipynb #cfea3e81
+def _xy_shape(obj, require_xy=False):
+    """Return (y, x) shape from xarray or numpy-like objects."""
+    if isinstance(obj, xr.Dataset):
+        if "y" in obj.sizes and "x" in obj.sizes:
+            return (obj.sizes["y"], obj.sizes["x"])
+        if require_xy:
+            raise ValueError("x/y dims not found in object")
+        first = next(iter(obj.data_vars.values()))
+        return first.shape
+    if isinstance(obj, xr.DataArray):
+        if "y" in obj.sizes and "x" in obj.sizes:
+            return (obj.sizes["y"], obj.sizes["x"])
+        if require_xy:
+            raise ValueError("x/y dims not found in object")
+        return obj.shape
+    if require_xy:
+        raise ValueError("x/y dims not found in object")
+    return obj.shape
+
+
+def _get_precoarsen_shape(zarr_path, obs_id, var="SCI"):
+    """Read the native x/y shape from the original zarr reference."""
+    ref_path = zarr_path / f"{obs_id}/ref.json"
+    ds = open_zarr_ref_as_dataset(str(ref_path))
+    da = ds[var]
+    return _xy_shape(da, require_xy=True)
+
+
 def create_skyflats(
     obs_id,  # observation ID for which to create the skyflats
     group_for_obs_id,  # dict of grouped observation IDs for each observation ID
@@ -284,6 +370,8 @@ def create_skyflats(
     normalise="median",  # normalisation method: "median", "zero" or None
     filter_size=None,  # size of the median filter for smoothing the skyflats
     short=False,  # whether to create the skyflats for the short dithers
+    return_interpolated=False,  # whether to return the interpolated skyflats
+    interpolation_method="nearest",  # interpolation method for the skyflats
     return_coarse_data=False,  # whether to return the coarse data
 ):
     """Read the coarse data and compute the skyflats for a given `obs_id`."""
@@ -314,6 +402,14 @@ def create_skyflats(
         flats = flats.rolling(
             x=filter_size, y=filter_size, min_periods=1, center=True
         ).median()
+    if return_interpolated:
+        target_shape = _get_precoarsen_shape(zarr_path, obs_id)
+        flats = interpolate_skyflats(
+            flats,
+            target_shape,
+            method=interpolation_method,
+            coarse_factor=n_pix,
+        )
     if return_coarse_data:
         return flats, coarse_data, coarse_data_norm
     else:
@@ -322,7 +418,16 @@ def create_skyflats(
 # %% ../../nbs/euclid/skyflat.ipynb #478ad480
 def apply_skyflat(data, skyflat, interpolation_method="nearest", coarse_factor=None):
     """Apply a coarse `skyflat` to some `data`."""
-    skyflat_interp = interpolate_skyflats(
-        skyflat, data, interpolation_method, coarse_factor
-    )
+    target_shape = _xy_shape(data)
+    skyflat_shape = _xy_shape(skyflat)
+
+    if skyflat_shape == target_shape:
+        skyflat_interp = skyflat
+    else:
+        skyflat_interp = interpolate_skyflats(
+            skyflat,
+            target_shape,
+            interpolation_method,
+            coarse_factor,
+        )
     return data - skyflat_interp
