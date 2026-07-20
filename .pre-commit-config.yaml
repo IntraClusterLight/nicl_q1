@@ -12,6 +12,11 @@ repos:
 - repo: https://github.com/fastai/nbdev
   rev: 2.4.14
   hooks:
-  - id: nbdev_clean
-  - id: nbdev_export
-
+    - id: nbdev_clean
+      additional_dependencies:
+        - execnb==0.1.18
+        - fastcore<2
+    - id: nbdev_export
+      additional_dependencies:
+        - execnb==0.1.18
+        - fastcore<2
